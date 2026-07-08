@@ -173,8 +173,8 @@ Cara pakai:
 
 Catatan:
 - File eraport-bridge-config.txt harus satu folder dengan EXE. Launcher akan tetap membuka helper jika config belum ada.
-- Sinkron Data Dasar mengambil sekolah, guru, rombel, siswa, anggota rombel, dan pembelajaran.
-- Mapel dibuat dari data pembelajaran yang punya guru. Rombel ekskul baru masuk jika ada anggota rombelnya.
+- Sinkron Data Dasar mengambil sekolah, guru, siswa, mapel, dan rombel.
+- Pembelajaran bisa dicoba lewat Sinkron Pilihan jika endpoint getPembelajaran tersedia di Dapodik.
 TXT;
 }
 
@@ -500,7 +500,6 @@ function helper_endpoint_name(string $type): string
         'guru' => 'getGtk',
         'siswa' => 'getPesertaDidik',
         'rombel' => 'getRombonganBelajar',
-        'anggota_rombel' => 'getAnggotaRombel',
         'mapel' => 'getMataPelajaran',
         'pembelajaran' => 'getPembelajaran',
     ];
@@ -526,7 +525,6 @@ function helper_data_types(bool $includeAll = false): array
         'sekolah' => 'Sekolah',
         'guru' => 'Guru/GTK',
         'siswa' => 'Siswa',
-        'anggota_rombel' => 'Anggota Rombel',
         'mapel' => 'Mapel',
         'rombel' => 'Rombel',
         'pembelajaran' => 'Pembelajaran',
@@ -537,7 +535,7 @@ function helper_data_types(bool $includeAll = false): array
 
 function helper_default_sync_types(): array
 {
-    return ['sekolah', 'guru', 'rombel', 'siswa', 'anggota_rombel', 'pembelajaran'];
+    return ['sekolah', 'guru', 'siswa', 'mapel', 'rombel'];
 }
 
 function helper_collect_payload(string $dapodikUrl, string $dapodikToken, string $npsn, string $type): array
@@ -719,7 +717,7 @@ $defaults = [
 <body>
 <main>
     <h1>Helper Sinkron Dapodik Lokal <?= h(HELPER_VERSION) ?></h1>
-    <p>Jalankan file ini di komputer yang bisa mengakses Web Service Dapodik lokal. Isi NPSN, Link Web Raport, dan Token Web Service Dapodik seperti model RaportKu. Sinkron Semua mengambil sekolah, guru, rombel, siswa, anggota rombel, dan pembelajaran. Mapel dibuat dari pembelajaran yang ada gurunya.</p>
+    <p>Jalankan file ini di komputer yang bisa mengakses Web Service Dapodik lokal. Isi NPSN, Link Web Raport, dan Token Web Service Dapodik seperti model RaportKu. Sinkron Semua mengambil data dasar; Pembelajaran bisa dicoba terpisah jika endpoint tersedia di Dapodik.</p>
     <?php if ($result): ?><div class="result"><?= h($result) ?></div><?php endif; ?>
     <form method="post">
         <label>URL Dapodik Lokal

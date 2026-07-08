@@ -53,8 +53,6 @@ $requiredChecks = [ordered]@{
     Authorization = $unicodeText.Contains('Authorization')
     Bearer = $unicodeText.Contains('Bearer')
     GetMataPelajaran = $unicodeText.Contains('getMataPelajaran')
-    GetAnggotaRombel = $unicodeText.Contains('getAnggotaRombel')
-    GetPembelajaran = $unicodeText.Contains('getPembelajaran')
     PortableConfig = $unicodeText.Contains('eraport-bridge-config.txt')
     OldMapelEndpointRemoved = -not $unicodeText.Contains('getReferensiMataPelajaran')
 }

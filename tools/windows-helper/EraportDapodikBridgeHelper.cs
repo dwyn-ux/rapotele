@@ -28,7 +28,7 @@ namespace EraportDapodikBridgeHelper
         private const string ConfigMarker = "__ERAPORT_BRIDGE_CONFIG__";
         private const string ConfigEndMarker = "__END_ERAPORT_BRIDGE_CONFIG__";
         private const string PortableConfigFileName = "eraport-bridge-config.txt";
-        private static readonly string[] DefaultSyncTypes = new[] { "sekolah", "guru", "rombel", "siswa", "anggota_rombel", "pembelajaran" };
+        private static readonly string[] DefaultSyncTypes = new[] { "sekolah", "guru", "siswa", "mapel", "rombel" };
 
         private readonly TextBox dapodikUrlText = new TextBox();
         private readonly TextBox dapodikTokenText = new TextBox();
@@ -48,7 +48,6 @@ namespace EraportDapodikBridgeHelper
             { "sekolah", "getSekolah" },
             { "guru", "getGtk" },
             { "siswa", "getPesertaDidik" },
-            { "anggota_rombel", "getAnggotaRombel" },
             { "mapel", "getMataPelajaran" },
             { "rombel", "getRombonganBelajar" },
             { "pembelajaran", "getPembelajaran" }
@@ -111,7 +110,6 @@ namespace EraportDapodikBridgeHelper
             typeCombo.Items.Add(new TypeOption("sekolah", "Sekolah"));
             typeCombo.Items.Add(new TypeOption("guru", "Guru/GTK"));
             typeCombo.Items.Add(new TypeOption("siswa", "Siswa"));
-            typeCombo.Items.Add(new TypeOption("anggota_rombel", "Anggota Rombel"));
             typeCombo.Items.Add(new TypeOption("mapel", "Mapel"));
             typeCombo.Items.Add(new TypeOption("rombel", "Rombel"));
             typeCombo.Items.Add(new TypeOption("pembelajaran", "Pembelajaran"));

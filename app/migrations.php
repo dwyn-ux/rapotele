@@ -55,7 +55,6 @@ function run_migrations(): void
 
         "CREATE TABLE IF NOT EXISTS teachers (
             id $pk,
-            dapodik_id VARCHAR(64) NULL,
             name VARCHAR(160) NOT NULL,
             nip VARCHAR(64) NULL,
             nuptk VARCHAR(64) NULL,
@@ -71,7 +70,6 @@ function run_migrations(): void
 
         "CREATE TABLE IF NOT EXISTS classes (
             id $pk,
-            dapodik_id VARCHAR(64) NULL,
             name VARCHAR(80) NOT NULL,
             grade VARCHAR(16) NOT NULL,
             major VARCHAR(80) NULL,
@@ -84,7 +82,6 @@ function run_migrations(): void
 
         "CREATE TABLE IF NOT EXISTS students (
             id $pk,
-            dapodik_id VARCHAR(64) NULL,
             nis VARCHAR(64) NULL,
             nisn VARCHAR(64) NULL,
             name VARCHAR(160) NOT NULL,
@@ -100,7 +97,6 @@ function run_migrations(): void
 
         "CREATE TABLE IF NOT EXISTS subjects (
             id $pk,
-            dapodik_id VARCHAR(64) NULL,
             name VARCHAR(160) NOT NULL,
             short_name VARCHAR(40) NULL,
             group_name VARCHAR(80) NULL,
@@ -111,7 +107,6 @@ function run_migrations(): void
 
         "CREATE TABLE IF NOT EXISTS teaching_assignments (
             id $pk,
-            dapodik_id VARCHAR(64) NULL,
             teacher_id INT NOT NULL,
             class_id INT NOT NULL,
             subject_id INT NOT NULL,
@@ -355,35 +350,12 @@ function run_migrations(): void
 
         "CREATE TABLE IF NOT EXISTS extracurriculars (
             id $pk,
-            dapodik_id VARCHAR(64) NULL,
             class_name VARCHAR(120) NOT NULL,
             type VARCHAR(80) NULL,
             name VARCHAR(160) NOT NULL,
             teacher_id INT NULL,
             active $bool NOT NULL DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )$engine",
-
-        "CREATE TABLE IF NOT EXISTS extracurricular_members (
-            id $pk,
-            extracurricular_id INT NOT NULL,
-            student_id INT NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE (extracurricular_id, student_id)
-        )$engine",
-
-        "CREATE TABLE IF NOT EXISTS dapodik_rombel_cache (
-            id $pk,
-            dapodik_id VARCHAR(64) NULL UNIQUE,
-            name VARCHAR(160) NOT NULL,
-            kind VARCHAR(80) NULL,
-            grade VARCHAR(16) NULL,
-            major VARCHAR(80) NULL,
-            academic_year VARCHAR(32) NULL,
-            teacher_id INT NULL,
-            is_regular $bool NOT NULL DEFAULT 0,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )$engine",
 

@@ -23,9 +23,7 @@ DROP TABLE IF EXISTS `signatures`;
 DROP TABLE IF EXISTS `report_mappings`;
 DROP TABLE IF EXISTS `merged_subjects`;
 DROP TABLE IF EXISTS `subject_groups`;
-DROP TABLE IF EXISTS `extracurricular_members`;
 DROP TABLE IF EXISTS `extracurriculars`;
-DROP TABLE IF EXISTS `dapodik_rombel_cache`;
 DROP TABLE IF EXISTS `audit_logs`;
 DROP TABLE IF EXISTS `telegram_logs`;
 DROP TABLE IF EXISTS `daily_journals`;
@@ -65,7 +63,6 @@ CREATE TABLE IF NOT EXISTS school_profile (
 
 CREATE TABLE IF NOT EXISTS teachers (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  dapodik_id VARCHAR(64) NULL,
   name VARCHAR(160) NOT NULL,
   nip VARCHAR(64) NULL,
   nuptk VARCHAR(64) NULL,
@@ -81,7 +78,6 @@ CREATE TABLE IF NOT EXISTS teachers (
 
 CREATE TABLE IF NOT EXISTS classes (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  dapodik_id VARCHAR(64) NULL,
   name VARCHAR(80) NOT NULL,
   grade VARCHAR(16) NOT NULL,
   major VARCHAR(80) NULL,
@@ -94,7 +90,6 @@ CREATE TABLE IF NOT EXISTS classes (
 
 CREATE TABLE IF NOT EXISTS students (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  dapodik_id VARCHAR(64) NULL,
   nis VARCHAR(64) NULL,
   nisn VARCHAR(64) NULL,
   name VARCHAR(160) NOT NULL,
@@ -110,7 +105,6 @@ CREATE TABLE IF NOT EXISTS students (
 
 CREATE TABLE IF NOT EXISTS subjects (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  dapodik_id VARCHAR(64) NULL,
   name VARCHAR(160) NOT NULL,
   short_name VARCHAR(40) NULL,
   group_name VARCHAR(80) NULL,
@@ -121,7 +115,6 @@ CREATE TABLE IF NOT EXISTS subjects (
 
 CREATE TABLE IF NOT EXISTS teaching_assignments (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  dapodik_id VARCHAR(64) NULL,
   teacher_id INT NOT NULL,
   class_id INT NOT NULL,
   subject_id INT NOT NULL,
@@ -365,35 +358,12 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 CREATE TABLE IF NOT EXISTS extracurriculars (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  dapodik_id VARCHAR(64) NULL,
   class_name VARCHAR(120) NOT NULL,
   type VARCHAR(80) NULL,
   name VARCHAR(160) NOT NULL,
   teacher_id INT NULL,
   active TINYINT(1) NOT NULL DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS extracurricular_members (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  extracurricular_id INT NOT NULL,
-  student_id INT NOT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (extracurricular_id, student_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS dapodik_rombel_cache (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  dapodik_id VARCHAR(64) NULL UNIQUE,
-  name VARCHAR(160) NOT NULL,
-  kind VARCHAR(80) NULL,
-  grade VARCHAR(16) NULL,
-  major VARCHAR(80) NULL,
-  academic_year VARCHAR(32) NULL,
-  teacher_id INT NULL,
-  is_regular TINYINT(1) NOT NULL DEFAULT 0,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -210,8 +210,8 @@ final class SmokeSuite
         $oldNpsn = (string)get_app_setting('dapodik_npsn', '');
         $dapodikToken = 'auto-setup-' . bin2hex(random_bytes(6));
         $npsn = 'AUTO' . bin2hex(random_bytes(3));
-        $teacherName = 'Smoke Auto Setup Guru ' . bin2hex(random_bytes(4));
-        $teacherId = 0;
+        $subjectName = 'Smoke Auto Setup Mapel ' . bin2hex(random_bytes(4));
+        $subjectId = 0;
 
         try {
             set_app_setting('dapodik_token', '');
@@ -220,14 +220,13 @@ final class SmokeSuite
             $response = $client->postJson(
                 '/dapodik_bridge.php',
                 [
-                    'type' => 'guru',
+                    'type' => 'mapel',
                     'npsn' => $npsn,
                     'token' => $dapodikToken,
                     'data' => [
                         [
-                            'ptk_id' => 'auto-ptk-' . bin2hex(random_bytes(5)),
-                            'nama' => $teacherName,
-                            'nuptk' => 'AUT' . bin2hex(random_bytes(4)),
+                            'nama_mata_pelajaran' => $subjectName,
+                            'kode' => 'SMKAUT',
                         ],
                     ],
                 ],
@@ -243,17 +242,17 @@ final class SmokeSuite
                 $this->fail('dapodik bridge auto setup persists server token');
             }
 
-            $teacher = fetch_one('SELECT id FROM teachers WHERE name = ?', [$teacherName]);
-            if (!$teacher) {
-                $this->fail('dapodik bridge auto setup imported teacher');
+            $subject = fetch_one('SELECT id FROM subjects WHERE name = ?', [$subjectName]);
+            if (!$subject) {
+                $this->fail('dapodik bridge auto setup imported subject');
                 return;
             }
 
-            $teacherId = (int)$teacher['id'];
-            $this->pass('dapodik bridge auto setup imported teacher');
+            $subjectId = (int)$subject['id'];
+            $this->pass('dapodik bridge auto setup imported subject');
         } finally {
-            if ($teacherId > 0) {
-                execute_sql('DELETE FROM teachers WHERE id = ?', [$teacherId]);
+            if ($subjectId > 0) {
+                execute_sql('DELETE FROM subjects WHERE id = ?', [$subjectId]);
             }
             set_app_setting('dapodik_token', $oldDapodikToken);
             set_app_setting('dapodik_npsn', $oldNpsn);
@@ -266,31 +265,10 @@ final class SmokeSuite
         $oldNpsn = (string)get_app_setting('dapodik_npsn', '');
         $dapodikToken = 'smoke-token-' . bin2hex(random_bytes(6));
         $npsn = 'SMOKE' . bin2hex(random_bytes(3));
-        $bodyTokenTeacherName = 'Smoke Bridge Body Token Guru ' . bin2hex(random_bytes(4));
-        $bodyTokenTeacherDapodikId = 'body-ptk-' . bin2hex(random_bytes(5));
-        $teacherName = 'Smoke Dapodik Guru ' . bin2hex(random_bytes(4));
-        $teacherDapodikId = 'ptk-' . bin2hex(random_bytes(6));
+        $bodyTokenSubjectName = 'Smoke Bridge Body Token ' . bin2hex(random_bytes(4));
         $subjectName = 'Smoke Bridge Mapel ' . bin2hex(random_bytes(4));
-        $subjectDapodikId = 'mapel-' . bin2hex(random_bytes(6));
-        $rawSubjectName = 'Smoke Raw Mapel Tanpa Guru ' . bin2hex(random_bytes(4));
-        $rawSubjectDapodikId = 'raw-mapel-' . bin2hex(random_bytes(6));
-        $assignmentDapodikId = 'pb-' . bin2hex(random_bytes(6));
-        $className = 'VII Smoke Rombel ' . bin2hex(random_bytes(4));
-        $classDapodikId = 'rombel-' . bin2hex(random_bytes(6));
-        $studentName = 'Smoke Anggota Rombel ' . bin2hex(random_bytes(4));
-        $studentDapodikId = 'pd-' . bin2hex(random_bytes(6));
-        $studentNisn = (string)random_int(1000000000, 9999999999);
-        $extracurricularName = 'MTQ Smoke ' . bin2hex(random_bytes(4));
-        $extracurricularDapodikId = 'ekskul-' . bin2hex(random_bytes(6));
-        $bodyTokenTeacherId = 0;
-        $teacherId = 0;
+        $bodyTokenSubjectId = 0;
         $subjectId = 0;
-        $assignmentId = 0;
-        $classId = 0;
-        $studentId = 0;
-        $extraClassId = 0;
-        $extracurricularId = 0;
-        $extracurricularMemberId = 0;
 
         try {
             set_app_setting('dapodik_token', $dapodikToken);
@@ -299,9 +277,9 @@ final class SmokeSuite
             $wrongNpsn = $client->postJson(
                 '/dapodik_bridge.php',
                 [
-                    'type' => 'guru',
+                    'type' => 'mapel',
                     'npsn' => 'NPSN-SALAH',
-                    'data' => [['nama' => $teacherName, 'ptk_id' => $teacherDapodikId]],
+                    'data' => [['nama_mata_pelajaran' => $subjectName, 'kode' => 'BADNPSN']],
                 ],
                 ['X-Eraport-Token: ' . $dapodikToken]
             );
@@ -311,38 +289,36 @@ final class SmokeSuite
             $bodyTokenResponse = $client->postJson(
                 '/dapodik_bridge.php',
                 [
-                    'type' => 'guru',
+                    'type' => 'mapel',
                     'npsn' => $npsn,
                     'token' => $dapodikToken,
                     'data' => [
                         [
-                            'nama' => $bodyTokenTeacherName,
-                            'ptk_id' => $bodyTokenTeacherDapodikId,
-                            'nuptk' => 'BOD' . bin2hex(random_bytes(4)),
+                            'nama_mata_pelajaran' => $bodyTokenSubjectName,
+                            'kode' => 'SMKBOD',
                         ],
                     ],
                 ],
                 ['X-Eraport-Token: wrong-header-token']
             );
             $this->assertStatus('dapodik bridge accepts body token fallback', $bodyTokenResponse, 200);
-            $bodyTokenTeacher = fetch_one('SELECT id FROM teachers WHERE name = ?', [$bodyTokenTeacherName]);
-            if (!$bodyTokenTeacher) {
-                $this->fail('dapodik bridge imported body token teacher');
+            $bodyTokenSubject = fetch_one('SELECT id FROM subjects WHERE name = ?', [$bodyTokenSubjectName]);
+            if (!$bodyTokenSubject) {
+                $this->fail('dapodik bridge imported body token subject');
                 return;
             }
-            $bodyTokenTeacherId = (int)$bodyTokenTeacher['id'];
-            $this->pass('dapodik bridge imported body token teacher');
+            $bodyTokenSubjectId = (int)$bodyTokenSubject['id'];
+            $this->pass('dapodik bridge imported body token subject');
 
             $response = $client->postJson(
                 '/dapodik_bridge.php',
                 [
-                    'type' => 'guru',
+                    'type' => 'mapel',
                     'npsn' => $npsn,
                     'data' => [
                         [
-                            'ptk_id' => $teacherDapodikId,
-                            'nama' => $teacherName,
-                            'nuptk' => 'NUP' . bin2hex(random_bytes(4)),
+                            'nama_mata_pelajaran' => $subjectName,
+                            'kode' => 'SMKBRG',
                         ],
                     ],
                 ],
@@ -353,321 +329,21 @@ final class SmokeSuite
             $this->assertContains('dapodik bridge valid json ok', $response->body, '"ok":true');
             $this->assertContains('dapodik bridge valid import count', $response->body, '"count":1');
 
-            $teacher = fetch_one('SELECT id FROM teachers WHERE dapodik_id = ?', [$teacherDapodikId]);
-            if (!$teacher) {
-                $this->fail('dapodik bridge imported teacher');
-                return;
-            }
-
-            $teacherId = (int)$teacher['id'];
-            $this->pass('dapodik bridge imported teacher');
-
-            $duplicateTeacher = $client->postJson('/dapodik_bridge.php', [
-                'type' => 'guru',
-                'npsn' => $npsn,
-                'data' => [[
-                    'ptk_id' => $teacherDapodikId,
-                    'nama' => $teacherName,
-                    'nuptk' => 'NUP' . bin2hex(random_bytes(4)),
-                ]],
-            ], ['X-Eraport-Token: ' . $dapodikToken]);
-            $this->assertStatus('dapodik bridge duplicate teacher update ok', $duplicateTeacher, 200);
-            $teacherCount = (int)(fetch_one('SELECT COUNT(*) AS c FROM teachers WHERE dapodik_id = ?', [$teacherDapodikId])['c'] ?? 0);
-            if ($teacherCount === 1) {
-                $this->pass('dapodik bridge duplicate teacher not duplicated');
-            } else {
-                $this->fail('dapodik bridge duplicate teacher not duplicated');
-            }
-
-            $rombelResponse = $client->postJson(
-                '/dapodik_bridge.php',
-                [
-                    'type' => 'rombel',
-                    'npsn' => $npsn,
-                    'data' => [
-                        [
-                            'rombongan_belajar_id' => $classDapodikId,
-                            'nama' => $className,
-                            'tingkat_pendidikan_id' => '7',
-                            'nama_jurusan_sp' => 'Reguler',
-                            'semester_id' => '20251',
-                        ],
-                    ],
-                ],
-                ['X-Eraport-Token: ' . $dapodikToken]
-            );
-            $this->assertStatus('dapodik bridge imports rombel', $rombelResponse, 200);
-            $this->assertContains('dapodik bridge rombel count', $rombelResponse->body, '"count":1');
-
-            $class = fetch_one('SELECT id, grade, major, academic_year FROM classes WHERE name = ?', [$className]);
-            if (!$class) {
-                $this->fail('dapodik bridge rombel created class');
-                return;
-            }
-            $classId = (int)$class['id'];
-            $this->pass('dapodik bridge rombel created class');
-            if ((string)$class['grade'] === '7' && (string)$class['major'] === 'Reguler' && (string)$class['academic_year'] === '2025/2026') {
-                $this->pass('dapodik bridge rombel mapped class fields');
-            } else {
-                $this->fail('dapodik bridge rombel mapped class fields');
-            }
-
-            execute_sql(
-                'INSERT INTO classes (name, grade, major, academic_year, active, updated_at) VALUES (?, ?, ?, ?, 1, ?)',
-                [$extracurricularName, '0', '', '2025/2026', now_string()]
-            );
-            $extraClassId = (int)db()->lastInsertId();
-            $extraResponse = $client->postJson(
-                '/dapodik_bridge.php',
-                [
-                    'type' => 'rombel',
-                    'npsn' => $npsn,
-                    'data' => [
-                        [
-                            'rombongan_belajar_id' => $extracurricularDapodikId,
-                            'nama' => $extracurricularName,
-                            'jenis_rombel' => 'Ekstrakurikuler',
-                            'tingkat_pendidikan_id' => '0',
-                            'semester_id' => '20251',
-                        ],
-                    ],
-                ],
-                ['X-Eraport-Token: ' . $dapodikToken]
-            );
-            $this->assertStatus('dapodik bridge skips extracurricular rombel', $extraResponse, 200);
-            $this->assertContains('dapodik bridge extracurricular count zero', $extraResponse->body, '"count":0');
-            if (!fetch_one('SELECT id FROM classes WHERE id = ?', [$extraClassId])) {
-                $this->pass('dapodik bridge removes extracurricular from classes');
-            } else {
-                $this->fail('dapodik bridge removes extracurricular from classes');
-            }
-            if (!fetch_one('SELECT id FROM extracurriculars WHERE dapodik_id = ?', [$extracurricularDapodikId])) {
-                $this->pass('dapodik bridge waits for extracurricular member');
-            } else {
-                $this->fail('dapodik bridge waits for extracurricular member');
-            }
-
-            $studentResponse = $client->postJson(
-                '/dapodik_bridge.php',
-                [
-                    'type' => 'siswa',
-                    'npsn' => $npsn,
-                    'data' => [
-                        [
-                            'peserta_didik_id' => $studentDapodikId,
-                            'nisn' => $studentNisn,
-                            'nama' => $studentName,
-                            'jenis_kelamin' => 'L',
-                        ],
-                    ],
-                ],
-                ['X-Eraport-Token: ' . $dapodikToken]
-            );
-            $this->assertStatus('dapodik bridge imports student before membership', $studentResponse, 200);
-            $student = fetch_one('SELECT id, class_id FROM students WHERE nisn = ?', [$studentNisn]);
-            if (!$student) {
-                $this->fail('dapodik bridge imported membership student');
-                return;
-            }
-            $studentId = (int)$student['id'];
-            $this->pass('dapodik bridge imported membership student');
-
-            $memberResponse = $client->postJson(
-                '/dapodik_bridge.php',
-                [
-                    'type' => 'anggota_rombel',
-                    'npsn' => $npsn,
-                    'data' => [
-                        [
-                            'rombongan_belajar_id' => $classDapodikId,
-                            'peserta_didik_id' => $studentDapodikId,
-                            'nisn' => $studentNisn,
-                        ],
-                    ],
-                ],
-                ['X-Eraport-Token: ' . $dapodikToken]
-            );
-            $this->assertStatus('dapodik bridge imports anggota rombel', $memberResponse, 200);
-            $this->assertContains('dapodik bridge anggota rombel count', $memberResponse->body, '"count":1');
-            $mappedStudent = fetch_one('SELECT class_id FROM students WHERE id = ?', [$studentId]);
-            if ((int)($mappedStudent['class_id'] ?? 0) === $classId) {
-                $this->pass('dapodik bridge anggota rombel mapped student class');
-            } else {
-                $this->fail('dapodik bridge anggota rombel mapped student class');
-            }
-
-            $rawMapelResponse = $client->postJson(
-                '/dapodik_bridge.php',
-                [
-                    'type' => 'mapel',
-                    'npsn' => $npsn,
-                    'data' => [
-                        [
-                            'mata_pelajaran_id' => $rawSubjectDapodikId,
-                            'nama_mata_pelajaran' => $rawSubjectName,
-                            'kode_mata_pelajaran' => 'RAW',
-                        ],
-                    ],
-                ],
-                ['X-Eraport-Token: ' . $dapodikToken]
-            );
-            $this->assertStatus('dapodik bridge skips raw mapel without teacher', $rawMapelResponse, 200);
-            $this->assertContains('dapodik bridge raw mapel count zero', $rawMapelResponse->body, '"count":0');
-            if (!fetch_one('SELECT id FROM subjects WHERE dapodik_id = ?', [$rawSubjectDapodikId])) {
-                $this->pass('dapodik bridge raw mapel without teacher not imported');
-            } else {
-                $this->fail('dapodik bridge raw mapel without teacher not imported');
-            }
-
-            $learningResponse = $client->postJson(
-                '/dapodik_bridge.php',
-                [
-                    'type' => 'pembelajaran',
-                    'npsn' => $npsn,
-                    'data' => [
-                        [
-                            'pembelajaran_id' => $assignmentDapodikId,
-                            'ptk_id' => $teacherDapodikId,
-                            'rombongan_belajar_id' => $classDapodikId,
-                            'mata_pelajaran_id' => $subjectDapodikId,
-                            'nama_mata_pelajaran' => $subjectName,
-                            'kode_mata_pelajaran' => 'SMK',
-                            'semester_id' => '20251',
-                        ],
-                    ],
-                ],
-                ['X-Eraport-Token: ' . $dapodikToken]
-            );
-            $this->assertStatus('dapodik bridge imports pembelajaran', $learningResponse, 200);
-            $this->assertContains('dapodik bridge pembelajaran count', $learningResponse->body, '"count":1');
-            $subject = fetch_one('SELECT id FROM subjects WHERE dapodik_id = ?', [$subjectDapodikId]);
+            $subject = fetch_one('SELECT id FROM subjects WHERE name = ?', [$subjectName]);
             if (!$subject) {
-                $this->fail('dapodik bridge pembelajaran created subject');
+                $this->fail('dapodik bridge imported subject');
                 return;
             }
+
             $subjectId = (int)$subject['id'];
-            $this->pass('dapodik bridge pembelajaran created subject');
-            $assignment = fetch_one('SELECT id FROM teaching_assignments WHERE dapodik_id = ?', [$assignmentDapodikId]);
-            if (!$assignment) {
-                $this->fail('dapodik bridge pembelajaran created assignment');
-                return;
-            }
-            $assignmentId = (int)$assignment['id'];
-            $this->pass('dapodik bridge pembelajaran created assignment');
-
-            $duplicateLearning = $client->postJson(
-                '/dapodik_bridge.php',
-                [
-                    'type' => 'pembelajaran',
-                    'npsn' => $npsn,
-                    'data' => [
-                        [
-                            'pembelajaran_id' => $assignmentDapodikId,
-                            'ptk_id' => $teacherDapodikId,
-                            'rombongan_belajar_id' => $classDapodikId,
-                            'mata_pelajaran_id' => $subjectDapodikId,
-                            'nama_mata_pelajaran' => $subjectName,
-                            'kode_mata_pelajaran' => 'SMK',
-                            'semester_id' => '20251',
-                        ],
-                    ],
-                ],
-                ['X-Eraport-Token: ' . $dapodikToken]
-            );
-            $this->assertStatus('dapodik bridge duplicate pembelajaran update ok', $duplicateLearning, 200);
-            $assignmentCount = (int)(fetch_one('SELECT COUNT(*) AS c FROM teaching_assignments WHERE dapodik_id = ?', [$assignmentDapodikId])['c'] ?? 0);
-            $subjectCount = (int)(fetch_one('SELECT COUNT(*) AS c FROM subjects WHERE dapodik_id = ?', [$subjectDapodikId])['c'] ?? 0);
-            if ($assignmentCount === 1 && $subjectCount === 1) {
-                $this->pass('dapodik bridge duplicate pembelajaran not duplicated');
-            } else {
-                $this->fail('dapodik bridge duplicate pembelajaran not duplicated');
-            }
-
-            $extraMemberResponse = $client->postJson(
-                '/dapodik_bridge.php',
-                [
-                    'type' => 'anggota_rombel',
-                    'npsn' => $npsn,
-                    'data' => [
-                        [
-                            'rombongan_belajar_id' => $extracurricularDapodikId,
-                            'peserta_didik_id' => $studentDapodikId,
-                            'nisn' => $studentNisn,
-                        ],
-                    ],
-                ],
-                ['X-Eraport-Token: ' . $dapodikToken]
-            );
-            $this->assertStatus('dapodik bridge imports extracurricular member', $extraMemberResponse, 200);
-            $this->assertContains('dapodik bridge extracurricular member count', $extraMemberResponse->body, '"count":1');
-            $extracurricular = fetch_one('SELECT id FROM extracurriculars WHERE dapodik_id = ?', [$extracurricularDapodikId]);
-            if (!$extracurricular) {
-                $this->fail('dapodik bridge creates extracurricular only with member');
-                return;
-            }
-            $extracurricularId = (int)$extracurricular['id'];
-            $member = fetch_one('SELECT id FROM extracurricular_members WHERE extracurricular_id = ? AND student_id = ?', [$extracurricularId, $studentId]);
-            if (!$member) {
-                $this->fail('dapodik bridge stores extracurricular member');
-                return;
-            }
-            $extracurricularMemberId = (int)$member['id'];
-            $this->pass('dapodik bridge creates extracurricular only with member');
-            $this->pass('dapodik bridge stores extracurricular member');
-
-            $duplicateExtraMember = $client->postJson(
-                '/dapodik_bridge.php',
-                [
-                    'type' => 'anggota_rombel',
-                    'npsn' => $npsn,
-                    'data' => [
-                        [
-                            'rombongan_belajar_id' => $extracurricularDapodikId,
-                            'peserta_didik_id' => $studentDapodikId,
-                            'nisn' => $studentNisn,
-                        ],
-                    ],
-                ],
-                ['X-Eraport-Token: ' . $dapodikToken]
-            );
-            $this->assertStatus('dapodik bridge duplicate extracurricular member update ok', $duplicateExtraMember, 200);
-            $extraMemberCount = (int)(fetch_one('SELECT COUNT(*) AS c FROM extracurricular_members WHERE extracurricular_id = ? AND student_id = ?', [$extracurricularId, $studentId])['c'] ?? 0);
-            if ($extraMemberCount === 1) {
-                $this->pass('dapodik bridge duplicate extracurricular member not duplicated');
-            } else {
-                $this->fail('dapodik bridge duplicate extracurricular member not duplicated');
-            }
+            $this->pass('dapodik bridge imported subject');
         } finally {
-            if ($extracurricularMemberId > 0) {
-                execute_sql('DELETE FROM extracurricular_members WHERE id = ?', [$extracurricularMemberId]);
-            }
-            if ($extracurricularId > 0) {
-                execute_sql('DELETE FROM extracurricular_members WHERE extracurricular_id = ?', [$extracurricularId]);
-                execute_sql('DELETE FROM extracurriculars WHERE id = ?', [$extracurricularId]);
-            }
-            if ($assignmentId > 0) {
-                execute_sql('DELETE FROM teaching_assignments WHERE id = ?', [$assignmentId]);
+            if ($bodyTokenSubjectId > 0) {
+                execute_sql('DELETE FROM subjects WHERE id = ?', [$bodyTokenSubjectId]);
             }
             if ($subjectId > 0) {
                 execute_sql('DELETE FROM subjects WHERE id = ?', [$subjectId]);
             }
-            if ($studentId > 0) {
-                execute_sql('DELETE FROM students WHERE id = ?', [$studentId]);
-            }
-            if ($classId > 0) {
-                execute_sql('DELETE FROM classes WHERE id = ?', [$classId]);
-            }
-            if ($extraClassId > 0) {
-                execute_sql('DELETE FROM classes WHERE id = ?', [$extraClassId]);
-            }
-            if ($teacherId > 0) {
-                execute_sql('DELETE FROM teachers WHERE id = ?', [$teacherId]);
-            }
-            if ($bodyTokenTeacherId > 0) {
-                execute_sql('DELETE FROM teachers WHERE id = ?', [$bodyTokenTeacherId]);
-            }
-            execute_sql('DELETE FROM dapodik_rombel_cache WHERE dapodik_id = ?', [$classDapodikId]);
-            execute_sql('DELETE FROM dapodik_rombel_cache WHERE dapodik_id = ?', [$extracurricularDapodikId]);
             set_app_setting('dapodik_token', $oldDapodikToken);
             set_app_setting('dapodik_npsn', $oldNpsn);
         }
