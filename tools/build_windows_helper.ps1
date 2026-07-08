@@ -49,12 +49,21 @@ if ($LASTEXITCODE -ne 0) {
 
 $bytes = [IO.File]::ReadAllBytes($output)
 $unicodeText = [Text.Encoding]::Unicode.GetString($bytes)
+$utf8Text = [Text.Encoding]::UTF8.GetString($bytes)
+function Test-BinaryText([string]$needle) {
+    return $unicodeText.Contains($needle) -or $utf8Text.Contains($needle)
+}
 $requiredChecks = [ordered]@{
-    Authorization = $unicodeText.Contains('Authorization')
-    Bearer = $unicodeText.Contains('Bearer')
-    GetMataPelajaran = $unicodeText.Contains('getMataPelajaran')
-    PortableConfig = $unicodeText.Contains('eraport-bridge-config.txt')
-    OldMapelEndpointRemoved = -not $unicodeText.Contains('getReferensiMataPelajaran')
+    Authorization = Test-BinaryText 'Authorization'
+    Bearer = Test-BinaryText 'Bearer'
+    GetMataPelajaran = Test-BinaryText 'getMataPelajaran'
+    GetAnggotaRombel = Test-BinaryText 'getAnggotaRombel'
+    GetAnggotaRombonganBelajar = Test-BinaryText 'getAnggotaRombonganBelajar'
+    GetPembelajaran = Test-BinaryText 'getPembelajaran'
+    GetDataPembelajaran = Test-BinaryText 'getDataPembelajaran'
+    Version25 = Test-BinaryText 'v2.5'
+    PortableConfig = Test-BinaryText 'Mode portable'
+    OldMapelEndpointRemoved = -not (Test-BinaryText 'getReferensiMataPelajaran')
 }
 
 $failedChecks = $requiredChecks.GetEnumerator() | Where-Object { -not $_.Value } | ForEach-Object { $_.Key }

@@ -388,6 +388,11 @@ function table_columns(string $table): array
     );
 }
 
+function table_column_exists(string $table, string $column): bool
+{
+    return in_array($column, table_columns($table), true);
+}
+
 function e(mixed $value): string
 {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');

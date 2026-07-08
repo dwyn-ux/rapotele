@@ -5,7 +5,7 @@ Aplikasi e-rapor PHP murni untuk shared hosting tanpa Node.js.
 ## Fitur
 
 - Login multi-role: admin, operator, guru.
-- Data sekolah, guru, siswa, kelas, mata pelajaran, dan pembelajaran.
+- Data sekolah, guru, siswa, kelas, mata pelajaran dari pembelajaran berguru, dan pembelajaran.
 - Input nilai akhir sederhana per pembelajaran.
 - Absensi siswa per mata pelajaran dan per pertemuan.
 - Absensi guru harian.
@@ -125,15 +125,15 @@ Default reminder dikirim 10 menit sebelum jadwal. Bisa diubah lewat `SCHEDULE_RE
 
 ## Helper Dapodik Lokal
 
-Buka menu `Update Data`, isi `Link Dapodik Lokal`, `Token / Key Webservice`, dan `NPSN`, lalu pilih `Unduh Portable ZIP v2.3`. Extract ZIP ke folder tetap di komputer Dapodik, misalnya `Desktop\Bridge-Dapodik`, lalu jalankan `jalankan-bridge-portable.bat` atau `eraport-dapodik-bridge-helper-v2.3.exe`.
+Buka menu `Update Data`, isi `Link Dapodik Lokal`, `Token / Key Webservice`, dan `NPSN`, lalu pilih `Unduh Portable ZIP v2.5`. Extract ZIP ke folder tetap di komputer Dapodik, misalnya `Desktop\Bridge-Dapodik`, lalu jalankan `jalankan-bridge-portable.bat` atau `eraport-dapodik-bridge-helper-v2.5.exe`.
 
 Mode portable menyimpan konfigurasi di `eraport-bridge-config.txt` pada folder yang sama dengan EXE. Model sinkronnya mengikuti pola RaportKu: helper cukup memakai `NPSN`, `Link Web Raport`, dan `Token Web Service Dapodik`. Token yang sama dipakai untuk membaca Dapodik lokal dan mengirim ke server e-rapor. Jika token berubah, tidak perlu download EXE ulang; ubah field token lalu klik `Simpan Konfigurasi`, atau download `Unduh Config Portable` dan ganti file `eraport-bridge-config.txt`.
 
-Gunakan tombol `Sinkron Data Dasar` di helper portable untuk menarik sekolah, guru, siswa, mapel, dan rombel. Pembelajaran bisa dicoba lewat `Sinkron Pilihan` jika endpoint `getPembelajaran` tersedia di Dapodik. Import JSON offline di menu `Update Data` tetap tersedia untuk file JSON Dapodik yang sudah ada. Jika Token / Key Webservice di server e-rapor masih kosong, bridge akan mengisi token dan NPSN server otomatis dari helper saat sinkron pertama berhasil membaca Dapodik lokal.
+Gunakan tombol `Sinkron Data Dasar` di helper portable untuk menarik sekolah, guru, rombel, siswa, anggota rombel, dan pembelajaran. Rombel kelas Dapodik masuk ke menu `Data Kelas`, sedangkan rombel ekskul tidak dimasukkan ke Data Kelas. Data `anggota_rombel` dipakai untuk menempelkan siswa ke kelas masing-masing dan membuat ekskul hanya jika rombel ekskul punya anggota. Mapel dibuat dari data pembelajaran yang punya guru, sehingga referensi mapel mentah dari Dapodik tidak lagi memenuhi data mapel. Import JSON offline di menu `Update Data` tetap tersedia untuk file JSON Dapodik yang sudah ada. Jika Token / Key Webservice di server e-rapor masih kosong, bridge akan mengisi token dan NPSN server otomatis dari helper saat sinkron pertama berhasil membaca Dapodik lokal.
 
 Jika bridge masih membalas `Token sinkron tidak valid`, berarti server e-rapor sudah punya token/NPSN berbeda atau request tidak membawa NPSN. Pastikan `NPSN` dan `Token / Key Webservice` di menu `Update Data` server tujuan sama dengan yang dipakai helper portable, lalu klik `Simpan Konfigurasi` atau ganti file `eraport-bridge-config.txt` dengan hasil `Unduh Config Portable`.
 
-Helper v2.3 mengirim token sinkron lewat header dan body JSON sekaligus agar tetap kompatibel dengan hosting/proxy yang menghapus custom header.
+Helper v2.5 mengirim token sinkron lewat header dan body JSON sekaligus agar tetap kompatibel dengan hosting/proxy yang menghapus custom header. Jika Web Service Dapodik lokal tidak menyediakan endpoint anggota rombel atau pembelajaran, helper akan melewati endpoint itu dan tetap menyimpan data dasar lain yang berhasil dibaca.
 
 Jika log helper menampilkan respons Dapodik diawali `Access`, koneksi ke Dapodik sudah tembus tetapi Web Service menolak akses. Cek ulang Token Web Service Dapodik, NPSN, dan pastikan Web Service Dapodik aktif. Beberapa versi Dapodik menolak token di URL browser biasa dan hanya menerima header `Authorization: Bearer <token>`; helper v2 sudah mencoba mode Bearer lebih dulu lalu fallback ke token query.
 
@@ -147,7 +147,7 @@ Jika source helper Windows berubah, build ulang EXE dengan:
 & .\tools\build_windows_helper.ps1
 ```
 
-Jika policy PowerShell memblokir script, jalankan dulu `Set-ExecutionPolicy -Scope Process Bypass`, lalu ulangi command build. Script ini mencari `csc.exe` dari PATH lalu fallback ke .NET Framework bawaan Windows, membuat ulang `public/downloads/eraport-dapodik-bridge-helper-base.exe`, dan memvalidasi binary sudah memakai `Authorization: Bearer` serta endpoint `getMataPelajaran`.
+Jika policy PowerShell memblokir script, jalankan dulu `Set-ExecutionPolicy -Scope Process Bypass`, lalu ulangi command build. Script ini mencari `csc.exe` dari PATH lalu fallback ke .NET Framework bawaan Windows, membuat ulang `public/downloads/eraport-dapodik-bridge-helper-base.exe`, dan memvalidasi binary sudah memakai `Authorization: Bearer` serta endpoint anggota rombel.
 
 ## WhatsApp Weekly Report
 

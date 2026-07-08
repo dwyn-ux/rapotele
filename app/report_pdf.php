@@ -463,6 +463,22 @@ function report_extracurriculars_for_student(array $student): array
     if (!table_exists('extracurriculars')) {
         return [];
     }
+    $studentId = (int)($student['id'] ?? 0);
+    if ($studentId > 0 && table_exists('extracurricular_members')) {
+        $memberRows = fetch_all(
+            'SELECT e.*, t.name AS teacher_name
+             FROM extracurricular_members em
+             JOIN extracurriculars e ON e.id = em.extracurricular_id
+             LEFT JOIN teachers t ON t.id = e.teacher_id
+             WHERE e.active = 1 AND em.student_id = ?
+             ORDER BY e.type, e.name
+             LIMIT 2',
+            [$studentId]
+        );
+        if ($memberRows) {
+            return $memberRows;
+        }
+    }
     $className = (string)($student['class_name'] ?? '');
     $rows = fetch_all(
         'SELECT e.*, t.name AS teacher_name

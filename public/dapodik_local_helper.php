@@ -2,13 +2,34 @@
 
 declare(strict_types=1);
 
-const HELPER_VERSION = 'v2.3';
+const HELPER_VERSION = 'v2.5';
 const HELPER_DEFAULT_DAPODIK_URL_B64 = '__ERAPORT_DAPODIK_URL_B64__';
 const HELPER_DEFAULT_DAPODIK_TOKEN_B64 = '__ERAPORT_DAPODIK_TOKEN_B64__';
 const HELPER_DEFAULT_NPSN_B64 = '__ERAPORT_NPSN_B64__';
 const HELPER_DEFAULT_BRIDGE_URL_B64 = '__ERAPORT_BRIDGE_URL_B64__';
 const HELPER_DEFAULT_BRIDGE_TOKEN_B64 = '__ERAPORT_BRIDGE_TOKEN_B64__';
 const HELPER_DEFAULT_TYPE_B64 = '__ERAPORT_TYPE_B64__';
+
+if (!function_exists('mb_strimwidth')) {
+    function mb_strimwidth(string $string, int $start, int $width, string $trimMarker = '', ?string $encoding = null): string
+    {
+        if ($width <= 0) {
+            return '';
+        }
+
+        $slice = substr($string, max(0, $start), $width);
+        if (strlen($string) <= max(0, $start) + $width) {
+            return $slice;
+        }
+
+        $markerLength = strlen($trimMarker);
+        if ($markerLength >= $width) {
+            return substr($trimMarker, 0, $width);
+        }
+
+        return substr($slice, 0, $width - $markerLength) . $trimMarker;
+    }
+}
 
 function helper_is_local_request(): bool
 {
@@ -121,13 +142,13 @@ function helper_portable_launcher(): string
     return <<<'BAT'
 @echo off
 setlocal EnableExtensions
-title E-Raport Dapodik Bridge Portable v2.3
+title E-Raport Dapodik Bridge Portable v2.5
 cd /d "%~dp0"
 
-set "EXE=%~dp0eraport-dapodik-bridge-helper-v2.3.exe"
+set "EXE=%~dp0eraport-dapodik-bridge-helper-v2.5.exe"
 set "CONFIG=%~dp0eraport-bridge-config.txt"
 
-echo E-Raport Dapodik Bridge Helper Portable v2.3
+echo E-Raport Dapodik Bridge Helper Portable v2.5
 echo Folder: %~dp0
 echo.
 
@@ -135,7 +156,7 @@ if not exist "%EXE%" (
     echo [ERROR] File EXE tidak ditemukan:
     echo %EXE%
     echo.
-    echo Extract ulang eraport-dapodik-bridge-portable-v2.3.zip ke satu folder tetap.
+    echo Extract ulang eraport-dapodik-bridge-portable-v2.5.zip ke satu folder tetap.
     pause
     exit /b 1
 )
@@ -163,18 +184,18 @@ BAT;
 function helper_portable_readme(): string
 {
     return <<<'TXT'
-E-Raport Dapodik Bridge Helper Portable v2.3
+E-Raport Dapodik Bridge Helper Portable v2.5
 
 Cara pakai:
 1. Extract ZIP ini ke satu folder tetap, misalnya Desktop\Bridge-Dapodik.
-2. Jalankan jalankan-bridge-portable.bat atau eraport-dapodik-bridge-helper-v2.3.exe.
+2. Jalankan jalankan-bridge-portable.bat atau eraport-dapodik-bridge-helper-v2.5.exe.
 3. Isi cukup NPSN, Link Web Raport, dan Token Web Service Dapodik. Token ini dipakai untuk baca Dapodik lokal dan kirim ke server e-rapor.
 4. Jika token berubah, tidak perlu download EXE lagi. Edit field token di aplikasi lalu klik Simpan Konfigurasi, atau ganti file eraport-bridge-config.txt dengan file config terbaru dari menu Update Data.
 
 Catatan:
 - File eraport-bridge-config.txt harus satu folder dengan EXE. Launcher akan tetap membuka helper jika config belum ada.
-- Sinkron Data Dasar mengambil sekolah, guru, siswa, mapel, dan rombel.
-- Pembelajaran bisa dicoba lewat Sinkron Pilihan jika endpoint getPembelajaran tersedia di Dapodik.
+- Sinkron Data Dasar mengambil sekolah, guru, rombel, siswa, anggota rombel, dan pembelajaran.
+- Mapel dibuat dari data pembelajaran yang punya guru. Rombel ekskul baru masuk jika ada anggota rombelnya.
 TXT;
 }
 
@@ -273,17 +294,17 @@ function helper_windows_launcher(string $helperUrl, string $openQuery = ''): str
     $bat = <<<'BAT'
 @echo off
 setlocal EnableExtensions
-title Helper Sinkron Dapodik Lokal v2.3
+title Helper Sinkron Dapodik Lokal v2.5
 cd /d "%~dp0"
 
-set "PORTABLE_EXE=%~dp0eraport-dapodik-bridge-helper-v2.3.exe"
+set "PORTABLE_EXE=%~dp0eraport-dapodik-bridge-helper-v2.5.exe"
 if exist "%PORTABLE_EXE%" (
     echo Menjalankan helper portable...
     start "E-Raport Dapodik Bridge Helper" "%PORTABLE_EXE%"
     exit /b 0
 )
 
-set "HELPER=%~dp0dapodik-local-helper-v2.3.php"
+set "HELPER=%~dp0dapodik-local-helper-v2.5.php"
 set "HELPER_URL=__HELPER_URL__"
 set "OPEN_URL=http://127.0.0.1:8088/__OPEN_QUERY__"
 set "POWERSHELL_EXE="
@@ -376,14 +397,14 @@ if (isset($_GET['download'])) {
 
         $defaults = helper_request_defaults();
         $zip = helper_zip_store([
-            'eraport-dapodik-bridge-helper-v2.3.exe' => (string)file_get_contents($exePath) . helper_exe_config_blob($defaults),
+            'eraport-dapodik-bridge-helper-v2.5.exe' => (string)file_get_contents($exePath) . helper_exe_config_blob($defaults),
             'eraport-bridge-config.txt' => helper_config_text($defaults),
             'jalankan-bridge-portable.bat' => str_replace("\n", "\r\n", helper_portable_launcher()),
             'README-PORTABLE.txt' => str_replace("\n", "\r\n", helper_portable_readme()),
         ]);
 
         header('Content-Type: application/zip');
-        header('Content-Disposition: attachment; filename="eraport-dapodik-bridge-portable-v2.3.zip"');
+        header('Content-Disposition: attachment; filename="eraport-dapodik-bridge-portable-v2.5.zip"');
         header('Content-Length: ' . strlen($zip));
         echo $zip;
         exit;
@@ -398,7 +419,7 @@ if (isset($_GET['download'])) {
         }
 
         header('Content-Type: application/octet-stream');
-        header('Content-Disposition: attachment; filename="eraport-dapodik-bridge-helper-v2.3.exe"');
+        header('Content-Disposition: attachment; filename="eraport-dapodik-bridge-helper-v2.5.exe"');
         header('Content-Length: ' . (filesize($exePath) + strlen(helper_exe_config_blob(helper_request_defaults()))));
         readfile($exePath);
         echo helper_exe_config_blob(helper_request_defaults());
@@ -409,13 +430,13 @@ if (isset($_GET['download'])) {
         $openParams = helper_request_defaults();
         $downloadParams = ['download' => '1'] + $openParams;
         header('Content-Type: application/octet-stream');
-        header('Content-Disposition: attachment; filename="jalankan-helper-dapodik-v2.3.bat"');
+        header('Content-Disposition: attachment; filename="jalankan-helper-dapodik-v2.5.bat"');
         echo str_replace("\n", "\r\n", helper_windows_launcher(helper_download_url(http_build_query($downloadParams)), $openParams ? '?' . http_build_query($openParams) : ''));
         exit;
     }
 
     header('Content-Type: application/octet-stream');
-    header('Content-Disposition: attachment; filename="dapodik-local-helper-v2.3.php"');
+    header('Content-Disposition: attachment; filename="dapodik-local-helper-v2.5.php"');
     echo helper_personalized_source(helper_request_defaults());
     exit;
 }
@@ -500,6 +521,7 @@ function helper_endpoint_name(string $type): string
         'guru' => 'getGtk',
         'siswa' => 'getPesertaDidik',
         'rombel' => 'getRombonganBelajar',
+        'anggota_rombel' => 'getAnggotaRombel',
         'mapel' => 'getMataPelajaran',
         'pembelajaran' => 'getPembelajaran',
     ];
@@ -525,6 +547,7 @@ function helper_data_types(bool $includeAll = false): array
         'sekolah' => 'Sekolah',
         'guru' => 'Guru/GTK',
         'siswa' => 'Siswa',
+        'anggota_rombel' => 'Anggota Rombel',
         'mapel' => 'Mapel',
         'rombel' => 'Rombel',
         'pembelajaran' => 'Pembelajaran',
@@ -535,7 +558,7 @@ function helper_data_types(bool $includeAll = false): array
 
 function helper_default_sync_types(): array
 {
-    return ['sekolah', 'guru', 'siswa', 'mapel', 'rombel'];
+    return ['sekolah', 'guru', 'rombel', 'siswa', 'anggota_rombel', 'pembelajaran'];
 }
 
 function helper_collect_payload(string $dapodikUrl, string $dapodikToken, string $npsn, string $type): array
@@ -584,7 +607,8 @@ function helper_response_label(string $type, array $response): string
     if (is_array($decoded)) {
         if (!empty($decoded['ok'])) {
             $count = isset($decoded['count']) ? (int)$decoded['count'] : 0;
-            return "$type: OK, diproses $count data.";
+            $warningCount = isset($decoded['warning_count']) ? (int)$decoded['warning_count'] : 0;
+            return "$type: OK, diproses $count data" . ($warningCount > 0 ? ", $warningCount baris dilewati" : "") . ".";
         }
         if (isset($decoded['message'])) {
             $message = (string)$decoded['message'];
@@ -608,6 +632,16 @@ function helper_is_bridge_token_error(array $response): bool
     $decoded = json_decode((string)$response['body'], true);
     $message = is_array($decoded) ? (string)($decoded['message'] ?? '') : (string)$response['body'];
     return stripos($message, 'Token bridge') !== false || stripos($message, 'Token sinkron') !== false;
+}
+
+function helper_is_optional_endpoint_missing(string $type, Throwable $exception): bool
+{
+    if (!in_array($type, ['anggota_rombel', 'pembelajaran'], true)) {
+        return false;
+    }
+
+    $message = $exception->getMessage();
+    return stripos($message, '404') !== false || stripos($message, 'Not Found') !== false;
 }
 
 try {
@@ -635,7 +669,15 @@ try {
         $payloads = [];
         $summary = [];
         foreach ($types as $currentType) {
-            $collected = helper_collect_payload($dapodikUrl, $dapodikToken, $npsn, $currentType);
+            try {
+                $collected = helper_collect_payload($dapodikUrl, $dapodikToken, $npsn, $currentType);
+            } catch (RuntimeException $exception) {
+                if (helper_is_optional_endpoint_missing($currentType, $exception)) {
+                    $summary[] = $currentType . ': dilewati karena endpoint tidak tersedia di Web Service Dapodik lokal.';
+                    continue;
+                }
+                throw $exception;
+            }
             $payloads[] = $collected['payload'];
             $summary[] = $currentType . ': ' . count($collected['payload']['data']) . ' data dari ' . $collected['endpoint'];
         }
@@ -717,7 +759,7 @@ $defaults = [
 <body>
 <main>
     <h1>Helper Sinkron Dapodik Lokal <?= h(HELPER_VERSION) ?></h1>
-    <p>Jalankan file ini di komputer yang bisa mengakses Web Service Dapodik lokal. Isi NPSN, Link Web Raport, dan Token Web Service Dapodik seperti model RaportKu. Sinkron Semua mengambil data dasar; Pembelajaran bisa dicoba terpisah jika endpoint tersedia di Dapodik.</p>
+    <p>Jalankan file ini di komputer yang bisa mengakses Web Service Dapodik lokal. Isi NPSN, Link Web Raport, dan Token Web Service Dapodik seperti model RaportKu. Sinkron Semua mengambil sekolah, guru, rombel, siswa, anggota rombel, dan pembelajaran. Mapel dibuat dari pembelajaran yang ada gurunya.</p>
     <?php if ($result): ?><div class="result"><?= h($result) ?></div><?php endif; ?>
     <form method="post">
         <label>URL Dapodik Lokal

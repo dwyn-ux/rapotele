@@ -24,11 +24,11 @@ namespace EraportDapodikBridgeHelper
 
     internal sealed class MainForm : Form
     {
-        private const string AppVersion = "v2.3";
+        private const string AppVersion = "v2.5";
         private const string ConfigMarker = "__ERAPORT_BRIDGE_CONFIG__";
         private const string ConfigEndMarker = "__END_ERAPORT_BRIDGE_CONFIG__";
         private const string PortableConfigFileName = "eraport-bridge-config.txt";
-        private static readonly string[] DefaultSyncTypes = new[] { "sekolah", "guru", "siswa", "mapel", "rombel" };
+        private static readonly string[] DefaultSyncTypes = new[] { "sekolah", "guru", "rombel", "siswa", "anggota_rombel", "pembelajaran" };
 
         private readonly TextBox dapodikUrlText = new TextBox();
         private readonly TextBox dapodikTokenText = new TextBox();
@@ -43,14 +43,15 @@ namespace EraportDapodikBridgeHelper
 
         private readonly JavaScriptSerializer serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
 
-        private readonly Dictionary<string, string> dapodikEndpoints = new Dictionary<string, string>
+        private readonly Dictionary<string, string[]> dapodikEndpoints = new Dictionary<string, string[]>
         {
-            { "sekolah", "getSekolah" },
-            { "guru", "getGtk" },
-            { "siswa", "getPesertaDidik" },
-            { "mapel", "getMataPelajaran" },
-            { "rombel", "getRombonganBelajar" },
-            { "pembelajaran", "getPembelajaran" }
+            { "sekolah", new[] { "getSekolah" } },
+            { "guru", new[] { "getGtk" } },
+            { "siswa", new[] { "getPesertaDidik" } },
+            { "anggota_rombel", new[] { "getAnggotaRombel", "getAnggotaRombonganBelajar", "getPesertaDidikRombel" } },
+            { "mapel", new[] { "getMataPelajaran" } },
+            { "rombel", new[] { "getRombonganBelajar" } },
+            { "pembelajaran", new[] { "getPembelajaran", "getPembelajaranGuru", "getDataPembelajaran" } }
         };
 
         public MainForm()
@@ -110,6 +111,7 @@ namespace EraportDapodikBridgeHelper
             typeCombo.Items.Add(new TypeOption("sekolah", "Sekolah"));
             typeCombo.Items.Add(new TypeOption("guru", "Guru/GTK"));
             typeCombo.Items.Add(new TypeOption("siswa", "Siswa"));
+            typeCombo.Items.Add(new TypeOption("anggota_rombel", "Anggota Rombel"));
             typeCombo.Items.Add(new TypeOption("mapel", "Mapel"));
             typeCombo.Items.Add(new TypeOption("rombel", "Rombel"));
             typeCombo.Items.Add(new TypeOption("pembelajaran", "Pembelajaran"));
@@ -245,6 +247,12 @@ namespace EraportDapodikBridgeHelper
                         }
                         catch (Exception typeEx)
                         {
+                            if (IsOptionalEndpointMissing(type, typeEx.Message))
+                            {
+                                AppendLog(type + ": dilewati. Endpoint ini tidak tersedia di Web Service Dapodik lokal yang sedang aktif.");
+                                continue;
+                            }
+
                             hasError = true;
                             AppendLog(type + ": gagal, " + typeEx.Message);
                             if (IsBridgeTokenError(typeEx.Message))
@@ -284,35 +292,49 @@ namespace EraportDapodikBridgeHelper
                 throw new InvalidOperationException("Link Web Raport dan Token Web Service Dapodik wajib diisi.");
             }
 
-            var endpoint = BuildDapodikEndpoint(dapodikUrl, type, npsn, null);
-            object records;
-            string authLabel;
-            try
+            var endpoints = BuildDapodikEndpoints(dapodikUrl, type, npsn, null);
+            var fallbackEndpoints = BuildDapodikEndpoints(dapodikUrl, type, npsn, dapodikToken);
+            var endpoint = endpoints[0];
+            object records = null;
+            string authLabel = "";
+            var errors = new List<string>();
+            var found = false;
+
+            for (var i = 0; i < endpoints.Count; i++)
             {
-                AppendLog(type + ": membaca " + endpoint + " [Authorization Bearer]");
-                var dapodikBody = HttpGet(endpoint, dapodikToken);
-                records = ExtractRecords(dapodikBody);
-                authLabel = "Authorization Bearer";
-            }
-            catch (Exception bearerEx)
-            {
-                var fallbackEndpoint = BuildDapodikEndpoint(dapodikUrl, type, npsn, dapodikToken);
                 try
                 {
-                    AppendLog(type + ": Bearer gagal, mencoba query token.");
-                    var dapodikBody = HttpGet(fallbackEndpoint, null);
+                    endpoint = endpoints[i];
+                    AppendLog(type + ": membaca " + endpoint + " [Authorization Bearer]");
+                    var dapodikBody = HttpGet(endpoint, dapodikToken);
                     records = ExtractRecords(dapodikBody);
-                    endpoint = fallbackEndpoint;
-                    authLabel = "query token";
+                    authLabel = "Authorization Bearer";
+                    found = true;
+                    break;
                 }
-                catch (Exception queryEx)
+                catch (Exception bearerEx)
                 {
-                    throw new InvalidOperationException(
-                        "Dapodik menolak akses dengan Authorization Bearer dan query token. Bearer: "
-                        + bearerEx.Message + " Query: " + queryEx.Message,
-                        queryEx
-                    );
+                    var fallbackEndpoint = fallbackEndpoints[i];
+                    try
+                    {
+                        AppendLog(type + ": Bearer gagal untuk " + Path.GetFileName(endpoint) + ", mencoba query token.");
+                        var dapodikBody = HttpGet(fallbackEndpoint, null);
+                        records = ExtractRecords(dapodikBody);
+                        endpoint = fallbackEndpoint;
+                        authLabel = "query token";
+                        found = true;
+                        break;
+                    }
+                    catch (Exception queryEx)
+                    {
+                        errors.Add(Path.GetFileName(endpoint) + " Bearer: " + bearerEx.Message + " Query: " + queryEx.Message);
+                    }
                 }
+            }
+
+            if (!found)
+            {
+                throw new InvalidOperationException("Dapodik menolak semua endpoint kandidat. " + string.Join("; ", errors.ToArray()));
             }
             AppendLog(type + ": data Dapodik terbaca via " + authLabel + ".");
 
@@ -338,21 +360,26 @@ namespace EraportDapodikBridgeHelper
             }
         }
 
-        private string BuildDapodikEndpoint(string baseUrl, string type, string npsn, string token)
+        private List<string> BuildDapodikEndpoints(string baseUrl, string type, string npsn, string token)
         {
-            string endpoint;
-            if (!dapodikEndpoints.TryGetValue(type, out endpoint))
+            string[] endpoints;
+            if (!dapodikEndpoints.TryGetValue(type, out endpoints))
             {
                 throw new InvalidOperationException("Jenis data tidak valid: " + type);
             }
 
-            var url = baseUrl.TrimEnd('/') + "/WebService/" + endpoint
-                + "?npsn=" + Uri.EscapeDataString(npsn);
-            if (!string.IsNullOrEmpty(token))
+            var urls = new List<string>();
+            foreach (var endpoint in endpoints)
             {
-                url += "&token=" + Uri.EscapeDataString(token);
+                var url = baseUrl.TrimEnd('/') + "/WebService/" + endpoint
+                    + "?npsn=" + Uri.EscapeDataString(npsn);
+                if (!string.IsNullOrEmpty(token))
+                {
+                    url += "&token=" + Uri.EscapeDataString(token);
+                }
+                urls.Add(url);
             }
-            return url;
+            return urls;
         }
 
         private object ExtractRecords(string json)
@@ -408,6 +435,21 @@ namespace EraportDapodikBridgeHelper
             var value = message ?? "";
             return value.IndexOf("Token bridge", StringComparison.OrdinalIgnoreCase) >= 0
                 || value.IndexOf("Token sinkron", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsOptionalEndpointMissing(string type, string message)
+        {
+            if (type != "anggota_rombel" && type != "pembelajaran")
+            {
+                return false;
+            }
+
+            var value = message ?? "";
+            return value.IndexOf("Dapodik menolak semua endpoint kandidat", StringComparison.OrdinalIgnoreCase) >= 0
+                && (
+                    value.IndexOf("404", StringComparison.OrdinalIgnoreCase) >= 0
+                    || value.IndexOf("Not Found", StringComparison.OrdinalIgnoreCase) >= 0
+                );
         }
 
         private string HttpGet(string url, string bearerToken)

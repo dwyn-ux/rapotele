@@ -19,6 +19,7 @@ try {
     if (!app_installed()) {
         throw new RuntimeException('Aplikasi e-rapor belum diinstall.');
     }
+    run_migrations();
 
     $raw = (string)file_get_contents('php://input');
     if (strlen($raw) > max_upload_bytes()) {
@@ -132,7 +133,15 @@ try {
             ['offline-bridge', 'all', 'dapodik_bridge.php', 'success', $autoConfigured ? $message . ' Konfigurasi token/NPSN server diisi otomatis.' : $message, null]
         );
 
-        echo json_encode(['ok' => true, 'type' => 'all', 'summary' => $summary, 'count' => array_sum($summary), 'auto_configured' => $autoConfigured], JSON_UNESCAPED_UNICODE);
+        $warningPayload = [];
+        foreach (array_keys($summary) as $summaryType) {
+            $warnings = dapodik_import_warning_payload((string)$summaryType);
+            if ($warnings) {
+                $warningPayload[$summaryType] = $warnings;
+            }
+        }
+
+        echo json_encode(['ok' => true, 'type' => 'all', 'summary' => $summary, 'count' => array_sum($summary), 'auto_configured' => $autoConfigured, 'warnings' => $warningPayload], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
@@ -145,7 +154,7 @@ try {
         ['offline-bridge', $type, 'dapodik_bridge.php', 'success', "Bridge menerima $type. Data diproses: $count." . ($autoConfigured ? ' Konfigurasi token/NPSN server diisi otomatis.' : ''), null]
     );
 
-    echo json_encode(['ok' => true, 'type' => $type, 'count' => $count, 'auto_configured' => $autoConfigured], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['ok' => true, 'type' => $type, 'count' => $count, 'auto_configured' => $autoConfigured] + dapodik_import_warning_payload($type), JSON_UNESCAPED_UNICODE);
 } catch (Throwable $exception) {
     http_response_code(http_response_code() >= 400 ? http_response_code() : 500);
     echo json_encode(['ok' => false, 'message' => friendly_error($exception)], JSON_UNESCAPED_UNICODE);

@@ -16,11 +16,15 @@ function migration_bool(): string
 
 function migration_column_exists(string $table, string $column): bool
 {
-    return in_array($column, table_columns($table), true);
+    return table_column_exists($table, $column);
 }
 
 function migration_add_column(string $table, string $column, string $definition): void
 {
+    if (!table_exists($table)) {
+        return;
+    }
+
     if (!migration_column_exists($table, $column)) {
         try {
             db()->exec('ALTER TABLE ' . db_identifier($table) . ' ADD COLUMN ' . db_identifier($column) . ' ' . $definition);
@@ -55,6 +59,7 @@ function run_migrations(): void
 
         "CREATE TABLE IF NOT EXISTS teachers (
             id $pk,
+            dapodik_id VARCHAR(64) NULL,
             name VARCHAR(160) NOT NULL,
             nip VARCHAR(64) NULL,
             nuptk VARCHAR(64) NULL,
@@ -70,6 +75,7 @@ function run_migrations(): void
 
         "CREATE TABLE IF NOT EXISTS classes (
             id $pk,
+            dapodik_id VARCHAR(64) NULL,
             name VARCHAR(80) NOT NULL,
             grade VARCHAR(16) NOT NULL,
             major VARCHAR(80) NULL,
@@ -82,6 +88,7 @@ function run_migrations(): void
 
         "CREATE TABLE IF NOT EXISTS students (
             id $pk,
+            dapodik_id VARCHAR(64) NULL,
             nis VARCHAR(64) NULL,
             nisn VARCHAR(64) NULL,
             name VARCHAR(160) NOT NULL,
@@ -97,6 +104,7 @@ function run_migrations(): void
 
         "CREATE TABLE IF NOT EXISTS subjects (
             id $pk,
+            dapodik_id VARCHAR(64) NULL,
             name VARCHAR(160) NOT NULL,
             short_name VARCHAR(40) NULL,
             group_name VARCHAR(80) NULL,
@@ -107,6 +115,7 @@ function run_migrations(): void
 
         "CREATE TABLE IF NOT EXISTS teaching_assignments (
             id $pk,
+            dapodik_id VARCHAR(64) NULL,
             teacher_id INT NOT NULL,
             class_id INT NOT NULL,
             subject_id INT NOT NULL,
@@ -350,12 +359,35 @@ function run_migrations(): void
 
         "CREATE TABLE IF NOT EXISTS extracurriculars (
             id $pk,
+            dapodik_id VARCHAR(64) NULL,
             class_name VARCHAR(120) NOT NULL,
             type VARCHAR(80) NULL,
             name VARCHAR(160) NOT NULL,
             teacher_id INT NULL,
             active $bool NOT NULL DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )$engine",
+
+        "CREATE TABLE IF NOT EXISTS extracurricular_members (
+            id $pk,
+            extracurricular_id INT NOT NULL,
+            student_id INT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (extracurricular_id, student_id)
+        )$engine",
+
+        "CREATE TABLE IF NOT EXISTS dapodik_rombel_cache (
+            id $pk,
+            dapodik_id VARCHAR(64) NULL UNIQUE,
+            name VARCHAR(160) NOT NULL,
+            kind VARCHAR(80) NULL,
+            grade VARCHAR(16) NULL,
+            major VARCHAR(80) NULL,
+            academic_year VARCHAR(32) NULL,
+            teacher_id INT NULL,
+            is_regular $bool NOT NULL DEFAULT 0,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )$engine",
 
@@ -518,6 +550,47 @@ function run_migrations(): void
     }
 
     migration_add_column('users', 'student_id', 'INT NULL');
+    migration_add_column('teachers', 'dapodik_id', 'VARCHAR(64) NULL');
+    migration_add_column('teachers', 'nip', 'VARCHAR(64) NULL');
+    migration_add_column('teachers', 'nuptk', 'VARCHAR(64) NULL');
+    migration_add_column('teachers', 'gender', 'VARCHAR(16) NULL');
+    migration_add_column('teachers', 'position', 'VARCHAR(120) NULL');
+    migration_add_column('teachers', 'active', migration_bool() . ' NOT NULL DEFAULT 1');
+    migration_add_column('teachers', 'updated_at', 'DATETIME NULL');
+    migration_add_column('classes', 'dapodik_id', 'VARCHAR(64) NULL');
+    migration_add_column('classes', 'grade', 'VARCHAR(16) NULL');
+    migration_add_column('classes', 'major', 'VARCHAR(80) NULL');
+    migration_add_column('classes', 'homeroom_teacher_id', 'INT NULL');
+    migration_add_column('classes', 'academic_year', 'VARCHAR(32) NULL');
+    migration_add_column('classes', 'active', migration_bool() . ' NOT NULL DEFAULT 1');
+    migration_add_column('classes', 'updated_at', 'DATETIME NULL');
+    migration_add_column('students', 'dapodik_id', 'VARCHAR(64) NULL');
+    migration_add_column('students', 'nis', 'VARCHAR(64) NULL');
+    migration_add_column('students', 'nisn', 'VARCHAR(64) NULL');
+    migration_add_column('students', 'gender', 'VARCHAR(16) NULL');
+    migration_add_column('students', 'birth_place', 'VARCHAR(80) NULL');
+    migration_add_column('students', 'birth_date', 'DATE NULL');
+    migration_add_column('students', 'religion', 'VARCHAR(64) NULL');
+    migration_add_column('students', 'class_id', 'INT NULL');
+    migration_add_column('students', 'active', migration_bool() . ' NOT NULL DEFAULT 1');
+    migration_add_column('students', 'updated_at', 'DATETIME NULL');
+    migration_add_column('subjects', 'dapodik_id', 'VARCHAR(64) NULL');
+    migration_add_column('subjects', 'short_name', 'VARCHAR(40) NULL');
+    migration_add_column('subjects', 'group_name', 'VARCHAR(80) NULL');
+    migration_add_column('subjects', 'active', migration_bool() . ' NOT NULL DEFAULT 1');
+    migration_add_column('subjects', 'updated_at', 'DATETIME NULL');
+    migration_add_column('teaching_assignments', 'dapodik_id', 'VARCHAR(64) NULL');
+    migration_add_column('teaching_assignments', 'academic_year', 'VARCHAR(32) NULL');
+    migration_add_column('teaching_assignments', 'semester', 'VARCHAR(32) NULL');
+    migration_add_column('teaching_assignments', 'active', migration_bool() . ' NOT NULL DEFAULT 1');
+    migration_add_column('teaching_assignments', 'updated_at', 'DATETIME NULL');
+    migration_add_column('extracurriculars', 'dapodik_id', 'VARCHAR(64) NULL');
+    migration_add_column('extracurriculars', 'class_name', 'VARCHAR(80) NULL');
+    migration_add_column('extracurriculars', 'type', 'VARCHAR(80) NULL');
+    migration_add_column('extracurriculars', 'teacher_id', 'INT NULL');
+    migration_add_column('extracurriculars', 'active', migration_bool() . ' NOT NULL DEFAULT 1');
+    migration_add_column('extracurriculars', 'updated_at', 'DATETIME NULL');
+    migration_add_column('extracurricular_members', 'updated_at', 'DATETIME NULL');
 }
 
 function seed_defaults(): void
