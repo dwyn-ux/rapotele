@@ -823,6 +823,7 @@ function render_lesson_schedule_admin_page(): void
         'Request Aktif' => $activeRequestTotal,
         'Hasil Filter' => count($rows),
     ]);
+    render_schedule_template_panel();
     render_schedule_generate_panel();
     render_schedule_filter_panel($filterClassId, $filterTeacherId);
     render_lesson_schedule_form($editSchedule);
@@ -871,12 +872,64 @@ function render_schedule_metrics(array $metrics): void
     echo '</div>';
 }
 
+function render_schedule_template_panel(): void
+{
+    $templates = [
+        [
+            'name' => 'Reguler 5 Hari',
+            'meta' => 'Senin-Jumat, 8 jam, 1 slot',
+            'days' => '1,2,3,4,5',
+            'max_period' => 8,
+            'periods_per_assignment' => 1,
+        ],
+        [
+            'name' => 'Reguler 6 Hari',
+            'meta' => 'Senin-Sabtu, 7 jam, 1 slot',
+            'days' => '1,2,3,4,5,6',
+            'max_period' => 7,
+            'periods_per_assignment' => 1,
+        ],
+        [
+            'name' => 'Blok Mapel',
+            'meta' => 'Senin-Jumat, 8 jam, 2 slot',
+            'days' => '1,2,3,4,5',
+            'max_period' => 8,
+            'periods_per_assignment' => 2,
+        ],
+    ];
+    ?>
+    <section class="panel">
+        <?php panel_title('Template Jadwal Cepat'); ?>
+        <div class="schedule-template-grid">
+            <?php foreach ($templates as $template): ?>
+                <button
+                    type="button"
+                    class="schedule-template"
+                    data-schedule-template
+                    data-days="<?= e($template['days']) ?>"
+                    data-max-period="<?= e($template['max_period']) ?>"
+                    data-periods-per-assignment="<?= e($template['periods_per_assignment']) ?>"
+                >
+                    <strong><?= e($template['name']) ?></strong>
+                    <span><?= e($template['meta']) ?></span>
+                </button>
+            <?php endforeach; ?>
+        </div>
+        <div class="schedule-period-strip">
+            <?php foreach (schedule_period_times() as $period => $time): ?>
+                <span><strong><?= e($period) ?></strong><?= e($time[0] . '-' . $time[1]) ?></span>
+            <?php endforeach; ?>
+        </div>
+    </section>
+    <?php
+}
+
 function render_schedule_generate_panel(): void
 {
     ?>
     <section class="panel">
         <?php panel_title('Generate Jadwal Otomatis'); ?>
-        <form method="post" class="grid four">
+        <form method="post" class="grid four" data-schedule-generate-form>
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="generate_lesson_schedule">
             <div class="wide">

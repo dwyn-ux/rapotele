@@ -674,7 +674,9 @@ function telegram_complete_registration(array $registration, array $input): arra
     $gender = (string)($input['gender'] ?? '');
     $phone = trim((string)($input['phone'] ?? ''));
     $position = trim((string)($input['position'] ?? '')) ?: 'Guru Mapel';
+    $subjectId = (int)($input['subject_id'] ?? 0);
     $subjectName = trim((string)($input['subject_name'] ?? ''));
+    $classIds = array_values(array_unique(array_filter(array_map('intval', (array)($input['class_ids'] ?? [])))));
     $className = trim((string)($input['class_name'] ?? ''));
 
     if ($chatId === '' || telegram_registration_token_row($token) === null) {
@@ -705,6 +707,9 @@ function telegram_complete_registration(array $registration, array $input): arra
         throw new RuntimeException('Konfirmasi password tidak sama.');
     }
     validate_password_strength($password);
+    if ($classIds && $subjectId <= 0 && $subjectName === '') {
+        throw new RuntimeException('Pilih mapel sebelum memilih kelas.');
+    }
 
     $existingUser = fetch_one('SELECT id, name FROM users WHERE telegram_chat_id = ? ORDER BY id LIMIT 1', [$chatId]);
     if ($existingUser) {
@@ -749,11 +754,36 @@ function telegram_complete_registration(array $registration, array $input): arra
         $userId = (int)$pdo->lastInsertId();
 
         $assignmentMessage = 'Data guru dan akun pengguna tersimpan.';
-        if ($subjectName !== '') {
-            $subjectId = telegram_find_or_create_subject($subjectName);
+        if ($subjectId > 0) {
+            $subject = fetch_one('SELECT id, name FROM subjects WHERE id = ? AND active = 1', [$subjectId]);
+            if (!$subject) {
+                throw new RuntimeException('Mapel yang dipilih tidak valid.');
+            }
+
+            $subjectName = (string)$subject['name'];
+            $assignmentMessage = 'Mapel utama tersimpan: ' . $subjectName . '.';
+            if ($classIds) {
+                $assignmentMessages = [];
+                foreach ($classIds as $classId) {
+                    $assignmentResult = telegram_create_optional_assignment_by_class_id($teacherId, $subjectId, $classId);
+                    if ($assignmentResult) {
+                        $assignmentMessages[] = $assignmentResult['message'];
+                    }
+                }
+                if ($assignmentMessages) {
+                    $assignmentMessage = implode(' ', $assignmentMessages);
+                }
+            } elseif ($className !== '') {
+                $assignmentResult = telegram_create_optional_assignment($teacherId, $subjectId, $className);
+                if ($assignmentResult) {
+                    $assignmentMessage = $assignmentResult['message'];
+                }
+            }
+        } elseif ($subjectName !== '') {
+            $legacySubjectId = telegram_find_or_create_subject($subjectName);
             $assignmentMessage = 'Mapel utama tersimpan: ' . $subjectName . '.';
             if ($className !== '') {
-                $assignmentResult = telegram_create_optional_assignment($teacherId, $subjectId, $className);
+                $assignmentResult = telegram_create_optional_assignment($teacherId, $legacySubjectId, $className);
                 if ($assignmentResult) {
                     $assignmentMessage = $assignmentResult['message'];
                 }
@@ -791,6 +821,25 @@ function telegram_create_optional_assignment(int $teacherId, int $subjectId, str
     if (!$class) {
         return ['ok' => false, 'message' => 'Kelas ' . $className . ' belum ada, jadi pembelajaran belum dibuat.'];
     }
+    return telegram_create_assignment_for_class($teacherId, $subjectId, $class);
+}
+
+function telegram_create_optional_assignment_by_class_id(int $teacherId, int $subjectId, int $classId): ?array
+{
+    if ($classId <= 0) {
+        return null;
+    }
+
+    $class = fetch_one('SELECT * FROM classes WHERE id = ? AND active = 1 ORDER BY id LIMIT 1', [$classId]);
+    if (!$class) {
+        return ['ok' => false, 'message' => 'Ada kelas yang tidak valid, jadi pembelajaran dilewati.'];
+    }
+
+    return telegram_create_assignment_for_class($teacherId, $subjectId, $class);
+}
+
+function telegram_create_assignment_for_class(int $teacherId, int $subjectId, array $class): array
+{
     $assignment = fetch_one(
         'SELECT id FROM teaching_assignments WHERE teacher_id = ? AND class_id = ? AND subject_id = ? ORDER BY id LIMIT 1',
         [$teacherId, (int)$class['id'], $subjectId]

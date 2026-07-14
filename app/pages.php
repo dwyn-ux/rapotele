@@ -505,6 +505,18 @@ function page_telegram_register(): void
         }
     }
 
+    $subjects = array_column_map(
+        fetch_all('SELECT id, name FROM subjects WHERE active = 1 ORDER BY group_name, name'),
+        'id',
+        'name'
+    );
+    $classes = array_column_map(
+        fetch_all('SELECT id, name FROM classes WHERE active = 1 ORDER BY grade, name'),
+        'id',
+        'name'
+    );
+    $selectedClassIds = array_map('strval', (array)($values['class_ids'] ?? []));
+
     render_public_header('Daftar Guru Telegram');
     ?>
     <div class="center">
@@ -552,11 +564,21 @@ function page_telegram_register(): void
             <input name="position" value="<?= e($values['position'] ?? 'Guru Mapel') ?>">
         </label>
         <label>Mapel Utama
-            <input name="subject_name" value="<?= e($values['subject_name'] ?? '') ?>">
+            <select name="subject_id">
+                <option value="">Pilih mapel</option>
+                <?= options($subjects, $values['subject_id'] ?? '') ?>
+            </select>
         </label>
-        <label>Kelas
-            <input name="class_name" value="<?= e($values['class_name'] ?? '') ?>">
-        </label>
+        <fieldset class="check-group">
+            <legend>Kelas</legend>
+            <?php if (!$classes): ?>
+                <p class="hint">Belum ada data kelas aktif.</p>
+            <?php else: ?>
+                <?php foreach ($classes as $classId => $className): ?>
+                    <label class="check"><input type="checkbox" name="class_ids[]" value="<?= e($classId) ?>" <?= in_array((string)$classId, $selectedClassIds, true) ? 'checked' : '' ?>> <?= e($className) ?></label>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </fieldset>
         <button class="button primary full" type="submit">Daftar</button>
     </form>
     <?php

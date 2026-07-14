@@ -396,6 +396,66 @@ label textarea {
     margin-top: 4px;
 }
 
+.schedule-template-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.schedule-template {
+    display: grid;
+    gap: 4px;
+    width: 100%;
+    min-height: 86px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fbfdff;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+}
+
+.schedule-template:hover,
+.schedule-template.is-selected {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(23, 107, 135, .12);
+}
+
+.schedule-template strong {
+    font-size: 16px;
+}
+
+.schedule-template span {
+    color: var(--muted);
+    font-weight: 650;
+}
+
+.schedule-period-strip {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+}
+
+.schedule-period-strip span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 6px 9px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.schedule-period-strip strong {
+    color: var(--primary);
+}
+
 .grid {
     display: grid;
     gap: 14px;
@@ -672,6 +732,24 @@ tr:hover td {
 .check input {
     width: auto;
     min-height: auto;
+}
+
+.check-group {
+    display: grid;
+    gap: 10px;
+    max-height: 220px;
+    overflow: auto;
+    margin: 0;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fbfdff;
+}
+
+.check-group legend {
+    padding: 0 6px;
+    color: var(--muted);
+    font-weight: 650;
 }
 
 .public-page {
@@ -986,6 +1064,7 @@ code.block {
     }
 
     .metric-grid,
+    .schedule-template-grid,
     .grid.three,
     .grid.four,
     .grid.two {

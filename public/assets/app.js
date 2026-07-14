@@ -70,4 +70,31 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    const scheduleGenerateForm = document.querySelector('[data-schedule-generate-form]');
+    if (scheduleGenerateForm) {
+        document.querySelectorAll('[data-schedule-template]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const days = new Set((button.dataset.days || '').split(',').filter(Boolean));
+                scheduleGenerateForm.querySelectorAll('input[name="days[]"]').forEach((checkbox) => {
+                    checkbox.checked = days.has(checkbox.value);
+                });
+
+                const maxPeriod = scheduleGenerateForm.querySelector('input[name="max_period"]');
+                if (maxPeriod && button.dataset.maxPeriod) {
+                    maxPeriod.value = button.dataset.maxPeriod;
+                }
+
+                const periodsPerAssignment = scheduleGenerateForm.querySelector('input[name="periods_per_assignment"]');
+                if (periodsPerAssignment && button.dataset.periodsPerAssignment) {
+                    periodsPerAssignment.value = button.dataset.periodsPerAssignment;
+                }
+
+                document.querySelectorAll('[data-schedule-template]').forEach((item) => {
+                    item.classList.toggle('is-selected', item === button);
+                });
+                scheduleGenerateForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+        });
+    }
 });
