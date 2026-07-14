@@ -754,18 +754,60 @@ final class SmokeSuite
         $this->assertStatus('missing csrf rejected', $badCsrf, 419);
 
         $studentId = $this->firstInt('SELECT id FROM students WHERE active = 1 ORDER BY id');
+        $generatedStudentReport = false;
         if ($studentId > 0) {
             $pdf = $client->get('/index.php?page=rapor-download-student&student_id=' . $studentId);
             $this->assertStatus('admin rapor student download', $pdf, 200);
             $this->assertContains('admin rapor is pdf', $pdf->header('Content-Type'), 'application/pdf');
+            $generatedStudentReport = true;
         }
+
+        $backupPage = $client->get('/index.php?page=backup-restore');
+        $csrf = $this->csrf($backupPage);
+        $createdBackup = $client->follow($client->postForm('/index.php?page=backup-restore', [
+            '_csrf' => $csrf,
+            'action' => 'create_backup',
+        ]));
+        $this->assertStatus('admin backup create', $createdBackup, 200);
+        $this->assertContains('admin backup create flash', $createdBackup->body, 'Backup dibuat');
 
         $backupId = $this->firstInt('SELECT id FROM backups ORDER BY id DESC');
         if ($backupId > 0) {
             $backup = $client->get('/index.php?page=backup-download&id=' . $backupId);
             $this->assertStatus('admin backup download', $backup, 200);
             $this->assertContains('admin backup is json', $backup->header('Content-Type'), 'application/json');
+            $payload = json_decode($backup->body, true);
+            if (is_array($payload) && (int)($payload['version'] ?? 0) >= 2) {
+                $this->pass('admin backup payload version');
+            } else {
+                $this->fail('admin backup payload version');
+            }
+            if (is_array($payload['tables']['students'] ?? null)) {
+                $this->pass('admin backup includes table data');
+            } else {
+                $this->fail('admin backup includes table data');
+            }
+            if (is_array($payload['files'] ?? null) && $this->payloadHasFilePrefix($payload['files'], 'storage/uploads/')) {
+                $this->pass('admin backup includes upload files');
+            } else {
+                $this->fail('admin backup includes upload files');
+            }
+            if (!$generatedStudentReport || $this->payloadHasFilePrefix((array)($payload['files'] ?? []), 'storage/reports/rapor-siswa-' . $studentId . '.pdf')) {
+                $this->pass('admin backup includes report files');
+            } else {
+                $this->fail('admin backup includes report files');
+            }
         }
+    }
+
+    private function payloadHasFilePrefix(array $files, string $prefix): bool
+    {
+        foreach ($files as $file) {
+            if (is_array($file) && str_starts_with((string)($file['path'] ?? ''), $prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function testDapodikSaveAndPortableDownload(SmokeClient $client): void

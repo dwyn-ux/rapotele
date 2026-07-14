@@ -29,11 +29,14 @@ function migration_add_column(string $table, string $column, string $definition)
         try {
             db()->exec('ALTER TABLE ' . db_identifier($table) . ' ADD COLUMN ' . db_identifier($column) . ' ' . $definition);
         } catch (PDOException $exception) {
-            if (db_driver() === 'mysql' && str_contains($exception->getMessage(), 'Duplicate column name')) {
-                return;
+            if (!(db_driver() === 'mysql' && str_contains($exception->getMessage(), 'Duplicate column name'))) {
+                throw $exception;
             }
-            throw $exception;
         }
+    }
+
+    if (!migration_column_exists($table, $column)) {
+        throw new RuntimeException('Kolom ' . $table . '.' . $column . ' belum berhasil dibuat. Jalankan install.php sekali atau beri user database izin ALTER TABLE.');
     }
 }
 
@@ -182,6 +185,7 @@ function run_migrations(): void
             teacher_id INT NULL,
             student_id INT NULL,
             telegram_chat_id VARCHAR(64) NULL,
+            telegram_login_active $bool NOT NULL DEFAULT 1,
             active $bool NOT NULL DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -244,6 +248,24 @@ function run_migrations(): void
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             UNIQUE (teacher_id, date)
+        )$engine",
+
+        "CREATE TABLE IF NOT EXISTS teacher_teaching_attendance (
+            id $pk,
+            schedule_id INT NOT NULL,
+            assignment_id INT NULL,
+            teacher_id INT NOT NULL,
+            class_id INT NOT NULL,
+            subject_id INT NOT NULL,
+            date DATE NOT NULL,
+            status VARCHAR(24) NOT NULL DEFAULT 'hadir',
+            time_in TIME NULL,
+            time_out TIME NULL,
+            notes TEXT NULL,
+            recorded_by INT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (schedule_id, date)
         )$engine",
 
         "CREATE TABLE IF NOT EXISTS student_violations (
@@ -346,6 +368,26 @@ function run_migrations(): void
             username VARCHAR(160) NULL,
             message TEXT NULL,
             response TEXT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )$engine",
+
+        "CREATE TABLE IF NOT EXISTS telegram_registration_tokens (
+            id $pk,
+            token VARCHAR(96) NOT NULL UNIQUE,
+            chat_id VARCHAR(64) NOT NULL,
+            from_username VARCHAR(160) NULL,
+            expires_at DATETIME NOT NULL,
+            used_at DATETIME NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )$engine",
+
+        "CREATE TABLE IF NOT EXISTS telegram_web_login_tokens (
+            id $pk,
+            token VARCHAR(96) NOT NULL UNIQUE,
+            user_id INT NOT NULL,
+            next_page VARCHAR(80) NOT NULL DEFAULT 'dashboard',
+            expires_at DATETIME NOT NULL,
+            used_at DATETIME NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )$engine",
 
@@ -550,6 +592,7 @@ function run_migrations(): void
     }
 
     migration_add_column('users', 'student_id', 'INT NULL');
+    migration_add_column('users', 'telegram_login_active', migration_bool() . ' NOT NULL DEFAULT 1');
     migration_add_column('teachers', 'dapodik_id', 'VARCHAR(64) NULL');
     migration_add_column('teachers', 'nip', 'VARCHAR(64) NULL');
     migration_add_column('teachers', 'nuptk', 'VARCHAR(64) NULL');

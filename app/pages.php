@@ -36,7 +36,7 @@ function render_header(string $title): void
             'status-penilaian' => ['Status Penilaian', 'status-penilaian'],
             'grades' => ['Input Nilai', 'grades'],
             'student-attendance' => ['Absensi Siswa/Mapel', 'student-attendance'],
-            'teacher-attendance' => ['Absensi Guru Harian', 'teacher-attendance'],
+            'teacher-attendance' => ['Absensi Mengajar', 'teacher-attendance'],
             'lesson-schedule' => ['Jadwal Pelajaran', 'lesson-schedule'],
             'journals' => ['Jurnal Harian', 'journals'],
             'violations' => ['Pelanggaran Siswa', 'violations'],
@@ -114,11 +114,12 @@ function render_header(string $title): void
             <link rel="icon" href="<?= e($appLogoUrl) ?>">
             <link rel="apple-touch-icon" href="<?= e($appLogoUrl) ?>">
         <?php endif; ?>
-        <link rel="stylesheet" href="<?= e(app_url('assets/app.css')) ?>">
+        <link rel="stylesheet" href="<?= e(asset_version_url('assets/app.css')) ?>">
     </head>
     <body>
     <div class="app-shell">
-        <aside class="sidebar">
+        <aside class="sidebar" id="app-sidebar">
+            <button type="button" class="sidebar-close" data-sidebar-close aria-label="Tutup menu">&times;</button>
             <div class="brand">
                 <?= render_app_mark() ?>
                 <div>
@@ -146,11 +147,17 @@ function render_header(string $title): void
                 <?php endforeach; ?>
             </nav>
         </aside>
+        <div class="sidebar-backdrop" data-sidebar-close></div>
         <main class="main">
             <header class="topbar">
-                <div>
-                    <div class="school-name"><?= e($school['name'] ?? config('school.name')) ?></div>
-                    <h1><?= e($title) ?></h1>
+                <div class="topbar-title">
+                    <button type="button" class="mobile-menu-button" data-sidebar-open aria-label="Buka menu" aria-controls="app-sidebar" aria-expanded="false">
+                        <span></span><span></span><span></span>
+                    </button>
+                    <div>
+                        <div class="school-name"><?= e($school['name'] ?? config('school.name')) ?></div>
+                        <h1><?= e($title) ?></h1>
+                    </div>
                 </div>
                 <?php if ($user): ?>
                     <div class="userbox">
@@ -174,9 +181,30 @@ function render_footer(): void
                 <span><?= e(date('Y')) ?> <?= e(config('app_name')) ?></span>
                 <span>PHP shared hosting, tanpa Node.js</span>
             </footer>
+            <nav class="mobile-bottom-nav" aria-label="Navigasi cepat">
+                <button type="button" class="mobile-bottom-item mobile-menu-button" data-sidebar-open aria-label="Buka menu" aria-controls="app-sidebar" aria-expanded="false">
+                    <span class="bottom-icon menu-lines"><span></span><span></span><span></span></span>
+                    <span>Menu</span>
+                </button>
+                <a class="mobile-bottom-item" href="<?= e(route_url('dashboard')) ?>">
+                    <span class="bottom-icon home-icon"></span>
+                    <span>Home</span>
+                </a>
+                <a class="mobile-bottom-item" href="<?= e(route_url('profile')) ?>">
+                    <span class="bottom-icon profile-icon"></span>
+                    <span>Profil</span>
+                </a>
+                <form method="post" action="<?= e(route_url('logout')) ?>" class="mobile-bottom-form">
+                    <?= csrf_field() ?>
+                    <button type="submit" class="mobile-bottom-item">
+                        <span class="bottom-icon logout-icon"></span>
+                        <span>Keluar</span>
+                    </button>
+                </form>
+            </nav>
         </main>
     </div>
-    <script src="<?= e(app_url('assets/app.js')) ?>"></script>
+    <script src="<?= e(asset_version_url('assets/app.js')) ?>"></script>
     </body>
     </html>
     <?php
@@ -191,6 +219,14 @@ function render_app_mark(bool $big = false): string
     }
 
     return '<div class="' . e($class) . ' brand-logo"><img src="' . e($logoUrl) . '" alt="' . e(config('app_name')) . '"></div>';
+}
+
+function asset_version_url(string $path): string
+{
+    $url = app_url($path);
+    $file = APP_ROOT . '/public/' . ltrim($path, '/');
+    $version = is_file($file) ? (string)filemtime($file) : (string)time();
+    return $url . (str_contains($url, '?') ? '&' : '?') . 'v=' . rawurlencode($version);
 }
 
 function panel_title(string $title, string $icon = '', string $actions = ''): void
@@ -239,7 +275,7 @@ function render_public_header(string $title): void
             <link rel="icon" href="<?= e($appLogoUrl) ?>">
             <link rel="apple-touch-icon" href="<?= e($appLogoUrl) ?>">
         <?php endif; ?>
-        <link rel="stylesheet" href="<?= e(app_url('assets/app.css')) ?>">
+        <link rel="stylesheet" href="<?= e(asset_version_url('assets/app.css')) ?>">
     </head>
     <body class="public-page">
     <main class="public-card">
@@ -389,6 +425,178 @@ function page_login(): void
     </form>
     <?php
     render_public_footer();
+}
+
+function page_telegram_register(): void
+{
+    if (!app_installed()) {
+        render_public_header('Daftar Guru Telegram');
+        ?>
+        <div class="center">
+            <?= render_app_mark(true) ?>
+            <h1>Aplikasi belum siap</h1>
+            <p>Database belum diinstall. Jalankan instalasi dulu sebelum membuka pendaftaran guru.</p>
+        </div>
+        <?php
+        render_public_footer();
+        return;
+    }
+
+    $token = trim((string)($_POST['token'] ?? $_GET['token'] ?? ''));
+    $registration = $token !== '' ? telegram_registration_token_row($token) : null;
+    $error = '';
+    $values = $_POST;
+
+    if (!$registration) {
+        render_public_header('Daftar Guru Telegram');
+        ?>
+        <div class="center">
+            <?= render_app_mark(true) ?>
+            <h1>Link Tidak Berlaku</h1>
+            <p>Ketik <strong>/daftar</strong> lagi di Telegram untuk mendapatkan link baru.</p>
+        </div>
+        <?php
+        render_public_footer();
+        return;
+    }
+    if (!is_post() && !empty($registration['from_username'])) {
+        $values['username'] = telegram_slug((string)$registration['from_username'], 'guru');
+    }
+
+    if (is_post()) {
+        verify_csrf();
+        try {
+            $result = telegram_complete_registration($registration, $_POST);
+            render_public_header('Daftar Guru Telegram');
+            ?>
+            <div class="center">
+                <?= render_app_mark(true) ?>
+                <h1>Pendaftaran Selesai</h1>
+                <p><?= e($result['name']) ?> sudah dibuat sebagai guru dan pengguna.</p>
+            </div>
+            <div class="alert success"><?= e($result['assignment_message']) ?></div>
+            <div class="stack">
+                <label>Username Web
+                    <input readonly value="<?= e($result['username']) ?>">
+                </label>
+                <label>Login Bot Telegram
+                    <input readonly value="/login password-yang-dibuat">
+                </label>
+                <a class="button primary full" href="<?= e(route_url('login')) ?>">Buka Login Web</a>
+            </div>
+            <?php
+            render_public_footer();
+            return;
+        } catch (Throwable $exception) {
+            $error = friendly_error($exception);
+            $registration = telegram_registration_token_row($token);
+            if (!$registration) {
+                render_public_header('Daftar Guru Telegram');
+                ?>
+                <div class="center">
+                    <?= render_app_mark(true) ?>
+                    <h1>Link Tidak Berlaku</h1>
+                    <p>Ketik <strong>/daftar</strong> lagi di Telegram untuk mendapatkan link baru.</p>
+                </div>
+                <?php
+                render_public_footer();
+                return;
+            }
+        }
+    }
+
+    render_public_header('Daftar Guru Telegram');
+    ?>
+    <div class="center">
+        <?= render_app_mark(true) ?>
+        <h1>Daftar Guru</h1>
+        <p>Isi data guru dan akun pengguna untuk menghubungkan Telegram dengan e-rapor.</p>
+    </div>
+    <?php if ($error !== ''): ?>
+        <div class="alert danger"><?= e($error) ?></div>
+    <?php endif; ?>
+    <form method="post" class="stack">
+        <?= csrf_field() ?>
+        <input type="hidden" name="token" value="<?= e($token) ?>">
+        <label>Nama Lengkap
+            <input name="name" required autofocus value="<?= e($values['name'] ?? '') ?>">
+        </label>
+        <label>Username Web
+            <input name="username" required pattern="[A-Za-z0-9_.-]{3,64}" value="<?= e($values['username'] ?? '') ?>">
+        </label>
+        <label>Password
+            <input type="password" name="password" required minlength="8">
+        </label>
+        <label>Ulangi Password
+            <input type="password" name="password_confirm" required minlength="8">
+        </label>
+        <label>Email
+            <input type="email" name="email" value="<?= e($values['email'] ?? '') ?>">
+        </label>
+        <label>NIP
+            <input name="nip" value="<?= e($values['nip'] ?? '') ?>">
+        </label>
+        <label>NUPTK
+            <input name="nuptk" value="<?= e($values['nuptk'] ?? '') ?>">
+        </label>
+        <label>JK
+            <select name="gender">
+                <option value="">-</option>
+                <?= options(['L' => 'Laki-laki', 'P' => 'Perempuan'], $values['gender'] ?? '') ?>
+            </select>
+        </label>
+        <label>Telepon
+            <input name="phone" value="<?= e($values['phone'] ?? '') ?>">
+        </label>
+        <label>Jabatan
+            <input name="position" value="<?= e($values['position'] ?? 'Guru Mapel') ?>">
+        </label>
+        <label>Mapel Utama
+            <input name="subject_name" value="<?= e($values['subject_name'] ?? '') ?>">
+        </label>
+        <label>Kelas
+            <input name="class_name" value="<?= e($values['class_name'] ?? '') ?>">
+        </label>
+        <button class="button primary full" type="submit">Daftar</button>
+    </form>
+    <?php
+    render_public_footer();
+}
+
+function page_telegram_web_login(): void
+{
+    if (!app_installed()) {
+        render_public_header('Miniweb Telegram');
+        ?>
+        <div class="center">
+            <?= render_app_mark(true) ?>
+            <h1>Aplikasi belum siap</h1>
+            <p>Database belum diinstall. Jalankan instalasi dulu sebelum membuka miniweb Telegram.</p>
+        </div>
+        <?php
+        render_public_footer();
+        return;
+    }
+
+    $token = trim((string)($_GET['token'] ?? ''));
+    $login = telegram_web_login_consume_token($token);
+    if (!$login) {
+        render_public_header('Miniweb Telegram');
+        ?>
+        <div class="center">
+            <?= render_app_mark(true) ?>
+            <h1>Link Tidak Berlaku</h1>
+            <p>Kembali ke Telegram lalu tekan tombol menu lagi.</p>
+        </div>
+        <?php
+        render_public_footer();
+        return;
+    }
+
+    session_regenerate_id(true);
+    unset($_SESSION['_csrf']);
+    $_SESSION['user_id'] = (int)$login['user_id'];
+    redirect_to((string)$login['next_page']);
 }
 
 function page_logout(): void
@@ -749,28 +957,52 @@ function action_save_student_attendance(): void
 
 function action_save_teacher_attendance(): void
 {
+    require_role(['admin', 'guru']);
+    teacher_teaching_attendance_ensure_schema();
     $date = date_ymd((string)$_POST['date']);
-    $allowedTeacherIds = allowed_teacher_ids_for_attendance();
-    foreach ((array)($_POST['status'] ?? []) as $teacherId => $status) {
-        $teacherId = (int)$teacherId;
-        if (!in_array($teacherId, $allowedTeacherIds, true)) {
+    foreach ((array)($_POST['status'] ?? []) as $scheduleId => $status) {
+        $schedule = teacher_teaching_schedule_by_id((int)$scheduleId);
+        if (!$schedule) {
+            continue;
+        }
+        if ((int)$schedule['day_of_week'] !== teacher_teaching_day_for_date($date)) {
             continue;
         }
         $status = strtolower((string)$status);
         if (!array_key_exists($status, teacher_attendance_statuses())) {
             $status = 'hadir';
         }
-        $timeIn = trim((string)(($_POST['time_in'][$teacherId] ?? ''))) ?: null;
-        $timeOut = trim((string)(($_POST['time_out'][$teacherId] ?? ''))) ?: null;
-        $notes = trim((string)(($_POST['notes'][$teacherId] ?? '')));
-        $existing = fetch_one('SELECT id FROM teacher_attendance WHERE teacher_id = ? AND date = ?', [$teacherId, $date]);
+        $timeIn = trim((string)(($_POST['time_in'][$schedule['schedule_id']] ?? ''))) ?: null;
+        $timeOut = trim((string)(($_POST['time_out'][$schedule['schedule_id']] ?? ''))) ?: null;
+        $notes = trim((string)(($_POST['notes'][$schedule['schedule_id']] ?? '')));
+        $base = [
+            (int)$schedule['schedule_id'],
+            (int)$schedule['assignment_id'],
+            (int)$schedule['teacher_id'],
+            (int)$schedule['class_id'],
+            (int)$schedule['subject_id'],
+            $date,
+            $status,
+            $timeIn,
+            $timeOut,
+            $notes,
+            (int)current_user()['id'],
+            now_string(),
+        ];
+        $existing = fetch_one('SELECT id FROM teacher_teaching_attendance WHERE schedule_id = ? AND date = ?', [(int)$schedule['schedule_id'], $date]);
         if ($existing) {
-            execute_sql('UPDATE teacher_attendance SET status = ?, time_in = ?, time_out = ?, notes = ?, recorded_by = ?, updated_at = ? WHERE id = ?', [$status, $timeIn, $timeOut, $notes, (int)current_user()['id'], now_string(), (int)$existing['id']]);
+            execute_sql(
+                'UPDATE teacher_teaching_attendance SET assignment_id = ?, teacher_id = ?, class_id = ?, subject_id = ?, status = ?, time_in = ?, time_out = ?, notes = ?, recorded_by = ?, updated_at = ? WHERE id = ?',
+                [(int)$schedule['assignment_id'], (int)$schedule['teacher_id'], (int)$schedule['class_id'], (int)$schedule['subject_id'], $status, $timeIn, $timeOut, $notes, (int)current_user()['id'], now_string(), (int)$existing['id']]
+            );
         } else {
-            execute_sql('INSERT INTO teacher_attendance (teacher_id, date, status, time_in, time_out, notes, recorded_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [$teacherId, $date, $status, $timeIn, $timeOut, $notes, (int)current_user()['id'], now_string()]);
+            execute_sql(
+                'INSERT INTO teacher_teaching_attendance (schedule_id, assignment_id, teacher_id, class_id, subject_id, date, status, time_in, time_out, notes, recorded_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                $base
+            );
         }
     }
-    flash('success', 'Absensi guru tersimpan.');
+    flash('success', 'Absensi mengajar guru tersimpan.');
     redirect_to('teacher-attendance', ['date' => $date]);
 }
 
@@ -883,6 +1115,77 @@ function allowed_teacher_ids_for_attendance(): array
     return $teacherId > 0 ? [$teacherId] : [];
 }
 
+function teacher_teaching_attendance_ensure_schema(): void
+{
+    if (!table_exists('lesson_schedules') || !table_exists('teacher_teaching_attendance')) {
+        run_migrations();
+    }
+}
+
+function teacher_teaching_day_for_date(string $date): int
+{
+    return (int)(new DateTimeImmutable($date))->format('N');
+}
+
+function teacher_teaching_schedule_rows(string $date): array
+{
+    teacher_teaching_attendance_ensure_schema();
+    if (!table_exists('lesson_schedules')) {
+        return [];
+    }
+    $day = teacher_teaching_day_for_date($date);
+    $params = [$date, $day];
+    $where = 'ls.day_of_week = ?';
+    if (!is_admin()) {
+        $where .= ' AND ls.teacher_id = ?';
+        $params[] = (int)(current_user()['teacher_id'] ?? 0);
+    }
+
+    return fetch_all(
+        "SELECT ls.id AS schedule_id, ls.assignment_id, ls.teacher_id, ls.class_id, ls.subject_id,
+                ls.day_of_week, ls.period_no, ls.start_time, ls.end_time, ls.note AS schedule_note,
+                t.name AS teacher_name, c.name AS class_name, s.name AS subject_name,
+                a.id AS attendance_id, a.status, a.time_in, a.time_out, a.notes
+         FROM lesson_schedules ls
+         JOIN teachers t ON t.id = ls.teacher_id
+         JOIN classes c ON c.id = ls.class_id
+         JOIN subjects s ON s.id = ls.subject_id
+         LEFT JOIN teacher_teaching_attendance a ON a.schedule_id = ls.id AND a.date = ?
+         WHERE $where
+         ORDER BY ls.period_no, ls.start_time, t.name, c.grade, c.name, s.name",
+        $params
+    );
+}
+
+function teacher_teaching_schedule_by_id(int $scheduleId): ?array
+{
+    if ($scheduleId <= 0) {
+        return null;
+    }
+    teacher_teaching_attendance_ensure_schema();
+    if (!table_exists('lesson_schedules')) {
+        return null;
+    }
+    $params = [$scheduleId];
+    $where = 'ls.id = ?';
+    if (!is_admin()) {
+        $where .= ' AND ls.teacher_id = ?';
+        $params[] = (int)(current_user()['teacher_id'] ?? 0);
+    }
+
+    return fetch_one(
+        "SELECT ls.id AS schedule_id, ls.assignment_id, ls.teacher_id, ls.class_id, ls.subject_id,
+                ls.day_of_week, ls.period_no, ls.start_time, ls.end_time,
+                t.name AS teacher_name, c.name AS class_name, s.name AS subject_name
+         FROM lesson_schedules ls
+         JOIN teachers t ON t.id = ls.teacher_id
+         JOIN classes c ON c.id = ls.class_id
+         JOIN subjects s ON s.id = ls.subject_id
+         WHERE $where",
+        $params
+    );
+}
+
 function current_student(): array
 {
     $user = current_user();
@@ -952,7 +1255,7 @@ function page_dashboard(): void
         <div>
             <p class="eyebrow">Ringkasan aplikasi</p>
             <h2>Selamat datang, <?= e(current_user()['name']) ?></h2>
-            <p>Kelola data e-rapor, input nilai, absensi per mata pelajaran, absensi guru harian, jurnal harian, dan input cepat lewat Telegram.</p>
+            <p>Kelola data e-rapor, input nilai, absensi siswa per mata pelajaran, absensi mengajar guru sesuai jadwal kelas, jurnal harian, dan input cepat lewat Telegram.</p>
         </div>
     </section>
     <div class="metric-grid">
@@ -981,7 +1284,7 @@ function page_dashboard(): void
             <h3>Shortcut guru</h3>
             <div class="quick-links">
                 <a href="<?= e(route_url('student-attendance')) ?>">Input Absensi Siswa</a>
-                <a href="<?= e(route_url('teacher-attendance')) ?>">Absensi Guru</a>
+                <a href="<?= e(route_url('teacher-attendance')) ?>">Absensi Mengajar</a>
                 <a href="<?= e(route_url('journals')) ?>">Tulis Jurnal</a>
                 <a href="<?= e(route_url('grades')) ?>">Input Nilai</a>
             </div>
@@ -1346,20 +1649,9 @@ function page_teacher_attendance(): void
 {
     require_role(['admin', 'guru']);
     $date = date_ymd((string)($_GET['date'] ?? date('Y-m-d')));
-    $ids = allowed_teacher_ids_for_attendance();
-    $teachers = [];
-    if ($ids) {
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $teachers = fetch_all(
-            "SELECT t.*, a.status, a.time_in, a.time_out, a.notes
-             FROM teachers t
-             LEFT JOIN teacher_attendance a ON a.teacher_id = t.id AND a.date = ?
-             WHERE t.id IN ($placeholders)
-             ORDER BY t.name",
-            array_merge([$date], $ids)
-        );
-    }
-    render_header('Absensi Guru Harian');
+    $dayName = schedule_days()[teacher_teaching_day_for_date($date)] ?? '-';
+    $rows = teacher_teaching_schedule_rows($date);
+    render_header('Absensi Kehadiran Mengajar');
     ?>
     <section class="panel">
         <form method="get" class="grid four">
@@ -1369,23 +1661,37 @@ function page_teacher_attendance(): void
         </form>
     </section>
     <section class="panel">
-        <form method="post">
-            <?= csrf_field() ?><input type="hidden" name="action" value="save_teacher_attendance"><input type="hidden" name="date" value="<?= e($date) ?>">
-            <div class="table-wrap">
-                <table><thead><tr><th>Guru</th><th>Status</th><th>Jam Masuk</th><th>Jam Pulang</th><th>Catatan</th></tr></thead><tbody>
-                    <?php foreach ($teachers as $teacher): ?>
-                        <tr>
-                            <td><?= e($teacher['name']) ?></td>
-                            <td><select name="status[<?= e($teacher['id']) ?>]"><?= options(teacher_attendance_statuses(), $teacher['status'] ?? 'hadir') ?></select></td>
-                            <td><input type="time" name="time_in[<?= e($teacher['id']) ?>]" value="<?= e($teacher['time_in']) ?>"></td>
-                            <td><input type="time" name="time_out[<?= e($teacher['id']) ?>]" value="<?= e($teacher['time_out']) ?>"></td>
-                            <td><input name="notes[<?= e($teacher['id']) ?>]" value="<?= e($teacher['notes']) ?>"></td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody></table>
-            </div>
-            <div class="actions"><button class="button primary">Simpan Absensi Guru</button></div>
-        </form>
+        <h3>Jadwal Mengajar <?= e($dayName) ?>, <?= e($date) ?></h3>
+        <p class="hint">Absensi ini mencatat kehadiran guru saat mengajar di kelas sesuai jadwal pelajaran, bukan absensi datang/pulang kantor.</p>
+        <?php if (!$rows): ?>
+            <p class="empty">Belum ada jadwal mengajar pada tanggal ini.</p>
+        <?php else: ?>
+            <form method="post">
+                <?= csrf_field() ?><input type="hidden" name="action" value="save_teacher_attendance"><input type="hidden" name="date" value="<?= e($date) ?>">
+                <div class="table-wrap">
+                    <table><thead><tr><th>Jam</th><th>Guru</th><th>Kelas</th><th>Mapel</th><th>Status</th><th>Mulai</th><th>Selesai</th><th>Catatan</th></tr></thead><tbody>
+                        <?php foreach ($rows as $row): ?>
+                            <?php
+                            $scheduleId = (int)$row['schedule_id'];
+                            $start = (string)($row['time_in'] ?: $row['start_time'] ?: '');
+                            $end = (string)($row['time_out'] ?: $row['end_time'] ?: '');
+                            ?>
+                            <tr>
+                                <td>Jam ke-<?= e($row['period_no']) ?><br><span class="hint"><?= e(trim(($row['start_time'] ?: '-') . ' - ' . ($row['end_time'] ?: '-'))) ?></span></td>
+                                <td><?= e($row['teacher_name']) ?></td>
+                                <td><?= e($row['class_name']) ?></td>
+                                <td><?= e($row['subject_name']) ?></td>
+                                <td><select name="status[<?= e($scheduleId) ?>]"><?= options(teacher_attendance_statuses(), $row['status'] ?? 'hadir') ?></select></td>
+                                <td><input type="time" name="time_in[<?= e($scheduleId) ?>]" value="<?= e(substr($start, 0, 5)) ?>"></td>
+                                <td><input type="time" name="time_out[<?= e($scheduleId) ?>]" value="<?= e(substr($end, 0, 5)) ?>"></td>
+                                <td><input name="notes[<?= e($scheduleId) ?>]" value="<?= e($row['notes']) ?>" placeholder="Materi/kelas pengganti/catatan"></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody></table>
+                </div>
+                <div class="actions"><button class="button primary">Simpan Kehadiran Mengajar</button></div>
+            </form>
+        <?php endif; ?>
     </section>
     <?php
     render_footer();
@@ -1634,6 +1940,7 @@ function page_reports(): void
 
 function render_admin_report_panels(): void
 {
+    teacher_teaching_attendance_ensure_schema();
     $date = date_ymd((string)($_GET['admin_date'] ?? '2026-06-03'));
     ?>
     <section class="panel no-print">
@@ -1641,24 +1948,31 @@ function render_admin_report_panels(): void
         <form method="get" class="grid four">
             <input type="hidden" name="page" value="reports">
             <input type="hidden" name="class_id" value="<?= e((int)($_GET['class_id'] ?? 0)) ?>">
-            <label>Tanggal Absensi Guru <input type="date" name="admin_date" value="<?= e($date) ?>"></label>
+            <label>Tanggal Absensi Mengajar <input type="date" name="admin_date" value="<?= e($date) ?>"></label>
             <div class="actions"><button class="button">Tampilkan Report Admin</button></div>
         </form>
     </section>
     <?php
-    $teacherRows = fetch_all(
-        'SELECT t.name, t.position, a.date, a.status, a.time_in, a.time_out, a.notes
-         FROM teachers t
-         LEFT JOIN teacher_attendance a ON a.teacher_id = t.id AND a.date = ?
-         WHERE t.active = 1
-         ORDER BY t.name',
-        [$date]
-    );
-    table_panel('Report Absensi Guru Harian', ['Guru', 'Jabatan', 'Tanggal', 'Status', 'Masuk', 'Pulang', 'Catatan'], $teacherRows, function ($row) use ($date) { ?>
+    $day = teacher_teaching_day_for_date($date);
+    $teacherRows = table_exists('lesson_schedules') ? fetch_all(
+        'SELECT t.name, c.name AS class_name, s.name AS subject_name, ls.period_no, ls.start_time, ls.end_time,
+                a.date, a.status, a.time_in, a.time_out, a.notes
+         FROM lesson_schedules ls
+         JOIN teachers t ON t.id = ls.teacher_id
+         JOIN classes c ON c.id = ls.class_id
+         JOIN subjects s ON s.id = ls.subject_id
+         LEFT JOIN teacher_teaching_attendance a ON a.schedule_id = ls.id AND a.date = ?
+         WHERE ls.day_of_week = ?
+         ORDER BY ls.period_no, t.name, c.grade, c.name, s.name',
+        [$date, $day]
+    ) : [];
+    table_panel('Report Kehadiran Mengajar Guru', ['Guru', 'Kelas', 'Mapel', 'Jam', 'Tanggal', 'Status', 'Mulai', 'Selesai', 'Catatan'], $teacherRows, function ($row) use ($date) { ?>
         <td><?= e($row['name']) ?></td>
-        <td><?= e($row['position']) ?></td>
+        <td><?= e($row['class_name']) ?></td>
+        <td><?= e($row['subject_name']) ?></td>
+        <td>Jam ke-<?= e($row['period_no']) ?> (<?= e(($row['start_time'] ?: '-') . ' - ' . ($row['end_time'] ?: '-')) ?>)</td>
         <td><?= e($row['date'] ?: $date) ?></td>
-        <td><?= e($row['status'] ?: 'belum input') ?></td>
+        <td><?= e($row['status'] ? (teacher_attendance_statuses()[$row['status']] ?? $row['status']) : 'belum input') ?></td>
         <td><?= e($row['time_in']) ?></td>
         <td><?= e($row['time_out']) ?></td>
         <td><?= e($row['notes']) ?></td>

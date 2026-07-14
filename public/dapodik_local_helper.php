@@ -572,6 +572,10 @@ function helper_collect_payload(string $dapodikUrl, string $dapodikToken, string
         $json = helper_get_json($endpoint, ['Authorization: Bearer ' . $dapodikToken]);
         $authLabel = 'Authorization Bearer';
     } catch (RuntimeException $bearerException) {
+        if (helper_is_optional_endpoint_missing_response($type, $bearerException->getMessage())) {
+            throw $bearerException;
+        }
+
         $fallbackEndpoint = helper_endpoint($dapodikUrl, $type, $npsn, $dapodikToken);
         try {
             $json = helper_get_json($fallbackEndpoint);
@@ -636,11 +640,15 @@ function helper_is_bridge_token_error(array $response): bool
 
 function helper_is_optional_endpoint_missing(string $type, Throwable $exception): bool
 {
+    return helper_is_optional_endpoint_missing_response($type, $exception->getMessage());
+}
+
+function helper_is_optional_endpoint_missing_response(string $type, string $message): bool
+{
     if (!in_array($type, ['anggota_rombel', 'pembelajaran'], true)) {
         return false;
     }
 
-    $message = $exception->getMessage();
     return stripos($message, '404') !== false || stripos($message, 'Not Found') !== false;
 }
 

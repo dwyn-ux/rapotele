@@ -4,6 +4,8 @@
 /config/config.php
 /build/
 /dist/
+*.zip
+/eraport-dapodik-bridge-portable-v2.5 (4)/
 /storage/*.sqlite
 /storage/*.sqlite-*
 /storage/*.log

@@ -139,7 +139,7 @@ function max_upload_bytes(): int
     return max(1, (int)config('security.max_upload_bytes', 2 * 1024 * 1024));
 }
 
-function uploaded_file(string $field, bool $required = true): ?array
+function uploaded_file(string $field, bool $required = true, ?int $maxBytes = null): ?array
 {
     if (!isset($_FILES[$field]) || (string)($_FILES[$field]['name'] ?? '') === '') {
         if ($required) {
@@ -155,7 +155,8 @@ function uploaded_file(string $field, bool $required = true): ?array
     if (!is_uploaded_file((string)$file['tmp_name'])) {
         throw new RuntimeException('Upload file tidak valid.');
     }
-    if ((int)($file['size'] ?? 0) > max_upload_bytes()) {
+    $limit = $maxBytes ?? max_upload_bytes();
+    if ((int)($file['size'] ?? 0) > $limit) {
         throw new RuntimeException('Ukuran file melebihi batas.');
     }
 
@@ -371,10 +372,6 @@ function db_identifier(string $identifier): string
 
 function table_columns(string $table): array
 {
-    if (!table_exists($table)) {
-        return [];
-    }
-
     if (db_driver() === 'sqlite') {
         return array_map(
             fn (array $row): string => (string)$row['name'],
@@ -382,10 +379,22 @@ function table_columns(string $table): array
         );
     }
 
-    return array_map(
-        fn (array $row): string => (string)$row['Field'],
-        fetch_all('SHOW COLUMNS FROM ' . db_identifier($table))
-    );
+    try {
+        $stmt = db()->prepare(
+            'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION'
+        );
+        $stmt->execute([$table]);
+        return array_map(
+            fn (array $row): string => (string)$row['COLUMN_NAME'],
+            $stmt->fetchAll()
+        );
+    } catch (PDOException $exception) {
+        $rows = fetch_all('SHOW COLUMNS FROM ' . db_identifier($table));
+        return array_map(
+            fn (array $row): string => (string)$row['Field'],
+            $rows
+        );
+    }
 }
 
 function table_column_exists(string $table, string $column): bool
@@ -567,18 +576,20 @@ function require_role(array $roles): void
 
 function table_exists(string $table): bool
 {
-    try {
-        if (db_driver() === 'sqlite') {
-            $stmt = db()->prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?");
-            $stmt->execute([$table]);
-            return (bool)$stmt->fetchColumn();
-        }
+    if (db_driver() === 'sqlite') {
+        $stmt = db()->prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?");
+        $stmt->execute([$table]);
+        return (bool)$stmt->fetchColumn();
+    }
 
+    try {
+        $stmt = db()->prepare('SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?');
+        $stmt->execute([$table]);
+        return (int)$stmt->fetchColumn() > 0;
+    } catch (PDOException $exception) {
         $stmt = db()->prepare('SHOW TABLES LIKE ?');
         $stmt->execute([$table]);
         return (bool)$stmt->fetchColumn();
-    } catch (Throwable) {
-        return false;
     }
 }
 
@@ -648,10 +659,11 @@ function allowed_statuses(): array
 function teacher_attendance_statuses(): array
 {
     return [
-        'hadir' => 'Hadir',
+        'hadir' => 'Mengajar',
+        'terlambat' => 'Terlambat Mengajar',
         'izin' => 'Izin',
         'sakit' => 'Sakit',
-        'dinas' => 'Dinas',
+        'dinas' => 'Tugas/Dinas',
         'alpa' => 'Alpa',
     ];
 }

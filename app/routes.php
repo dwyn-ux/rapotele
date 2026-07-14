@@ -7,6 +7,8 @@ return [
         'install' => 'page_install',
         'login' => 'page_login',
         'logout' => 'page_logout',
+        'telegram-register' => 'page_telegram_register',
+        'telegram-web-login' => 'page_telegram_web_login',
     ],
 
     'private' => [

@@ -79,12 +79,18 @@ https://api.telegram.org/botTOKEN_ANDA/setWebhook?url=https%3A%2F%2Fdomain-anda%
 Perintah bot:
 
 ```text
+/daftar
+/daftar Nama Guru Mapel
+/daftar Nama Guru | Mapel | Kelas
+/login password
 /login username password
 /menu
 /web
 /jadwal
 /requestjadwal
 /kelas
+/absensi
+/absensiguru
 /hadir ID_PEMBELAJARAN YYYY-MM-DD [PERTEMUAN] [topik]
 /absen ID_PEMBELAJARAN YYYY-MM-DD NIS status [catatan]
 /jurnal ID_PEMBELAJARAN YYYY-MM-DD | topik | kegiatan | materi | kendala | tindak_lanjut
@@ -93,6 +99,12 @@ Perintah bot:
 ```
 
 Status absensi siswa: `hadir`, `sakit`, `izin`, `alpa`, `terlambat`.
+
+Ketik `/start` untuk membuka menu home. Kalau belum login, bot menampilkan kartu pilihan login. Kalau sudah login, bot menampilkan kartu menu guru.
+
+Ketik `/login` tanpa parameter untuk menampilkan kartu pilihan login dengan tombol. Bot juga menerima format tanpa garis miring, misalnya `login password`. Tombol web dibuka sebagai miniweb di Telegram. Untuk akun yang sudah login di bot, tombol menu guru memakai token satu-kali agar halaman miniweb langsung masuk tanpa login web ulang.
+
+Ketik `/daftar` tanpa isian untuk membuka miniweb pendaftaran guru. Form ini membuat data guru dan akun pengguna sekaligus. Setelah form selesai, guru bisa login bot dengan `/login password`. Format `/login username password` tetap tersedia untuk akun lama atau akun yang belum terhubung Telegram.
 
 Perintah `/menu` dan `/web` menampilkan link halaman web untuk pekerjaan yang lebih nyaman dikerjakan lewat form, seperti jadwal, nilai, absensi, dan jurnal. Pastikan `APP_URL` atau `base_url` di config sudah berisi domain aplikasi agar link Telegram mengarah ke web yang benar.
 

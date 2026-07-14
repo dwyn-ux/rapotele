@@ -27,6 +27,8 @@ DROP TABLE IF EXISTS `extracurricular_members`;
 DROP TABLE IF EXISTS `extracurriculars`;
 DROP TABLE IF EXISTS `dapodik_rombel_cache`;
 DROP TABLE IF EXISTS `audit_logs`;
+DROP TABLE IF EXISTS `telegram_web_login_tokens`;
+DROP TABLE IF EXISTS `telegram_registration_tokens`;
 DROP TABLE IF EXISTS `telegram_logs`;
 DROP TABLE IF EXISTS `daily_journals`;
 DROP TABLE IF EXISTS `whatsapp_logs`;
@@ -34,6 +36,7 @@ DROP TABLE IF EXISTS `whatsapp_queue`;
 DROP TABLE IF EXISTS `whatsapp_templates`;
 DROP TABLE IF EXISTS `whatsapp_guardians`;
 DROP TABLE IF EXISTS `student_violations`;
+DROP TABLE IF EXISTS `teacher_teaching_attendance`;
 DROP TABLE IF EXISTS `teacher_attendance`;
 DROP TABLE IF EXISTS `student_attendance_entries`;
 DROP TABLE IF EXISTS `student_attendance_sessions`;
@@ -188,6 +191,7 @@ CREATE TABLE IF NOT EXISTS users (
   teacher_id INT NULL,
   student_id INT NULL,
   telegram_chat_id VARCHAR(64) NULL,
+  telegram_login_active TINYINT(1) NOT NULL DEFAULT 1,
   active TINYINT(1) NOT NULL DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -250,6 +254,24 @@ CREATE TABLE IF NOT EXISTS teacher_attendance (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (teacher_id, date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS teacher_teaching_attendance (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  schedule_id INT NOT NULL,
+  assignment_id INT NULL,
+  teacher_id INT NOT NULL,
+  class_id INT NOT NULL,
+  subject_id INT NOT NULL,
+  date DATE NOT NULL,
+  status VARCHAR(24) NOT NULL DEFAULT 'hadir',
+  time_in TIME NULL,
+  time_out TIME NULL,
+  notes TEXT NULL,
+  recorded_by INT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (schedule_id, date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS student_violations (
@@ -352,6 +374,26 @@ CREATE TABLE IF NOT EXISTS telegram_logs (
   username VARCHAR(160) NULL,
   message TEXT NULL,
   response TEXT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS telegram_registration_tokens (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  token VARCHAR(96) NOT NULL UNIQUE,
+  chat_id VARCHAR(64) NOT NULL,
+  from_username VARCHAR(160) NULL,
+  expires_at DATETIME NOT NULL,
+  used_at DATETIME NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS telegram_web_login_tokens (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  token VARCHAR(96) NOT NULL UNIQUE,
+  user_id INT NOT NULL,
+  next_page VARCHAR(80) NOT NULL DEFAULT 'dashboard',
+  expires_at DATETIME NOT NULL,
+  used_at DATETIME NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -315,9 +315,16 @@ namespace EraportDapodikBridgeHelper
                 catch (Exception bearerEx)
                 {
                     var fallbackEndpoint = fallbackEndpoints[i];
+                    if (IsOptionalEndpointMissingResponse(type, bearerEx.Message))
+                    {
+                        errors.Add(Path.GetFileName(endpoint) + " Bearer: " + bearerEx.Message);
+                        AppendLog(type + ": endpoint " + Path.GetFileName(endpoint) + " tidak tersedia, cek kandidat berikutnya.");
+                        continue;
+                    }
+
                     try
                     {
-                        AppendLog(type + ": Bearer gagal untuk " + Path.GetFileName(endpoint) + ", mencoba query token.");
+                        AppendLog(type + ": Authorization Bearer belum berhasil untuk " + Path.GetFileName(endpoint) + ", mencoba query token.");
                         var dapodikBody = HttpGet(fallbackEndpoint, null);
                         records = ExtractRecords(dapodikBody);
                         endpoint = fallbackEndpoint;
@@ -328,6 +335,10 @@ namespace EraportDapodikBridgeHelper
                     catch (Exception queryEx)
                     {
                         errors.Add(Path.GetFileName(endpoint) + " Bearer: " + bearerEx.Message + " Query: " + queryEx.Message);
+                        if (IsOptionalEndpointMissingResponse(type, queryEx.Message))
+                        {
+                            AppendLog(type + ": endpoint " + Path.GetFileName(endpoint) + " tidak tersedia, cek kandidat berikutnya.");
+                        }
                     }
                 }
             }
@@ -439,17 +450,21 @@ namespace EraportDapodikBridgeHelper
 
         private static bool IsOptionalEndpointMissing(string type, string message)
         {
+            var value = message ?? "";
+            return value.IndexOf("Dapodik menolak semua endpoint kandidat", StringComparison.OrdinalIgnoreCase) >= 0
+                && IsOptionalEndpointMissingResponse(type, value);
+        }
+
+        private static bool IsOptionalEndpointMissingResponse(string type, string message)
+        {
             if (type != "anggota_rombel" && type != "pembelajaran")
             {
                 return false;
             }
 
             var value = message ?? "";
-            return value.IndexOf("Dapodik menolak semua endpoint kandidat", StringComparison.OrdinalIgnoreCase) >= 0
-                && (
-                    value.IndexOf("404", StringComparison.OrdinalIgnoreCase) >= 0
-                    || value.IndexOf("Not Found", StringComparison.OrdinalIgnoreCase) >= 0
-                );
+            return value.IndexOf("404", StringComparison.OrdinalIgnoreCase) >= 0
+                || value.IndexOf("Not Found", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private string HttpGet(string url, string bearerToken)

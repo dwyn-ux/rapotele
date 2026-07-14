@@ -64,6 +64,7 @@ return [
     'security' => [
         'session_name' => 'ERAPORTSESSID',
         'max_upload_bytes' => 10 * 1024 * 1024,
+        'max_backup_upload_bytes' => 128 * 1024 * 1024,
         'max_image_upload_bytes' => 2 * 1024 * 1024,
         'login_max_attempts' => 5,
         'login_window_seconds' => 15 * 60,
