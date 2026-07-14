@@ -289,7 +289,11 @@ function action_save_learning_objective(): void
 {
     require_role(['admin', 'guru']);
     $id = (int)($_POST['id'] ?? 0);
-    $data = [(int)$_POST['subject_id'], trim((string)$_POST['grade']), trim((string)$_POST['description']), isset($_POST['active']) ? 1 : 0, now_string()];
+    $className = trim((string)($_POST['grade'] ?? ''));
+    if ($className === '' || !array_key_exists($className, learning_objective_class_options())) {
+        throw new RuntimeException('Kelas tidak valid.');
+    }
+    $data = [(int)$_POST['subject_id'], $className, trim((string)$_POST['description']), isset($_POST['active']) ? 1 : 0, now_string()];
     if ($id > 0) {
         execute_sql('UPDATE learning_objectives SET subject_id = ?, grade = ?, description = ?, active = ?, updated_at = ? WHERE id = ?', array_merge($data, [$id]));
     } else {
@@ -297,6 +301,11 @@ function action_save_learning_objective(): void
     }
     flash('success', 'Tujuan pembelajaran tersimpan.');
     redirect_to('data-tp');
+}
+
+function learning_objective_class_options(): array
+{
+    return array_column_map(classes_for_current_user(), 'name', 'name');
 }
 
 function action_save_graduation(): void
@@ -2110,16 +2119,17 @@ function page_data_tp(): void
     require_role(['admin', 'guru']);
     $edit = ext_edit_row('learning_objectives');
     $subjects = map_options('subjects', 'name');
+    $classes = learning_objective_class_options();
     $rows = fetch_all('SELECT lo.*, s.name AS subject_name FROM learning_objectives lo JOIN subjects s ON s.id = lo.subject_id ORDER BY lo.grade, s.name, lo.id DESC');
     render_header('Tujuan Pembelajaran');
     ext_simple_form_start('save_learning_objective', $edit, 'Tujuan Pembelajaran', 'grid two');
     ?>
         <label>Mapel <select name="subject_id"><?= options($subjects, $edit['subject_id'] ?? '') ?></select></label>
-        <label>Tingkat <input name="grade" required value="<?= e($edit['grade'] ?? '') ?>"></label>
+        <label>Kelas <select name="grade" required><option value="">Pilih kelas</option><?= options($classes, $edit['grade'] ?? '') ?></select></label>
         <label class="wide">Tujuan Pembelajaran <textarea name="description" required><?= e($edit['description'] ?? '') ?></textarea></label>
         <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
     <?php ext_simple_form_end('data-tp'); ?>
-    <?php table_panel('Daftar TP', ['Tingkat', 'Mapel', 'Tujuan', 'Status', 'Aksi'], $rows, function ($row) { ?>
+    <?php table_panel('Daftar TP', ['Kelas', 'Mapel', 'Tujuan', 'Status', 'Aksi'], $rows, function ($row) { ?>
         <td><?= e($row['grade']) ?></td><td><?= e($row['subject_name']) ?></td><td><?= e(mb_strimwidth((string)$row['description'], 0, 120, '...')) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= ext_delete_button('learning_objectives', 'data-tp', (int)$row['id']) ?></td>
     <?php }); render_footer();
 }
