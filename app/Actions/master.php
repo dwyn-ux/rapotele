@@ -333,3 +333,128 @@ function action_save_profile(): void
     flash('success', 'Profil tersimpan.');
     redirect_to('profile');
 }
+
+function action_import_bulk(): void
+{
+    require_role(['admin']);
+    $type = (string)($_POST['data_type'] ?? '');
+    if (!in_array($type, ['guru', 'siswa'], true)) {
+        flash('danger', 'Jenis data tidak valid.');
+        redirect_to('import-bulk');
+    }
+
+    if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
+        flash('danger', 'File CSV tidak berhasil diupload.');
+        redirect_to('import-bulk');
+    }
+
+    $handle = fopen($_FILES['csv_file']['tmp_name'], 'r');
+    if (!$handle) {
+        flash('danger', 'Gagal membaca file CSV.');
+        redirect_to('import-bulk');
+    }
+
+    $header = fgetcsv($handle);
+    if (!$header) {
+        flash('danger', 'File CSV kosong atau format tidak valid.');
+        redirect_to('import-bulk');
+    }
+
+    $header = array_map('strtolower', array_map('trim', $header));
+    $imported = 0;
+    $skipped = 0;
+    $errors = [];
+    $defaultPassword = $type === 'guru'
+        ? (string)config('default_teacher_password', 'guru123')
+        : (string)config('default_student_password', 'siswa123');
+
+    $rowNum = 1;
+    while (($row = fgetcsv($handle)) !== false) {
+        $rowNum++;
+        $data = array_combine($header, $row);
+        if (!$data) {
+            $skipped++;
+            continue;
+        }
+
+        $username = trim((string)($data['username'] ?? ''));
+        $password = trim((string)($data['password'] ?? '')) ?: $defaultPassword;
+        $name = trim((string)($data['name'] ?? ''));
+
+        if ($name === '') {
+            $errors[] = "Baris $rowNum: nama kosong, dilewati.";
+            $skipped++;
+            continue;
+        }
+        if ($username === '') {
+            $errors[] = "Baris $rowNum: username kosong, dilewati.";
+            $skipped++;
+            continue;
+        }
+
+        $taken = fetch_one('SELECT id FROM users WHERE username = ?', [$username]);
+        if ($taken) {
+            $errors[] = "Baris $rowNum: username '$username' sudah ada, dilewati.";
+            $skipped++;
+            continue;
+        }
+
+        if ($type === 'guru') {
+            $gender = trim((string)($data['gender'] ?? ''));
+            $nip = trim((string)($data['nip'] ?? ''));
+            $nuptk = trim((string)($data['nuptk'] ?? ''));
+            $phone = trim((string)($data['phone'] ?? ''));
+            $email = trim((string)($data['email'] ?? ''));
+            $position = trim((string)($data['position'] ?? ''));
+            $telegramChatId = trim((string)($data['telegram_chat_id'] ?? ''));
+
+            execute_sql(
+                'INSERT INTO teachers (name, nip, nuptk, gender, phone, email, position, telegram_chat_id, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)',
+                [$name, $nip, $nuptk, $gender, $phone, $email, $position, $telegramChatId, now_string()]
+            );
+            $teacherId = (int)db()->lastInsertId();
+
+            execute_sql(
+                'INSERT INTO users (username, password_hash, name, role, teacher_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)',
+                [$username, password_hash($password, PASSWORD_DEFAULT), $name, 'guru', $teacherId, now_string(), now_string()]
+            );
+        } else {
+            $nis = trim((string)($data['nis'] ?? ''));
+            $nisn = trim((string)($data['nisn'] ?? ''));
+            $gender = trim((string)($data['gender'] ?? ''));
+            $birthPlace = trim((string)($data['birth_place'] ?? ''));
+            $birthDate = trim((string)($data['birth_date'] ?? '')) ?: null;
+            $religion = trim((string)($data['religion'] ?? ''));
+            $className = trim((string)($data['class_name'] ?? ''));
+
+            $classId = null;
+            if ($className !== '') {
+                $class = fetch_one('SELECT id FROM classes WHERE name = ?', [$className]);
+                $classId = $class ? (int)$class['id'] : null;
+            }
+
+            execute_sql(
+                'INSERT INTO students (nis, nisn, name, gender, birth_place, birth_date, religion, class_id, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)',
+                [$nis, $nisn, $name, $gender, $birthPlace, $birthDate, $religion, $classId, now_string()]
+            );
+            $studentId = (int)db()->lastInsertId();
+
+            execute_sql(
+                'INSERT INTO users (username, password_hash, name, role, student_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)',
+                [$username, password_hash($password, PASSWORD_DEFAULT), $name, 'siswa', $studentId, now_string(), now_string()]
+            );
+        }
+        $imported++;
+    }
+    fclose($handle);
+
+    $msg = "Import selesai: $imported berhasil, $skipped dilewati.";
+    if ($errors) {
+        $msg .= ' Detail: ' . implode(' ', array_slice($errors, 0, 5));
+        if (count($errors) > 5) {
+            $msg .= ' ... dan ' . (count($errors) - 5) . ' error lainnya.';
+        }
+    }
+    flash($imported > 0 ? 'success' : 'warning', $msg);
+    redirect_to('import-bulk');
+}
