@@ -66,12 +66,35 @@ function action_save_teacher(): void
             'UPDATE teachers SET name = ?, nip = ?, nuptk = ?, gender = ?, phone = ?, email = ?, position = ?, telegram_chat_id = ?, active = ?, updated_at = ? WHERE id = ?',
             array_merge($data, [$id])
         );
+        $teacherId = $id;
     } else {
         execute_sql(
             'INSERT INTO teachers (name, nip, nuptk, gender, phone, email, position, telegram_chat_id, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             $data
         );
+        $teacherId = (int)db()->lastInsertId();
     }
+
+    $username = trim((string)($_POST['username'] ?? ''));
+    $password = (string)($_POST['password'] ?? '');
+    if ($username !== '' && $password !== '') {
+        $existingUser = fetch_one('SELECT id FROM users WHERE teacher_id = ?', [$teacherId]);
+        if (!$existingUser) {
+            $taken = fetch_one('SELECT id FROM users WHERE username = ?', [$username]);
+            if ($taken) {
+                flash('danger', 'Username "' . $username . '" sudah dipakai user lain.');
+                redirect_to('teachers');
+            }
+            execute_sql(
+                'INSERT INTO users (username, password_hash, name, role, teacher_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [$username, password_hash($password, PASSWORD_DEFAULT), trim((string)$_POST['name']), 'guru', $teacherId, 1, now_string(), now_string()]
+            );
+            flash('success', 'Data guru & akun login tersimpan. Guru bisa login dengan username: ' . $username);
+        }
+    } elseif ($username !== '' && $password === '' && !$id) {
+        flash('warning', 'Username diisi tapi password kosong, akun login tidak dibuat.');
+    }
+
     flash('success', 'Data guru tersimpan.');
     redirect_to('teachers');
 }
