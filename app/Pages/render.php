@@ -303,7 +303,7 @@ function get_school_profile(): array
         ];
     }
 
-    $school = fetch_one('SELECT *, location_lat, location_lng, attendance_radius_meters FROM school_profile ORDER BY id LIMIT 1');
+    $school = fetch_one('SELECT * FROM school_profile ORDER BY id LIMIT 1');
     return $school ?: [
         'name' => config('school.name'),
         'academic_year' => config('school.academic_year'),
