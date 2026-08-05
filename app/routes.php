@@ -57,6 +57,7 @@ return [
         'whatsapp' => 'page_whatsapp',
         'users' => 'page_users',
         'profile' => 'page_profile',
+        'import-bulk' => 'page_import_bulk',
         'grades' => 'page_grades',
         'student-attendance' => 'page_student_attendance',
         'teacher-attendance' => 'page_teacher_attendance',

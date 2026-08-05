@@ -27,3 +27,4 @@ require_once $base . '/Pages/rapor.php';
 require_once $base . '/Pages/kokurikuler.php';
 require_once $base . '/Pages/dapodik.php';
 require_once $base . '/Pages/export.php';
+require_once $base . '/Pages/import_bulk.php';

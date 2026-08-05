@@ -66,4 +66,5 @@ return [
     'sync_dapodik' => 'action_sync_dapodik',
     'send_dapodik' => 'action_send_dapodik',
     'delete_extended' => 'action_delete_extended',
+    'import_bulk' => 'action_import_bulk',
 ];

@@ -23,6 +23,7 @@ function render_header(string $title): void
             'data-logo-ttd' => ['Data Logo dan TTD', 'data-logo-ttd'],
             'tanggal-rapor' => ['Data Tanggal Rapor', 'tanggal-rapor'],
             'foto-siswa' => ['Foto Siswa', 'foto-siswa'],
+            'import-bulk' => ['Import Bulk (CSV)', 'import-bulk'],
         ],
         'Kokurikuler' => [
             'tema-kokurikuler' => ['Daftar Tema', 'tema-kokurikuler'],
