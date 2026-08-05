@@ -1,5 +1,18 @@
-RewriteEngine On
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^$ public/ [L]
-RewriteRule (.*) public/$1 [L]
+Options -Indexes
+DirectoryIndex public/index.php index.php
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    RewriteRule ^(app|config|database|storage|tools)(/|$) - [F,L]
+    RewriteRule ^assets/(.*)$ public/assets/$1 [L]
+    RewriteRule ^(index|install|media|telegram_webhook|schedule_reminders|whatsapp_weekly|dapodik_bridge|dapodik_local_helper)\.php$ public/$1.php [L]
+
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ public/index.php [L]
+</IfModule>
+
+<FilesMatch "(^\.|\.sqlite$|\.db$|\.log$|\.json$|\.sql$|\.env$)">
+    Require all denied
+</FilesMatch>
