@@ -34,7 +34,18 @@ if (!function_exists('mb_strimwidth')) {
 function helper_is_local_request(): bool
 {
     $remote = (string)($_SERVER['REMOTE_ADDR'] ?? '');
-    return in_array($remote, ['127.0.0.1', '::1'], true);
+    if (in_array($remote, ['127.0.0.1', '::1', '::ffff:127.0.0.1'], true)) {
+        return true;
+    }
+    $sessionName = 'ERAPORTSESSID';
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_name($sessionName);
+        @session_start();
+    }
+    if (!empty($_SESSION['user_id'])) {
+        return true;
+    }
+    return false;
 }
 
 function helper_normalize_http_url(string $url): string
