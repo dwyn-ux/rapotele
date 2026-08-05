@@ -69,7 +69,7 @@ function page_teachers(): void
     require_role(['admin']);
     $edit = edit_row('teachers') ?: [];
     $rows = fetch_all('SELECT * FROM teachers ORDER BY active DESC, name');
-    $existingUser = $edit ? fetch_one('SELECT id FROM users WHERE teacher_id = ?', [(int)$edit['id']]) : null;
+    $existingUser = $edit ? fetch_one('SELECT id, username FROM users WHERE teacher_id = ?', [(int)$edit['id']]) : null;
     render_header('Data Guru');
     input_panel_start($edit ? 'Edit Guru' : 'Input Guru', 'Tambah Guru', (bool)$edit || isset($_GET['add']));
     ?>
@@ -83,7 +83,10 @@ function page_teachers(): void
             <label>Email <input type="email" name="email" value="<?= e($edit['email'] ?? '') ?>"></label>
             <label>Jabatan <input name="position" value="<?= e($edit['position'] ?? '') ?>"></label>
             <label>Telegram Chat ID <input name="telegram_chat_id" value="<?= e($edit['telegram_chat_id'] ?? '') ?>"></label>
-            <?php if (!$existingUser): ?>
+            <?php if ($existingUser): ?>
+                <label>Username Login <input name="username" value="<?= e($existingUser['username'] ?? '') ?>" readonly></label>
+                <label>Password Baru <input type="password" name="password" placeholder="Kosongkan jika tidak diganti"></label>
+            <?php else: ?>
                 <label>Username Login <input name="username" value="<?= e($edit['username'] ?? '') ?>" placeholder="untuk login guru"></label>
                 <label>Password Login <input type="password" name="password" value="<?= e(config('default_teacher_password', 'guru123')) ?>" placeholder="default: <?= e(config('default_teacher_password', 'guru123')) ?>"></label>
             <?php endif; ?>

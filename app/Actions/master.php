@@ -77,22 +77,25 @@ function action_save_teacher(): void
 
     $username = trim((string)($_POST['username'] ?? ''));
     $password = (string)($_POST['password'] ?? '');
-    if ($username !== '' && $password !== '') {
-        $existingUser = fetch_one('SELECT id FROM users WHERE teacher_id = ?', [$teacherId]);
-        if (!$existingUser) {
-            $taken = fetch_one('SELECT id FROM users WHERE username = ?', [$username]);
-            if ($taken) {
-                flash('danger', 'Username "' . $username . '" sudah dipakai user lain.');
-                redirect_to('teachers');
-            }
-            execute_sql(
-                'INSERT INTO users (username, password_hash, name, role, teacher_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [$username, password_hash($password, PASSWORD_DEFAULT), trim((string)$_POST['name']), 'guru', $teacherId, 1, now_string(), now_string()]
-            );
-            flash('success', 'Data guru & akun login tersimpan. Guru bisa login dengan username: ' . $username);
+    $existingUser = fetch_one('SELECT id FROM users WHERE teacher_id = ?', [$teacherId]);
+    if ($existingUser) {
+        if ($password !== '') {
+            execute_sql('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [password_hash($password, PASSWORD_DEFAULT), now_string(), (int)$existingUser['id']]);
+            flash('success', 'Password guru berhasil diubah.');
         }
-    } elseif ($username !== '' && $password === '' && !$id) {
-        flash('warning', 'Username diisi tapi password kosong, akun login tidak dibuat.');
+    } elseif ($username !== '' && $password !== '') {
+        $taken = fetch_one('SELECT id FROM users WHERE username = ?', [$username]);
+        if ($taken) {
+            flash('danger', 'Username "' . $username . '" sudah dipakai user lain.');
+            redirect_to('teachers');
+        }
+        execute_sql(
+            'INSERT INTO users (username, password_hash, name, role, teacher_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [$username, password_hash($password, PASSWORD_DEFAULT), trim((string)$_POST['name']), 'guru', $teacherId, 1, now_string(), now_string()]
+        );
+        flash('success', 'Data guru & akun login tersimpan. Username: ' . $username);
+    } elseif ($username !== '' && $password === '') {
+        flash('warning', 'Password kosong, akun login tidak dibuat.');
     }
 
     flash('success', 'Data guru tersimpan.');
