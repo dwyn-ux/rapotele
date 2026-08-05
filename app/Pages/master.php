@@ -133,6 +133,7 @@ function page_students(): void
     $edit = edit_row('students') ?: [];
     $classes = map_options('classes', 'name');
     $rows = fetch_all('SELECT s.*, c.name AS class_name FROM students s LEFT JOIN classes c ON c.id = s.class_id ORDER BY c.grade, c.name, s.name');
+    $existingUser = $edit ? fetch_one('SELECT id, username FROM users WHERE student_id = ?', [(int)$edit['id']]) : null;
     render_header('Data Siswa');
     input_panel_start($edit ? 'Edit Siswa' : 'Input Siswa', 'Tambah Siswa', (bool)$edit || isset($_GET['add']));
     ?>
@@ -146,6 +147,13 @@ function page_students(): void
             <label>Tanggal Lahir <input type="date" name="birth_date" value="<?= e($edit['birth_date'] ?? '') ?>"></label>
             <label>Agama <input name="religion" value="<?= e($edit['religion'] ?? '') ?>"></label>
             <label>Kelas <select name="class_id"><option value="">-</option><?= options($classes, $edit['class_id'] ?? '') ?></select></label>
+            <?php if ($existingUser): ?>
+                <label>Username Login <input name="username" value="<?= e($existingUser['username'] ?? '') ?>" readonly></label>
+                <label>Password Baru <input type="password" name="password" placeholder="Kosongkan jika tidak diganti"></label>
+            <?php else: ?>
+                <label>Username Login <input name="username" value="<?= e($edit['nisn'] ?? '') ?>" placeholder="default: NISN siswa"></label>
+                <label>Password Login <input type="password" name="password" value="<?= e(config('default_teacher_password', 'guru123')) ?>" placeholder="default: <?= e(config('default_teacher_password', 'guru123')) ?>"></label>
+            <?php endif; ?>
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
             <div class="actions span-2"><button class="button primary">Simpan</button><a class="button" href="<?= e(route_url('students')) ?>">Reset</a></div>
         </form>

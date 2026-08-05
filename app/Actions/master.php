@@ -151,12 +151,36 @@ function action_save_student(): void
             'UPDATE students SET nis = ?, nisn = ?, name = ?, gender = ?, birth_place = ?, birth_date = ?, religion = ?, class_id = ?, active = ?, updated_at = ? WHERE id = ?',
             array_merge($data, [$id])
         );
+        $studentId = $id;
     } else {
         execute_sql(
             'INSERT INTO students (nis, nisn, name, gender, birth_place, birth_date, religion, class_id, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             $data
         );
+        $studentId = (int)db()->lastInsertId();
     }
+
+    $username = trim((string)($_POST['username'] ?? ''));
+    $password = (string)($_POST['password'] ?? '');
+    $existingUser = fetch_one('SELECT id FROM users WHERE student_id = ?', [$studentId]);
+    if ($existingUser) {
+        if ($password !== '') {
+            execute_sql('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [password_hash($password, PASSWORD_DEFAULT), now_string(), (int)$existingUser['id']]);
+            flash('success', 'Password siswa berhasil diubah.');
+        }
+    } elseif ($username !== '' && $password !== '') {
+        $taken = fetch_one('SELECT id FROM users WHERE username = ?', [$username]);
+        if ($taken) {
+            flash('danger', 'Username "' . $username . '" sudah dipakai user lain.');
+            redirect_to('students');
+        }
+        execute_sql(
+            'INSERT INTO users (username, password_hash, name, role, student_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [$username, password_hash($password, PASSWORD_DEFAULT), trim((string)$_POST['name']), 'siswa', $studentId, 1, now_string(), now_string()]
+        );
+        flash('success', 'Data siswa & akun login tersimpan. Username: ' . $username);
+    }
+
     flash('success', 'Data siswa tersimpan.');
     redirect_to('students');
 }
