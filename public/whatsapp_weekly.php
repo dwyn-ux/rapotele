@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/app/bootstrap.php';
-require_once dirname(__DIR__) . '/app/report_pdf.php';
-require_once dirname(__DIR__) . '/app/whatsapp.php';
+require_once dirname(__DIR__) . '/app/Services/pdf.php';
+require_once dirname(__DIR__) . '/app/Services/whatsapp.php';
 
 header('Content-Type: application/json; charset=utf-8');
 

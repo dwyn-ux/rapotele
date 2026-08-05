@@ -4,6 +4,31 @@ declare(strict_types=1);
 
 define('APP_ROOT', dirname(__DIR__));
 
+$envFile = APP_ROOT . '/.env';
+if (is_file($envFile)) {
+    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '' || str_starts_with($line, '#')) {
+            continue;
+        }
+        $sep = strpos($line, '=');
+        if ($sep === false) {
+            continue;
+        }
+        $key = trim(substr($line, 0, $sep));
+        $value = trim(substr($line, $sep + 1));
+        if (preg_match('/^"(.*)"$/', $value, $m)) {
+            $value = $m[1];
+        } elseif (preg_match("/^'(.*)'$/", $value, $m)) {
+            $value = $m[1];
+        }
+        putenv("$key=$value");
+        $_ENV[$key] = $value;
+        $_SERVER[$key] = $value;
+    }
+}
+
 $configFile = APP_ROOT . '/config/config.php';
 if (!is_file($configFile)) {
     $configFile = APP_ROOT . '/config/config.example.php';
@@ -38,8 +63,12 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
-require_once __DIR__ . '/core.php';
+require_once __DIR__ . '/Core/config.php';
+require_once __DIR__ . '/Core/helpers.php';
+require_once __DIR__ . '/Core/security.php';
+require_once __DIR__ . '/Core/database.php';
+require_once __DIR__ . '/Core/http.php';
 require_once __DIR__ . '/migrations.php';
-require_once __DIR__ . '/telegram.php';
+require_once __DIR__ . '/Services/telegram.php';
 
 send_security_headers();

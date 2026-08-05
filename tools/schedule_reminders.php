@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/app/bootstrap.php';
-require_once dirname(__DIR__) . '/app/schedule.php';
+require_once dirname(__DIR__) . '/app/Services/schedule.php';
 
 if (!app_installed()) {
     fwrite(STDERR, "Aplikasi belum diinstall.\n");

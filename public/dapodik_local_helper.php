@@ -376,6 +376,12 @@ BAT;
 }
 
 if (isset($_GET['download'])) {
+    if (!helper_is_local_request()) {
+        http_response_code(403);
+        echo 'Download hanya boleh dilakukan dari localhost.';
+        exit;
+    }
+
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
     header('Expires: 0');

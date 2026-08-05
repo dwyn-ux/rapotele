@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/app/bootstrap.php';
-require_once dirname(__DIR__) . '/app/report_pdf.php';
-require_once dirname(__DIR__) . '/app/whatsapp.php';
+require_once dirname(__DIR__) . '/app/Services/pdf.php';
 
+require_once dirname(__DIR__) . '/app/Services/whatsapp.php';
 if (!app_installed()) {
     fwrite(STDERR, "Aplikasi belum diinstall.\n");
     exit(1);

@@ -5,7 +5,8 @@
 /build/
 /dist/
 *.zip
-/eraport-dapodik-bridge-portable-v2.5 (4)/
+.env
+.env.local
 /storage/*.sqlite
 /storage/*.sqlite-*
 /storage/*.log

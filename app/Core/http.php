@@ -2,11 +2,56 @@
 
 declare(strict_types=1);
 
+function send_security_headers(): void
+{
+    if (PHP_SAPI === 'cli' || headers_sent()) {
+        return;
+    }
+
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: SAMEORIGIN');
+    header('Referrer-Policy: same-origin');
+    header('Permissions-Policy: camera=(), microphone=(), geolocation=(self)');
+    // ponytail: 'unsafe-inline' in script-src needed for geolocation script in assessment.php.
+    // Upgrade path: move that inline script to public/assets/app.js and switch to nonce-based CSP.
+    header("Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'");
+
+    if (is_https_request()) {
+        header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+    }
+}
+
+function app_url(string $path = ''): string
+{
+    $base = rtrim((string)config('base_url', ''), '/');
+    if ($base === '') {
+        $script = $_SERVER['SCRIPT_NAME'] ?? '/index.php';
+        $base = rtrim(str_replace('\\', '/', dirname($script)), '/');
+        if ($base === '/') {
+            $base = '';
+        }
+    }
+
+    return $base . '/' . ltrim($path, '/');
+}
+
+function route_url(string $page, array $params = []): string
+{
+    $params = array_merge(['page' => $page], $params);
+    return app_url('index.php') . '?' . http_build_query($params);
+}
+
+function redirect_to(string $page, array $params = []): never
+{
+    header('Location: ' . route_url($page, $params));
+    exit;
+}
+
 function app_routes(): array
 {
     static $routes;
     if (!is_array($routes)) {
-        $routes = require __DIR__ . '/routes.php';
+        $routes = require __DIR__ . '/../routes.php';
     }
 
     return $routes;
@@ -16,7 +61,7 @@ function app_post_actions(): array
 {
     static $actions;
     if (!is_array($actions)) {
-        $actions = require __DIR__ . '/actions.php';
+        $actions = require __DIR__ . '/../actions.php';
     }
 
     return $actions;

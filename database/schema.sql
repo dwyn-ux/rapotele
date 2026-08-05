@@ -7,6 +7,9 @@ CREATE TABLE IF NOT EXISTS school_profile (
   principal_nip VARCHAR(64) NULL,
   academic_year VARCHAR(32) NOT NULL,
   semester VARCHAR(32) NOT NULL,
+  location_lat DECIMAL(10,8) NULL,
+  location_lng DECIMAL(11,8) NULL,
+  attendance_radius_meters INT NULL DEFAULT 500,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

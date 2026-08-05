@@ -3,8 +3,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/app/bootstrap.php';
-require_once dirname(__DIR__) . '/app/pages.php';
-require_once dirname(__DIR__) . '/app/extended_pages.php';
+require_once dirname(__DIR__) . '/app/web.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -70,31 +69,14 @@ try {
     }
 
     if (!$tokenAccepted) {
-        $setupToken = $bodyToken !== '' ? $bodyToken : $headerToken;
-        if ($expectedDapodikToken === '' && $setupToken !== '' && $payloadNpsn !== '' && ($expectedNpsn === '' || hash_equals($expectedNpsn, $payloadNpsn))) {
-            set_app_setting('dapodik_token', $setupToken);
-            set_app_setting('dapodik_npsn', $payloadNpsn);
-            $expectedDapodikToken = $setupToken;
-            $expectedNpsn = $payloadNpsn;
-            $tokenAccepted = true;
-            $matchedTokenSource = $bodyToken !== '' ? 'body-auto-setup' : 'header-auto-setup';
-        }
-    }
-
-    $autoConfigured = str_ends_with($matchedTokenSource, '-auto-setup');
-    if ($tokenAccepted && $expectedNpsn === '' && $payloadNpsn !== '') {
-        set_app_setting('dapodik_npsn', $payloadNpsn);
-        $expectedNpsn = $payloadNpsn;
-        $autoConfigured = true;
-    }
-
-    if (!$tokenAccepted) {
         $reasons = [];
         if (!$tokenCandidates) {
             $reasons[] = 'token tidak diterima oleh server';
         }
-        if ($expectedDapodikToken === '') {
-            $reasons[] = 'Token / Key Webservice di menu Update Data server masih kosong';
+        if ($expectedDapodikToken === '' && $expectedBridgeToken === '') {
+            $reasons[] = 'Token / Key Webservice belum dikonfigurasi di menu Update Data';
+        } elseif ($expectedDapodikToken === '' && $expectedBridgeToken !== '') {
+            $reasons[] = 'Token bridge diterima, namun Token / Key Webservice di server masih kosong. Isi di menu Update Data.';
         } elseif (!in_array(true, array_map(fn (string $token): bool => hash_equals($expectedDapodikToken, $token), $tokenCandidates), true)) {
             $reasons[] = 'token yang dikirim helper tidak sama dengan Token / Key Webservice di server';
         }
@@ -106,17 +88,6 @@ try {
         echo json_encode([
             'ok' => false,
             'message' => 'Token sinkron tidak valid. ' . ($reasons ? 'Penyebab: ' . implode('; ', $reasons) . '. ' : '') . 'Pakai Token Web Service Dapodik dan NPSN yang sama dengan konfigurasi Update Data di server e-rapor tujuan.',
-            'diagnostic' => [
-                'token_header_diterima' => $headerToken !== '',
-                'token_body_diterima' => $bodyToken !== '',
-                'panjang_token_header' => strlen($headerToken),
-                'panjang_token_body' => strlen($bodyToken),
-                'token_server_terisi' => $expectedDapodikToken !== '',
-                'panjang_token_server' => strlen($expectedDapodikToken),
-                'npsn_server' => $expectedNpsn,
-                'npsn_helper' => $payloadNpsn,
-                'npsn_sama' => $expectedNpsn === '' || ($payloadNpsn !== '' && hash_equals($expectedNpsn, $payloadNpsn)),
-            ],
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -130,7 +101,7 @@ try {
         $message = 'Bridge menerima semua data. ' . dapodik_summary_text($summary) . '.';
         execute_sql(
             'INSERT INTO dapodik_sync_logs (mode, data_type, endpoint, status, message, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-            ['offline-bridge', 'all', 'dapodik_bridge.php', 'success', $autoConfigured ? $message . ' Konfigurasi token/NPSN server diisi otomatis.' : $message, null]
+            ['offline-bridge', 'all', 'dapodik_bridge.php', 'success', $message, null]
         );
 
         $warningPayload = [];
@@ -141,7 +112,7 @@ try {
             }
         }
 
-        echo json_encode(['ok' => true, 'type' => 'all', 'summary' => $summary, 'count' => array_sum($summary), 'auto_configured' => $autoConfigured, 'warnings' => $warningPayload], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['ok' => true, 'type' => 'all', 'summary' => $summary, 'count' => array_sum($summary), 'warnings' => $warningPayload], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
@@ -151,10 +122,10 @@ try {
     $count = dapodik_import($type, $data);
     execute_sql(
         'INSERT INTO dapodik_sync_logs (mode, data_type, endpoint, status, message, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-        ['offline-bridge', $type, 'dapodik_bridge.php', 'success', "Bridge menerima $type. Data diproses: $count." . ($autoConfigured ? ' Konfigurasi token/NPSN server diisi otomatis.' : ''), null]
+        ['offline-bridge', $type, 'dapodik_bridge.php', 'success', "Bridge menerima $type. Data diproses: $count.", null]
     );
 
-    echo json_encode(['ok' => true, 'type' => $type, 'count' => $count, 'auto_configured' => $autoConfigured] + dapodik_import_warning_payload($type), JSON_UNESCAPED_UNICODE);
+    echo json_encode(['ok' => true, 'type' => $type, 'count' => $count] + dapodik_import_warning_payload($type), JSON_UNESCAPED_UNICODE);
 } catch (Throwable $exception) {
     http_response_code(http_response_code() >= 400 ? http_response_code() : 500);
     echo json_encode(['ok' => false, 'message' => friendly_error($exception)], JSON_UNESCAPED_UNICODE);

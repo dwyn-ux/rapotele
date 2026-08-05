@@ -12,6 +12,7 @@ final class SimplePdf
     private float $height = 841.89;
     private string $font = 'Helvetica';
     private float $fontSize = 10.0;
+    private bool $italic = false;
 
     public function addPage(): void
     {
@@ -39,8 +40,9 @@ final class SimplePdf
         $objects[2] = '';
         $objects[$fontRegular] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
         $objects[$fontBold] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+        $objects[5] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding >>';
 
-        $next = 5;
+        $next = 6;
         $imageResources = '';
         foreach ($this->images as $name => &$image) {
             $imageObject = $next++;
@@ -57,7 +59,7 @@ final class SimplePdf
             $compressed = gzcompress($pageContent, 6);
             $objects[$contentObject] = "<< /Length " . strlen($compressed) . " /Filter /FlateDecode >>\nstream\n" . $compressed . "\nendstream";
             $objects[$pageObject] = sprintf(
-                '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.2F %.2F] /Resources << /Font << /F1 %d 0 R /F2 %d 0 R >>%s >> /Contents %d 0 R >>',
+                '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.2F %.2F] /Resources << /Font << /F1 %d 0 R /F2 %d 0 R /F3 5 0 R >>%s >> /Contents %d 0 R >>',
                 $this->width,
                 $this->height,
                 $fontRegular,
@@ -108,10 +110,19 @@ final class SimplePdf
 
     public function text(float $x, float $y, string $text, ?float $size = null, bool $bold = false): void
     {
-        if ($size !== null || ($bold && $this->font !== 'Helvetica-Bold')) {
+        if ($size !== null || ($bold && $this->font !== 'Helvetica-Bold') || ($bold && $this->italic)) {
+            $this->italic = false;
             $this->setFont('Helvetica', $size ?? $this->fontSize, $bold);
         }
         $this->content .= sprintf("q 0 g BT %.2F %.2F Td (%s) Tj ET Q\n", $x, $y, $this->escape($text));
+    }
+
+    public function italicText(float $x, float $y, string $text, float $size): void
+    {
+        $this->font = 'Helvetica-Oblique';
+        $this->fontSize = $size;
+        $this->italic = true;
+        $this->content .= sprintf("q 0 g BT /F3 %.2F Tf %.2F %.2F Td (%s) Tj ET Q\n", $size, $x, $y, $this->escape($text));
     }
 
     public function centerText(float $x, float $y, float $w, string $text, ?float $size = null, bool $bold = false): void
@@ -119,6 +130,55 @@ final class SimplePdf
         $fontSize = $size ?? $this->fontSize;
         $textWidth = $this->stringWidth($text, $fontSize, $bold);
         $this->text($x + max(0, ($w - $textWidth) / 2), $y, $text, $fontSize, $bold);
+    }
+
+    public function justifyText(float $x, float $y, float $w, string $text, float $size = 9, bool $bold = false): array
+    {
+        $words = explode(' ', $text);
+        $lines = $this->wrapText($text, $w, $size);
+        $lineY = $y;
+        foreach ($lines as $idx => $line) {
+            $lineWords = explode(' ', $line);
+            if (count($lineWords) <= 1 || $idx === count($lines) - 1) {
+                $this->text($x, $lineY, $line, $size, $bold);
+            } else {
+                $lineWidth = $this->stringWidth($line, $size, $bold);
+                $spaceCount = count($lineWords) - 1;
+                $spaceWidth = ($w - ($lineWidth - $this->stringWidth(' ', $size, $bold) * $spaceCount)) / $spaceCount;
+                $cx = $x;
+                foreach ($lineWords as $wi => $word) {
+                    $this->text($cx, $lineY, $word, $size, $bold);
+                    $cx += $this->stringWidth($word, $size, $bold) + ($wi < $spaceCount ? $spaceWidth : 0);
+                }
+            }
+            $lineY -= 11.34;
+        }
+        return $lines;
+    }
+
+    public function justifyTextClamped(float $x, float $y, float $w, string $text, float $size, int $maxLines, bool $bold = false): void
+    {
+        $allLines = $this->wrapText($text, $w, $size);
+        $lines = array_slice($allLines, 0, $maxLines);
+        $lineY = $y;
+        $total = count($lines);
+        foreach ($lines as $idx => $line) {
+            $lineWords = explode(' ', $line);
+            $isLast = $idx === $total - 1;
+            if (count($lineWords) <= 1 || $isLast) {
+                $this->text($x, $lineY, $line, $size, $bold);
+            } else {
+                $lineWidth = $this->stringWidth($line, $size, $bold);
+                $spaceCount = count($lineWords) - 1;
+                $spaceWidth = ($w - ($lineWidth - $this->stringWidth(' ', $size, $bold) * $spaceCount)) / $spaceCount;
+                $cx = $x;
+                foreach ($lineWords as $wi => $word) {
+                    $this->text($cx, $lineY, $word, $size, $bold);
+                    $cx += $this->stringWidth($word, $size, $bold) + ($wi < $spaceCount ? $spaceWidth : 0);
+                }
+            }
+            $lineY -= 11.34;
+        }
     }
 
     public function line(float $x1, float $y1, float $x2, float $y2): void
@@ -313,6 +373,7 @@ function report_student_payload(int $studentId): array
         'cocurricular' => report_cocurricular_for_student($student),
         'extracurriculars' => report_extracurriculars_for_student($student),
         'homeroom_note' => trim((string)($reportDate['note'] ?? '')) ?: 'Menunjukkan sikap baik dan perlu terus dibiasakan belajar mandiri di rumah.',
+        'graduation' => fetch_one('SELECT status, notes FROM graduations WHERE student_id = ?', [$studentId]),
     ];
 }
 
@@ -320,42 +381,143 @@ function report_subjects_for_student(array $student, int $studentId): array
 {
     $classId = (int)($student['class_id'] ?? 0);
     $grade = (string)($student['grade'] ?? '');
+    $examWeight = (int)get_app_setting('grade.exam_weight', '40');
+    $dailyWeight = 100 - $examWeight;
+    $kkm = (int)get_app_setting('grade.kkm', '70');
+
+    $subjects = [];
+
+    $rows = [];
     $mapped = $grade !== ''
         ? (int)(fetch_one('SELECT COUNT(*) AS total FROM report_mappings WHERE grade = ? AND include_in_report = 1', [$grade])['total'] ?? 0)
         : 0;
 
     if ($mapped > 0) {
-        return fetch_all(
-            'SELECT sub.id, sub.name, COALESCE(sg.name, sub.group_name, ?) AS group_name,
-                    COALESCE(AVG(g.score), fs.score) AS score,
-                    COALESCE(MAX(NULLIF(g.description, ?)), ?) AS description,
-                    MIN(rm.display_order) AS display_order
+        $rows = fetch_all(
+            'SELECT sub.id, sub.name, sub.group_name, COALESCE(sg.name, sub.group_name, ?) AS group_name,
+                    AVG(g.score) AS daily_avg, es.score AS exam_score, fs.score AS final_score,
+                    MIN(rm.display_order) AS display_order, MIN(sg.display_order) AS group_order
              FROM report_mappings rm
              JOIN subjects sub ON sub.id = rm.subject_id
              LEFT JOIN subject_groups sg ON sg.id = rm.group_id
              LEFT JOIN teaching_assignments ta ON ta.subject_id = sub.id AND ta.class_id = ?
              LEFT JOIN grades g ON g.assignment_id = ta.id AND g.student_id = ?
+             LEFT JOIN exam_scores es ON es.subject_id = sub.id AND es.student_id = ?
              LEFT JOIN final_scores fs ON fs.subject_id = sub.id AND fs.student_id = ?
              WHERE rm.grade = ? AND rm.include_in_report = 1 AND sub.active = 1
-             GROUP BY sub.id, sub.name, sg.name, sub.group_name, fs.score
-             ORDER BY MIN(rm.display_order), COALESCE(MIN(sg.display_order), 999), sub.name',
-            ['Kelompok A', '', '', $classId, $studentId, $studentId, $grade]
+             GROUP BY sub.id, sub.name, sub.group_name, sg.name, es.score, fs.score
+             ORDER BY COALESCE(MIN(sg.display_order), 999), MIN(rm.display_order), sub.name',
+            ['Kelompok A', $classId, $studentId, $studentId, $studentId, $grade]
         );
     }
 
-    return fetch_all(
-        'SELECT sub.id, sub.name, COALESCE(sub.group_name, ?) AS group_name,
-                COALESCE(AVG(g.score), fs.score) AS score,
-                COALESCE(MAX(NULLIF(g.description, ?)), ?) AS description
-         FROM subjects sub
-         LEFT JOIN teaching_assignments ta ON ta.subject_id = sub.id AND ta.class_id = ?
-         LEFT JOIN grades g ON g.assignment_id = ta.id AND g.student_id = ?
-         LEFT JOIN final_scores fs ON fs.subject_id = sub.id AND fs.student_id = ?
-         WHERE sub.active = 1
-         GROUP BY sub.id, sub.name, sub.group_name, fs.score
-         ORDER BY sub.group_name, sub.name',
-        ['Kelompok A', '', '', $classId, $studentId, $studentId]
+    if (!$rows) {
+        $rows = fetch_all(
+            'SELECT sub.id, sub.name, sub.group_name, COALESCE(sub.group_name, ?) AS group_name,
+                    AVG(g.score) AS daily_avg, es.score AS exam_score, fs.score AS final_score
+             FROM subjects sub
+             LEFT JOIN teaching_assignments ta ON ta.subject_id = sub.id AND ta.class_id = ?
+             LEFT JOIN grades g ON g.assignment_id = ta.id AND g.student_id = ?
+             LEFT JOIN exam_scores es ON es.subject_id = sub.id AND es.student_id = ?
+             LEFT JOIN final_scores fs ON fs.subject_id = sub.id AND fs.student_id = ?
+             WHERE sub.active = 1
+             GROUP BY sub.id, sub.name, sub.group_name, es.score, fs.score
+             ORDER BY sub.group_name, sub.name',
+            ['Kelompok A', $classId, $studentId, $studentId, $studentId]
+        );
+    }
+
+    $allObjectives = fetch_all(
+        'SELECT lo.id, lo.subject_id, lo.description
+         FROM learning_objectives lo
+         WHERE lo.grade = ? AND lo.active = 1',
+        [(string)$grade]
     );
+    $objectivesBySubject = [];
+    foreach ($allObjectives as $lo) {
+        $sid = (int)$lo['subject_id'];
+        $objectivesBySubject[$sid][] = $lo['description'];
+    }
+
+    foreach ($rows as $r) {
+        $daily = (float)($r['daily_avg'] ?? 0);
+        $exam = (float)($r['exam_score'] ?? 0);
+        $final = (float)($r['final_score'] ?? 0);
+
+        if ($final <= 0 && $daily > 0) {
+            if ($exam > 0) {
+                $final = ($daily * $dailyWeight / 100) + ($exam * $examWeight / 100);
+            } else {
+                $final = $daily;
+            }
+        } elseif ($final <= 0 && $exam > 0) {
+            $final = $exam;
+        }
+
+        $finalRounded = $final > 0 ? (int)round($final) : 0;
+
+        $desc = '';
+        $sid = (int)$r['id'];
+        $objectives = $objectivesBySubject[$sid] ?? [];
+        if ($objectives) {
+            $achieved = [];
+            $needHelp = [];
+            foreach ($objectives as $obj) {
+                if ($finalRounded >= $kkm) {
+                    $achieved[] = $obj;
+                } else {
+                    $needHelp[] = $obj;
+                }
+            }
+            $parts = [];
+            if ($achieved) {
+                $parts[] = 'Mencapai kompetensi baik dalam ' . implode(', ', array_slice($achieved, 0, 3));
+            }
+            if ($needHelp) {
+                $parts[] = 'Perlu peningkatan dalam memahami ' . implode(', ', array_slice($needHelp, 0, 2));
+            }
+            $desc = $parts ? implode('. ', $parts) . '.' : '';
+        }
+        if ($desc === '') {
+            $desc = $finalRounded >= $kkm
+                ? 'Mencapai kompetensi dengan baik.'
+                : 'Perlu peningkatan dalam memahami kompetensi dasar.';
+        }
+
+        $subjects[] = [
+            'name' => $r['name'],
+            'group_name' => $r['group_name'],
+            'kkm' => $kkm,
+            'score' => $finalRounded > 0 ? $finalRounded : null,
+            'predikat' => $finalRounded > 0 ? predikat_from_score($finalRounded) : '-',
+            'description' => $desc,
+        ];
+    }
+
+    return $subjects;
+}
+
+function predikat_from_score(int $score): string
+{
+    $predikatSetting = get_app_setting('grade.predikat', '');
+    if ($predikatSetting !== '') {
+        $ranges = explode(',', $predikatSetting);
+        foreach ($ranges as $range) {
+            $parts = explode('=', trim($range));
+            if (count($parts) === 2) {
+                $label = trim($parts[0]);
+                $bounds = explode('-', trim($parts[1]));
+                if (count($bounds) === 2 && $score >= (int)$bounds[0] && $score <= (int)$bounds[1]) {
+                    return $label;
+                }
+            }
+        }
+    }
+
+    if ($score >= 86) return 'A';
+    if ($score >= 71) return 'B';
+    if ($score >= 56) return 'C';
+    return 'D';
 }
 
 function report_student_photo(int $studentId): ?array
@@ -466,10 +628,11 @@ function report_extracurriculars_for_student(array $student): array
     $studentId = (int)($student['id'] ?? 0);
     if ($studentId > 0 && table_exists('extracurricular_members')) {
         $memberRows = fetch_all(
-            'SELECT e.*, t.name AS teacher_name
+            'SELECT e.*, t.name AS teacher_name, es.score AS keterangan
              FROM extracurricular_members em
              JOIN extracurriculars e ON e.id = em.extracurricular_id
              LEFT JOIN teachers t ON t.id = e.teacher_id
+             LEFT JOIN extracurricular_scores es ON es.student_id = em.student_id AND es.extracurricular_id = e.id
              WHERE e.active = 1 AND em.student_id = ?
              ORDER BY e.type, e.name
              LIMIT 2',
@@ -481,24 +644,27 @@ function report_extracurriculars_for_student(array $student): array
     }
     $className = (string)($student['class_name'] ?? '');
     $rows = fetch_all(
-        'SELECT e.*, t.name AS teacher_name
+        'SELECT e.*, t.name AS teacher_name, es.score AS keterangan
          FROM extracurriculars e
          LEFT JOIN teachers t ON t.id = e.teacher_id
+         LEFT JOIN extracurricular_scores es ON es.student_id = ? AND es.extracurricular_id = e.id
          WHERE e.active = 1 AND (e.class_name = ? OR e.class_name = ? OR e.class_name = ?)
          ORDER BY e.type, e.name
          LIMIT 2',
-        [$className, 'Semua Kelas', 'Pramuka Reguler']
+        [$studentId, $className, 'Semua Kelas', 'Pramuka Reguler']
     );
     if ($rows) {
         return $rows;
     }
     return fetch_all(
-        'SELECT e.*, t.name AS teacher_name
+        'SELECT e.*, t.name AS teacher_name, es.score AS keterangan
          FROM extracurriculars e
          LEFT JOIN teachers t ON t.id = e.teacher_id
+         LEFT JOIN extracurricular_scores es ON es.student_id = ? AND es.extracurricular_id = e.id
          WHERE e.active = 1
          ORDER BY e.type, e.name
-         LIMIT 2'
+         LIMIT 2',
+        [$studentId]
     );
 }
 
@@ -555,11 +721,6 @@ function draw_report_identity(SimplePdf $pdf, array $payload, int $pageNo): void
     $student = $payload['student'];
     $school = $payload['school'];
     $class = $student['class_name'] ?: '-';
-    $grade = (string)($student['grade'] ?: $class);
-    $address = $school['address'] ?: 'Jl. Sepi  Gg.01 Makam Pahlawan';
-
-    draw_report_asset_badge($pdf, 24.00, 789.00, 28.00, 28.00, 'LOGO', $payload['logo']['file_path'] ?? '');
-    draw_report_asset_badge($pdf, 542.00, 789.00, 30.00, 38.00, report_student_initials((string)$student['name']), $payload['photo']['file_path'] ?? '');
 
     $pdf->setFont('Helvetica', 10);
     $pdf->text(59.53, 775.11, 'Nama Murid');
@@ -569,32 +730,24 @@ function draw_report_identity(SimplePdf $pdf, array $payload, int $pageNo): void
     $pdf->text(476.22, 775.11, ':');
     $pdf->text(484.72, 775.11, $class);
 
-    $pdf->text(59.53, 760.94, 'NIS/NISN ');
+    $pdf->text(59.53, 760.94, 'NIS/NISN');
     $pdf->text(161.58, 760.94, ':');
     $pdf->text(170.08, 760.94, trim(($student['nis'] ?: '-') . ' / ' . ($student['nisn'] ?: '-')));
-    $pdf->text(391.18, 760.94, 'Fase');
+    $pdf->text(391.18, 760.94, 'Semester');
     $pdf->text(476.22, 760.94, ':');
-    $pdf->text(484.72, 760.94, class_phase($grade));
+    $pdf->text(484.72, 760.94, semester_number());
 
     $pdf->text(59.53, 746.76, 'Sekolah');
     $pdf->text(161.58, 746.76, ':');
     $pdf->text(170.08, 746.76, (string)$school['name']);
-    $pdf->text(391.18, 746.76, 'Semester');
+    $pdf->text(391.18, 746.76, 'Tahun Ajaran');
     $pdf->text(476.22, 746.76, ':');
-    $pdf->text(484.72, 746.76, semester_number());
-
-    $pdf->text(59.53, 732.59, 'Alamat');
-    $pdf->text(161.58, 732.59, ':');
-    $pdf->text(170.08, 732.59, $address);
-    $pdf->text(391.18, 732.59, 'Tahun Ajaran');
-    $pdf->text(476.22, 732.59, ':');
-    $pdf->text(484.72, 732.59, (string)$school['academic_year']);
+    $pdf->text(484.72, 746.76, (string)$school['academic_year']);
     $pdf->line(56.69, 722.83, 538.58, 722.83);
 
-    $pdf->setFont('Helvetica', 7.5);
     $pdf->line(56.69, 36.85, 538.58, 36.85);
-    $pdf->text(59.53, 20.43, $class . '  | ' . $student['name'] . ' | ' . $student['nis']);
-    $pdf->text(489.08, 20.43, 'Halaman : ' . $pageNo);
+    $pdf->italicText(59.53, 20.43, $class . '  | ' . $student['name'] . ' | ' . $student['nis'], 7.5);
+    $pdf->italicText(489.08, 20.43, 'Halaman : ' . $pageNo, 7.5);
 }
 
 function draw_report_asset_badge(SimplePdf $pdf, float $x, float $topY, float $w, float $h, string $label, string $filePath = ''): void
@@ -624,21 +777,44 @@ function report_student_initials(string $name): string
     return $initials ?: 'FS';
 }
 
+/**
+ * Single source of truth for the learning-results table geometry, shared by
+ * the header row and the per-subject body rows so they never drift apart.
+ * 'Predikat' was widened (28.35 -> 53.00, taken from 'Nilai' and 'Capaian
+ * Kompetensi') because the label "Predikat" in bold 10pt does not fit in
+ * 28.35pt and was being sliced by the column border.
+ */
+function report_learning_table_columns(): array
+{
+    return [
+        'no'       => ['x' => 56.69,  'w' => 22.68,  'label' => 'No', 'fill' => true],
+        'mapel'    => ['x' => 79.37,  'w' => 99.21,  'label' => 'Mata Pelajaran', 'fill' => true],
+        'kkm'      => ['x' => 178.58, 'w' => 28.35,  'label' => 'KKM', 'fill' => false],
+        'nilai'    => ['x' => 206.93, 'w' => 36.00,  'label' => 'Nilai', 'fill' => false],
+        'predikat' => ['x' => 242.93, 'w' => 53.00,  'label' => 'Predikat', 'fill' => false],
+        'capaian'  => ['x' => 295.93, 'w' => 242.65, 'label' => 'Capaian Kompetensi', 'fill' => false],
+    ];
+}
+
 function draw_report_learning_table_header(SimplePdf $pdf): float
 {
+    $y = 715.00;
+    $titleHeight = 17.01;
+    // Title band: plain text, no fill and no border.
     $pdf->setFont('Helvetica', 12, true);
-    $pdf->centerText(56.69, 696.56, 481.89, 'LAPORAN HASIL BELAJAR', 12, true);
-    $pdf->setFont('Helvetica', 10, true);
-    $pdf->rect(56.69, 680.31, 22.68, -22.68, 'B', [0.973, 0.973, 1.000]);
-    $pdf->centerText(56.69, 665.98, 22.68, 'No', 10, true);
-    $pdf->rect(79.37, 680.31, 113.39, -22.68, 'B', [0.973, 0.973, 1.000]);
-    $pdf->centerText(79.37, 665.98, 113.39, 'Mata Pelajaran', 10, true);
-    $pdf->rect(192.76, 680.31, 56.69, -22.68, 'B', [0.973, 0.973, 1.000]);
-    $pdf->centerText(192.76, 665.98, 56.69, 'Nilai Akhir', 10, true);
-    $pdf->rect(249.45, 680.31, 289.13, -22.68, 'B', [0.973, 0.973, 1.000]);
-    $pdf->centerText(249.45, 665.98, 289.13, 'Capaian Kompetensi', 10, true);
+    $pdf->centerText(56.69, $y - 11.50, 481.89, 'LAPORAN HASIL BELAJAR', 12, true);
+    $y -= $titleHeight;
 
-    return 657.64;
+    // Column header row: only "No" and "Mata Pelajaran" get the light-blue fill.
+    $headerRowHeight = 22.68;
+    $pdf->setFont('Helvetica', 10, true);
+    $labelY = $y - ($headerRowHeight / 2) - 3.5;
+    foreach (report_learning_table_columns() as $col) {
+        $style = $col['fill'] ? 'B' : 'S';
+        $pdf->rect($col['x'], $y, $col['w'], -$headerRowHeight, $style, [0.973, 0.973, 1.000]);
+        $pdf->centerText($col['x'], $labelY, $col['w'], $col['label'], 10, true);
+    }
+    return $y - $headerRowHeight;
 }
 
 function draw_report_page_one(SimplePdf $pdf, array $payload): int
@@ -657,8 +833,14 @@ function draw_report_page_one(SimplePdf $pdf, array $payload): int
         if ($description === '') {
             $description = 'Menunjukkan perkembangan belajar yang baik pada mata pelajaran ' . $subject['name'] . '.';
         }
-        $lines = array_slice($pdf->wrapText($description, 270, 9), 0, 4);
-        $height = max(28.35, 17 + (count($lines) * 11.34));
+        $cols = report_learning_table_columns();
+        $capaianTextWidth = $cols['capaian']['w'] - 10.78;
+        $capaianLines = min(4, count($pdf->wrapText($description, $capaianTextWidth, 9)));
+        $mapelLines = min(2, count($pdf->wrapText((string)$subject['name'], $cols['mapel']['w'] - 11.34, 9)));
+        $height = 28.35 + ($capaianLines - 1) * 11.34;
+        if ($mapelLines > 1) {
+            $height = max($height, 28.35 + 11.34);
+        }
         $needsGroupHeader = $group !== $currentGroup;
         $neededHeight = $height + ($needsGroupHeader ? 17.01 : 0);
         if ($y - $neededHeight < $pageBottomLimit) {
@@ -677,35 +859,31 @@ function draw_report_page_one(SimplePdf $pdf, array $payload): int
             $y -= 17.01;
         }
         $pdf->setFont('Helvetica', 9);
-        $pdf->rect(56.69, $y, 22.68, -$height, 'S');
-        $pdf->centerText(56.69, $y - ($height / 2) - 3, 22.68, (string)$no, 9);
-        $pdf->rect(79.37, $y, 113.39, -$height, 'S');
-        $pdf->text(85.04, $y - ($height / 2) - 3, (string)$subject['name'], 9);
-        $pdf->rect(192.76, $y, 56.69, -$height, 'S');
-        $score = $subject['score'] !== null && $subject['score'] !== '' ? number_format((float)$subject['score'], 0) : '';
-        $pdf->centerText(192.76, $y - ($height / 2) - 3, 56.69, $score, 9);
-        $pdf->rect(249.45, $y, 289.13, -$height, 'S');
-        $lineY = $y - 11.55;
-        foreach ($lines as $line) {
-            $pdf->text(255.12, $lineY, $line, 9);
-            $lineY -= 11.34;
+        $pdf->rect($cols['no']['x'], $y, $cols['no']['w'], -$height, 'S');
+        $pdf->centerText($cols['no']['x'], $y - ($height / 2) - 3, $cols['no']['w'], (string)$no, 9);
+        $pdf->rect($cols['mapel']['x'], $y, $cols['mapel']['w'], -$height, 'S');
+        $mapelLines = $pdf->wrapText((string)$subject['name'], $cols['mapel']['w'] - 11.34, 9);
+        $mapelLines = array_slice($mapelLines, 0, 2);
+        $mapelLineCount = count($mapelLines);
+        $mapelStartY = $y - ($height / 2) - 3;
+        if ($mapelLineCount === 2) {
+            $mapelStartY = $y - ($height / 2) + 2;
         }
+        foreach ($mapelLines as $mlIdx => $ml) {
+            $pdf->text($cols['mapel']['x'] + 5.67, $mapelStartY - ($mlIdx * 11.34), $ml, 9);
+        }
+        $pdf->rect($cols['kkm']['x'], $y, $cols['kkm']['w'], -$height, 'S');
+        $pdf->centerText($cols['kkm']['x'], $y - ($height / 2) - 3, $cols['kkm']['w'], (string)($subject['kkm'] ?? '-'), 9);
+        $pdf->rect($cols['nilai']['x'], $y, $cols['nilai']['w'], -$height, 'S');
+        $score = $subject['score'] !== null ? (string)$subject['score'] : '';
+        $pdf->centerText($cols['nilai']['x'], $y - ($height / 2) - 3, $cols['nilai']['w'], $score, 9);
+        $pdf->rect($cols['predikat']['x'], $y, $cols['predikat']['w'], -$height, 'S');
+        $pdf->centerText($cols['predikat']['x'], $y - ($height / 2) - 3, $cols['predikat']['w'], (string)($subject['predikat'] ?? '-'), 9);
+        $pdf->rect($cols['capaian']['x'], $y, $cols['capaian']['w'], -$height, 'S');
+        $pdf->justifyText($cols['capaian']['x'] + 5.67, $y - 11.55, $capaianTextWidth, $description, 9);
         $y -= $height;
         $no++;
     }
-
-    $sectionGap = 14.17;
-    $sectionStackHeight = 85.04 + $sectionGap + 56.69 + $sectionGap + 181.42;
-    $sectionTop = min(547.09, $y - $sectionGap);
-    if ($sectionTop - $sectionStackHeight < $pageBottomLimit) {
-        $pageNo++;
-        $pdf->addPage();
-        draw_report_identity($pdf, $payload, $pageNo);
-        $sectionTop = 547.09;
-    }
-    $sectionBottom = draw_kokurikuler_section($pdf, $payload, $sectionTop);
-    $sectionBottom = draw_extrakurikuler_section($pdf, $payload, $sectionBottom - $sectionGap);
-    draw_attendance_note_section($pdf, $payload, $sectionBottom - $sectionGap);
 
     return $pageNo;
 }
@@ -720,12 +898,7 @@ function draw_kokurikuler_section(SimplePdf $pdf, array $payload, float $topY = 
     $pdf->rect(56.69, $topY, 481.89, -$headerHeight, 'B', [0.973, 0.973, 1.000]);
     $pdf->centerText(56.69, $topY - 14.34, 481.89, 'Kokurikuler', 10, true);
     $pdf->setFont('Helvetica', 9);
-    $lines = array_slice($pdf->wrapText($text, 460, 9), 0, 5);
-    $lineY = $topY - 33.88;
-    foreach ($lines as $line) {
-        $pdf->text(62.36, $lineY, $line, 9);
-        $lineY -= 11.34;
-    }
+    $pdf->justifyTextClamped(62.36, $topY - 33.88, 460.00, $text, 9, 5);
     $pdf->rect(56.69, $bodyTop, 481.89, -$bodyHeight, 'S');
 
     return $bodyTop - $bodyHeight;
@@ -755,10 +928,15 @@ function draw_extrakurikuler_section(SimplePdf $pdf, array $payload, float $topY
         }
         $pdf->rect(221.10, $rowTop, 317.48, -$rowHeight, 'S');
         if ($row) {
-            $note = trim((string)($row['type'] ?? ''));
-            $teacher = trim((string)($row['teacher_name'] ?? ''));
-            $text = trim(($note !== '' ? $note : 'Aktif') . ($teacher !== '' ? ' - Pembina: ' . $teacher : ''));
-            $pdf->text(226.77, $rowTop - 11.5, $text, 9);
+            $keterangan = trim((string)($row['keterangan'] ?? ''));
+            if ($keterangan !== '') {
+                $pdf->text(226.77, $rowTop - 11.5, $keterangan, 9);
+            } else {
+                $note = trim((string)($row['type'] ?? ''));
+                $teacher = trim((string)($row['teacher_name'] ?? ''));
+                $text = trim(($note !== '' ? $note : 'Aktif') . ($teacher !== '' ? ' - Pembina: ' . $teacher : ''));
+                $pdf->text(226.77, $rowTop - 11.5, $text, 9);
+            }
         }
         $rowTop -= $rowHeight;
     }
@@ -793,12 +971,7 @@ function draw_attendance_note_section(SimplePdf $pdf, array $payload, float $top
         $pdf->text(150.24, $y - 12.62, ' : ' . ($count ?: '') . ' hari', 9);
     }
     $pdf->rect(221.10, $noteTop, 317.48, -59.53, 'S');
-    $noteLines = array_slice($pdf->wrapText((string)($payload['homeroom_note'] ?? ''), 300, 9), 0, 4);
-    $noteY = $noteTop - 12.62;
-    foreach ($noteLines as $line) {
-        $pdf->text(226.77, $noteY, $line, 9);
-        $noteY -= 11.34;
-    }
+    $pdf->justifyTextClamped(226.77, $noteTop - 12.62, 300.00, (string)($payload['homeroom_note'] ?? ''), 9, 4);
     $pdf->setFont('Helvetica', 10, true);
     $pdf->rect(56.69, $parentHeaderTop, 481.89, -$headerHeight, 'B', [0.973, 0.973, 1.000]);
     $pdf->centerText(56.69, $parentHeaderTop - 14.34, 481.89, 'Tanggapan Orang Tua/Wali Murid', 10, true);
@@ -824,22 +997,42 @@ function draw_report_page_two(SimplePdf $pdf, array $payload, int $pageNo = 2): 
     $date = $reportDate['report_date'] ?? '2025-11-23';
     $dateText = $place . ', ' . format_indonesian_date($date);
 
+    $gap = 14.17;
+    $sectionTop = 711.50;
+
+    $sectionBottom = draw_kokurikuler_section($pdf, $payload, $sectionTop);
+    $sectionBottom = draw_extrakurikuler_section($pdf, $payload, $sectionBottom - $gap);
+    $sectionBottom = draw_attendance_note_section($pdf, $payload, $sectionBottom - $gap);
+
+    $promotionTop = $sectionBottom - $gap;
     $pdf->setFont('Helvetica', 10, true);
-    $pdf->rect(56.69, 711.50, 481.89, -28.35, 'S');
-    $pdf->centerText(56.69, 694.32, 481.89, 'Keterangan Kenaikan Kelas  :  Naik/Tidak Naik ke kelas ....... ', 10, true);
+    $pdf->rect(56.69, $promotionTop, 481.89, -28.35, 'S');
+    $status = 'Naik/Tidak Naik';
+    $nextGrade = '';
+    $promotionEnabled = get_app_setting('promotion.enabled', '1') === '1' && semester_number() === '2';
+    $graduation = $payload['graduation'] ?? null;
+    if ($promotionEnabled && $graduation && in_array((string)$graduation['status'], ['naik', 'tinggal'], true)) {
+        $label = $graduation['status'] === 'naik' ? 'Naik Kelas' : 'Tinggal Kelas';
+        $status = $label;
+        $gradeNum = (int)preg_replace('/\D+/', '', (string)($payload['student']['grade'] ?? ''));
+        $nextGrade = $graduation['status'] === 'naik' ? ' ke kelas ' . ($gradeNum + 1) : '';
+    }
+    $pdf->centerText(56.69, $promotionTop - 17.18, 481.89, 'Keterangan Kenaikan Kelas  :  ' . $status . $nextGrade, 10, true);
+
+    $sigTop = $promotionTop - 28.35 - $gap;
     $pdf->setFont('Helvetica', 10);
-    $pdf->text(390.11, 660.31, $dateText, 10);
-    $pdf->text(81.30, 648.97, 'Orang Tua Murid,', 10);
-    $pdf->text(237.51, 648.97, 'Kepala Sekolah,', 10);
-    $pdf->text(427.49, 648.97, ' Wali Kelas', 10);
-    draw_report_signature_marker($pdf, 230.00, 628.00, 'TTD Digital', (string)($principalSignature['file_path'] ?? ''));
-    draw_report_signature_marker($pdf, 418.00, 628.00, 'TTD Digital', (string)($homeroomSignature['file_path'] ?? ''));
-    $pdf->text(80.43, 586.61, '............................', 10);
-    $pdf->text(234.28, 586.61, $principalName, 10, true);
-    $pdf->text(419.02, 586.61, $homeroomName, 10, true);
+    $pdf->text(390.11, $sigTop, $dateText, 10);
+    $pdf->text(81.30, $sigTop - 11.34, 'Orang Tua Murid,', 10);
+    $pdf->text(237.51, $sigTop - 11.34, 'Kepala Sekolah,', 10);
+    $pdf->text(427.49, $sigTop - 11.34, ' Wali Kelas', 10);
+    draw_report_signature_marker($pdf, 230.00, $sigTop - 32.34, 'TTD Digital', (string)($principalSignature['file_path'] ?? ''));
+    draw_report_signature_marker($pdf, 418.00, $sigTop - 32.34, 'TTD Digital', (string)($homeroomSignature['file_path'] ?? ''));
+    $pdf->text(80.43, $sigTop - 73.73, '............................', 10);
+    $pdf->text(234.28, $sigTop - 73.73, $principalName, 10, true);
+    $pdf->text(419.02, $sigTop - 73.73, $homeroomName, 10, true);
     $pdf->setFont('Helvetica', 10);
-    $pdf->text(211.80, 575.27, 'NIP. ' . $principalNip, 10);
-    $pdf->text(441.87, 575.27, 'NIP. ' . $homeroomNip, 10);
+    $pdf->text(211.80, $sigTop - 85.07, 'NIP. ' . $principalNip, 10);
+    $pdf->text(441.87, $sigTop - 85.07, 'NIP. ' . $homeroomNip, 10);
 }
 
 function draw_report_signature_marker(SimplePdf $pdf, float $x, float $topY, string $label, string $filePath = ''): void

@@ -56,6 +56,9 @@ function run_migrations(): void
             principal_nip VARCHAR(64) NULL,
             academic_year VARCHAR(32) NOT NULL,
             semester VARCHAR(32) NOT NULL,
+            location_lat DECIMAL(10,8) NULL,
+            location_lng DECIMAL(11,8) NULL,
+            attendance_radius_meters INT NULL DEFAULT 500,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )$engine",
@@ -100,6 +103,8 @@ function run_migrations(): void
             birth_date DATE NULL,
             religion VARCHAR(64) NULL,
             class_id INT NULL,
+            location_lat DECIMAL(10,8) NULL,
+            location_lng DECIMAL(11,8) NULL,
             active $bool NOT NULL DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -243,6 +248,8 @@ function run_migrations(): void
             status VARCHAR(24) NOT NULL DEFAULT 'hadir',
             time_in TIME NULL,
             time_out TIME NULL,
+            location_lat DECIMAL(10,8) NULL,
+            location_lng DECIMAL(11,8) NULL,
             notes TEXT NULL,
             recorded_by INT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -559,6 +566,16 @@ function run_migrations(): void
             UNIQUE (student_id, subject_id)
         )$engine",
 
+        "CREATE TABLE IF NOT EXISTS exam_scores (
+            id $pk,
+            student_id INT NOT NULL,
+            subject_id INT NOT NULL,
+            score DECIMAL(5,2) NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (student_id, subject_id)
+        )$engine",
+
         "CREATE TABLE IF NOT EXISTS app_settings (
             id $pk,
             setting_key VARCHAR(120) NOT NULL UNIQUE,
@@ -584,6 +601,16 @@ function run_migrations(): void
             status VARCHAR(40) NOT NULL DEFAULT 'ready',
             created_by INT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )$engine",
+
+        "CREATE TABLE IF NOT EXISTS extracurricular_scores (
+            id $pk,
+            student_id INT NOT NULL,
+            extracurricular_id INT NOT NULL,
+            score VARCHAR(20) NULL,
+            notes TEXT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (student_id, extracurricular_id)
         )$engine",
     ];
 
@@ -634,6 +661,8 @@ function run_migrations(): void
     migration_add_column('extracurriculars', 'active', migration_bool() . ' NOT NULL DEFAULT 1');
     migration_add_column('extracurriculars', 'updated_at', 'DATETIME NULL');
     migration_add_column('extracurricular_members', 'updated_at', 'DATETIME NULL');
+
+    migrate_foreign_keys();
 }
 
 function seed_defaults(): void
@@ -1270,4 +1299,83 @@ function seed_demo_journal(int $assignmentId, int $teacherId, int $classId, int 
             [$assignmentId, $teacherId, $classId, $subjectId, '2026-06-03', 1, 'Pembelajaran ' . $subjectName, 'Apersepsi, diskusi, latihan terarah, dan refleksi.', 'Buku siswa dan lembar kerja.', 'Sebagian siswa perlu pendampingan membaca instruksi.', 'Guru memberi penguatan dan latihan tambahan.', 1, now_string()]
         );
     }
+}
+
+function migrate_foreign_keys(): int
+{
+    if (db_driver() !== 'mysql') {
+        return 0;
+    }
+
+    $fks = [
+        'students' => [
+            ['columns' => ['class_id'], 'ref' => 'classes(id)', 'delete' => 'SET NULL'],
+        ],
+        'teaching_assignments' => [
+            ['columns' => ['teacher_id'], 'ref' => 'teachers(id)', 'delete' => 'CASCADE'],
+            ['columns' => ['class_id'], 'ref' => 'classes(id)', 'delete' => 'CASCADE'],
+            ['columns' => ['subject_id'], 'ref' => 'subjects(id)', 'delete' => 'CASCADE'],
+        ],
+        'grades' => [
+            ['columns' => ['assignment_id'], 'ref' => 'teaching_assignments(id)', 'delete' => 'CASCADE'],
+            ['columns' => ['student_id'], 'ref' => 'students(id)', 'delete' => 'CASCADE'],
+        ],
+        'student_attendance_sessions' => [
+            ['columns' => ['assignment_id'], 'ref' => 'teaching_assignments(id)', 'delete' => 'CASCADE'],
+        ],
+        'student_attendance_entries' => [
+            ['columns' => ['session_id'], 'ref' => 'student_attendance_sessions(id)', 'delete' => 'CASCADE'],
+            ['columns' => ['student_id'], 'ref' => 'students(id)', 'delete' => 'CASCADE'],
+        ],
+        'daily_journals' => [
+            ['columns' => ['assignment_id'], 'ref' => 'teaching_assignments(id)', 'delete' => 'CASCADE'],
+        ],
+        'lesson_schedules' => [
+            ['columns' => ['assignment_id'], 'ref' => 'teaching_assignments(id)', 'delete' => 'CASCADE'],
+            ['columns' => ['teacher_id'], 'ref' => 'teachers(id)', 'delete' => 'CASCADE'],
+            ['columns' => ['class_id'], 'ref' => 'classes(id)', 'delete' => 'CASCADE'],
+            ['columns' => ['subject_id'], 'ref' => 'subjects(id)', 'delete' => 'CASCADE'],
+        ],
+        'teacher_teaching_attendance' => [
+            ['columns' => ['assignment_id'], 'ref' => 'teaching_assignments(id)', 'delete' => 'CASCADE'],
+            ['columns' => ['teacher_id'], 'ref' => 'teachers(id)', 'delete' => 'CASCADE'],
+        ],
+        'student_violations' => [
+            ['columns' => ['student_id'], 'ref' => 'students(id)', 'delete' => 'CASCADE'],
+        ],
+        'final_scores' => [
+            ['columns' => ['student_id'], 'ref' => 'students(id)', 'delete' => 'CASCADE'],
+            ['columns' => ['subject_id'], 'ref' => 'subjects(id)', 'delete' => 'CASCADE'],
+        ],
+        'whatsapp_guardians' => [
+            ['columns' => ['student_id'], 'ref' => 'students(id)', 'delete' => 'CASCADE'],
+        ],
+    ];
+
+    $added = 0;
+    foreach ($fks as $table => $constraints) {
+        if (!table_exists($table)) {
+            continue;
+        }
+        foreach ($constraints as $i => $fk) {
+            $colSql = implode('_', $fk['columns']);
+            $fkName = 'fk_' . $table . '_' . $colSql;
+            try {
+                db()->exec(sprintf(
+                    'ALTER TABLE %s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s ON DELETE %s ON UPDATE CASCADE',
+                    db_identifier($table),
+                    db_identifier($fkName),
+                    implode(', ', array_map('db_identifier', $fk['columns'])),
+                    $fk['ref'],
+                    $fk['delete']
+                ));
+                $added++;
+            } catch (PDOException $e) {
+                if (!str_contains($e->getMessage(), 'Duplicate')) {
+                    throw $e;
+                }
+            }
+        }
+    }
+    return $added;
 }
