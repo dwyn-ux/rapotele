@@ -85,7 +85,7 @@ function page_teachers(): void
             <label>Telegram Chat ID <input name="telegram_chat_id" value="<?= e($edit['telegram_chat_id'] ?? '') ?>"></label>
             <?php if (!$existingUser): ?>
                 <label>Username Login <input name="username" value="<?= e($edit['username'] ?? '') ?>" placeholder="untuk login guru"></label>
-                <label>Password Login <input type="password" name="password" placeholder="<?= $edit ? 'Kosongkan jika tidak ingin buat akun' : 'Password akun guru' ?>"></label>
+                <label>Password Login <input type="password" name="password" value="<?= e(config('default_teacher_password', 'guru123')) ?>" placeholder="default: <?= e(config('default_teacher_password', 'guru123')) ?>"></label>
             <?php endif; ?>
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
             <div class="actions span-2"><button class="button primary">Simpan</button><a class="button" href="<?= e(route_url('teachers')) ?>">Reset</a></div>
