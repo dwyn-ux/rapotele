@@ -14,7 +14,7 @@ function send_security_headers(): void
     header('Permissions-Policy: camera=(), microphone=(), geolocation=(self)');
     // ponytail: 'unsafe-inline' in script-src needed for geolocation script in assessment.php.
     // Upgrade path: move that inline script to public/assets/app.js and switch to nonce-based CSP.
-    header("Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'");
+    header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: https://*.tile.openstreetmap.org; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; base-uri 'self'; frame-ancestors 'self'; form-action 'self'");
 
     if (is_https_request()) {
         header('Strict-Transport-Security: max-age=31536000; includeSubDomains');

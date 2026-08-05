@@ -6,6 +6,8 @@ function page_school(): void
     $school = get_school_profile();
     render_header('Data Sekolah');
     ?>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <section class="panel">
         <form method="post" class="grid two">
             <?= csrf_field() ?><input type="hidden" name="action" value="save_school">
@@ -16,13 +18,38 @@ function page_school(): void
             <label>NIP Kepala Sekolah <input name="principal_nip" value="<?= e($school['principal_nip'] ?? '') ?>"></label>
             <label>Tahun Ajaran <input name="academic_year" required value="<?= e($school['academic_year'] ?? '') ?>"></label>
             <label>Semester <input name="semester" required value="<?= e($school['semester'] ?? '') ?>"></label>
-            <label>Lat. Sekolah <input type="number" step="any" name="location_lat" value="<?= e($school['location_lat'] ?? '') ?>" placeholder="-6.2088"></label>
-            <label>Lng. Sekolah <input type="number" step="any" name="location_lng" value="<?= e($school['location_lng'] ?? '') ?>" placeholder="106.8456"></label>
+            <label>Lat. Sekolah <input type="number" step="any" name="location_lat" id="school_lat" value="<?= e($school['location_lat'] ?? '') ?>" placeholder="-6.2088"></label>
+            <label>Lng. Sekolah <input type="number" step="any" name="location_lng" id="school_lng" value="<?= e($school['location_lng'] ?? '') ?>" placeholder="106.8456"></label>
             <label>Radius Absensi (meter) <input type="number" min="0" name="attendance_radius_meters" value="<?= e($school['attendance_radius_meters'] ?? '500') ?>" placeholder="500"></label>
+            <div class="wide">
+                <label style="margin-bottom:4px">Peta Lokasi Sekolah <small>(klik peta untuk set lokasi)</small></label>
+                <div id="school-map" style="height:350px;width:100%;border-radius:8px;border:1px solid #ccc;z-index:0;"></div>
+            </div>
             <label class="check"><input type="checkbox" name="promotion_enabled" value="1" <?= checked(get_app_setting('promotion.enabled', '1') === '1') ?>> Aktifkan Keterangan Naik Kelas (semester genap)</label>
             <div class="wide actions"><button class="button primary">Simpan</button></div>
         </form>
     </section>
+    <script>
+    (function(){
+        var lat = parseFloat(document.getElementById('school_lat').value) || -2.5;
+        var lng = parseFloat(document.getElementById('school_lng').value) || 118.0;
+        var map = L.map('school-map').setView([lat, lng], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+        var marker = (document.getElementById('school_lat').value && document.getElementById('school_lng').value)
+            ? L.marker([lat, lng]).addTo(map) : null;
+        map.on('click', function(e){
+            var mlat = e.latlng.lat.toFixed(8);
+            var mlng = e.latlng.lng.toFixed(8);
+            document.getElementById('school_lat').value = mlat;
+            document.getElementById('school_lng').value = mlng;
+            if(marker){ marker.setLatLng(e.latlng); }
+            else { marker = L.marker(e.latlng).addTo(map); }
+        });
+        setTimeout(function(){ map.invalidateSize(); }, 200);
+    })();
+    </script>
     <?php
     render_footer();
 }
