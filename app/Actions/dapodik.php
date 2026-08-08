@@ -443,47 +443,6 @@ function dapodik_academic_year_from_row(array $row): string
     return (string)config('school.academic_year', '2025/2026');
 }
 
-function dapodik_class_name_map(string $rawName): string
-{
-    $name = trim($rawName);
-    if ($name === '' || mb_strlen($name) > 30) {
-        return $name;
-    }
-
-    $grade = dapodik_grade_from_rombel([], $name);
-    if ($grade === '') {
-        return $name;
-    }
-
-    $romanMap = ['7' => 'VII', '8' => 'VIII', '9' => 'IX', '10' => 'X', '11' => 'XI', '12' => 'XII'];
-    $roman = $romanMap[$grade] ?? $grade;
-
-    $upper = strtoupper($name);
-
-    $hasPutri = str_contains($upper, 'PUTRI') || str_contains($upper, 'WANITA') || str_contains($upper, 'PEREMPUAN');
-    $hasPutra = str_contains($upper, 'PUTRA') || str_contains($upper, 'LAKI') || str_contains($upper, 'LAKI-LAKI');
-
-    if ($hasPutri) {
-        return $roman . ' B';
-    }
-    if ($hasPutra) {
-        return $roman . ' A';
-    }
-
-    if (preg_match('/^(\d+)\s*([AB])$/i', $name, $m)) {
-        return $roman . ' ' . strtoupper($m[2]);
-    }
-
-    if (preg_match('/^(\d+)$/', $name)) {
-        if (in_array((int)$grade, [10, 11], true)) {
-            return $roman;
-        }
-        return $roman . ' A';
-    }
-
-    return $name;
-}
-
 function dapodik_grade_from_rombel(array $row, string $name): string
 {
     $value = dapodik_row_value($row, ['tingkat_pendidikan_id', 'tingkat_pendidikan', 'grade', 'kelas_id']);
@@ -644,7 +603,6 @@ function dapodik_class_id_from_row(array $row): ?int
         return null;
     }
 
-    $name = dapodik_class_name_map($name);
     $academicYear = dapodik_academic_year_from_row($row);
     $class = fetch_one('SELECT id FROM classes WHERE name = ? AND academic_year = ? ORDER BY id LIMIT 1', [$name, $academicYear])
         ?: fetch_one('SELECT id FROM classes WHERE name = ? ORDER BY id LIMIT 1', [$name]);
@@ -989,7 +947,6 @@ function dapodik_import_rombel(array $row): bool
         return false;
     }
 
-    $name = dapodik_class_name_map($name);
     $grade = dapodik_grade_from_rombel($row, $name);
     $dapodikId = dapodik_limit(dapodik_external_id($row, ['rombongan_belajar_id', 'rombel_id', 'id_rombel', 'id_rombongan_belajar', 'rombongan_belajar_id_str']), 64);
     $major = dapodik_limit(dapodik_row_value($row, ['nama_jurusan_sp', 'jurusan', 'program_keahlian', 'kompetensi_keahlian', 'major']), 80);
