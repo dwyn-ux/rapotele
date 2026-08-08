@@ -1,21 +1,12 @@
 -- =========================================
 -- E-Raport KumerBot Master Data Import
--- Generator: 2026-08-08 15:44:07
+-- Generated: 2026-08-08 15:56:05
 -- =========================================
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS=0;
 
--- ======================
 -- TEACHERS
--- ======================
-INSERT IGNORE INTO teachers (name, gender, active, created_at, updated_at) VALUES ('Siti Aminah, S.Pd', 'P', 1, NOW(), NOW());
-INSERT IGNORE INTO teachers (name, gender, active, created_at, updated_at) VALUES ('Budi Santoso, S.Pd', 'L', 1, NOW(), NOW());
-INSERT IGNORE INTO teachers (name, gender, active, created_at, updated_at) VALUES ('Rina Lestari, S.Pd', 'P', 1, NOW(), NOW());
-INSERT IGNORE INTO teachers (name, gender, active, created_at, updated_at) VALUES ('Agus Prasetyo, S.Pd', 'L', 1, NOW(), NOW());
-INSERT IGNORE INTO teachers (name, gender, active, created_at, updated_at) VALUES ('Fahmi Dwi Payana, S.H', 'L', 1, NOW(), NOW());
-INSERT IGNORE INTO teachers (name, gender, active, created_at, updated_at) VALUES ('Guru Dengan Nama Sangat Panjang Tapi Normal', 'Laki-laki panjan', 1, NOW(), NOW());
-INSERT IGNORE INTO teachers (name, gender, active, created_at, updated_at) VALUES ('Guru Test', '', 1, NOW(), NOW());
 INSERT IGNORE INTO teachers (name, gender, active, created_at, updated_at) VALUES ('Ust. Rahmat Yulianto, S. H', 'L', 1, NOW(), NOW());
 INSERT IGNORE INTO teachers (name, gender, active, created_at, updated_at) VALUES ('Ust. Muhammad Abdullah', 'L', 1, NOW(), NOW());
 INSERT IGNORE INTO teachers (name, gender, active, created_at, updated_at) VALUES ('Ust. Asyik Nur Rahman', 'L', 1, NOW(), NOW());
@@ -49,9 +40,7 @@ INSERT IGNORE INTO teachers (name, gender, active, created_at, updated_at) VALUE
 INSERT IGNORE INTO teachers (name, gender, active, created_at, updated_at) VALUES ('Ust. Salafi Hafizh Azzikri', 'L', 1, NOW(), NOW());
 INSERT IGNORE INTO teachers (name, gender, active, created_at, updated_at) VALUES ('Usth. Nafidzah Ilma Fajrin', 'P', 1, NOW(), NOW());
 
--- ======================
 -- SUBJECTS
--- ======================
 INSERT IGNORE INTO subjects (name, short_name, group_name, active, created_at, updated_at) VALUES ('Bahasa Indonesia', 'B.Indo', 'Wajib', 1, NOW(), NOW());
 INSERT IGNORE INTO subjects (name, short_name, group_name, active, created_at, updated_at) VALUES ('Matematika', 'MTK', 'Wajib', 1, NOW(), NOW());
 INSERT IGNORE INTO subjects (name, short_name, group_name, active, created_at, updated_at) VALUES ('Pendidikan Pancasila', 'PP', 'Wajib', 1, NOW(), NOW());
@@ -94,12 +83,7 @@ INSERT IGNORE INTO subjects (name, short_name, group_name, active, created_at, u
 INSERT IGNORE INTO subjects (name, short_name, group_name, active, created_at, updated_at) VALUES ('Geografi', 'GEO', 'Wajib', 1, NOW(), NOW());
 INSERT IGNORE INTO subjects (name, short_name, group_name, active, created_at, updated_at) VALUES ('Latihan Soal', 'Latsol', 'Wajib', 1, NOW(), NOW());
 
--- ======================
 -- CLASSES
--- ======================
-INSERT IGNORE INTO classes (name, grade, academic_year, active, created_at, updated_at) VALUES ('1A', '1', '2025/2026', 1, NOW(), NOW());
-INSERT IGNORE INTO classes (name, grade, academic_year, active, created_at, updated_at) VALUES ('2A', '2', '2025/2026', 1, NOW(), NOW());
-INSERT IGNORE INTO classes (name, grade, academic_year, active, created_at, updated_at) VALUES ('9A', '9', '2025/2026', 1, NOW(), NOW());
 INSERT IGNORE INTO classes (name, grade, academic_year, active, created_at, updated_at) VALUES ('VII A', '7', '2025/2026', 1, NOW(), NOW());
 INSERT IGNORE INTO classes (name, grade, academic_year, active, created_at, updated_at) VALUES ('VII B', '7', '2025/2026', 1, NOW(), NOW());
 INSERT IGNORE INTO classes (name, grade, academic_year, active, created_at, updated_at) VALUES ('VIII A', '8', '2025/2026', 1, NOW(), NOW());
@@ -111,212 +95,1004 @@ INSERT IGNORE INTO classes (name, grade, academic_year, active, created_at, upda
 INSERT IGNORE INTO classes (name, grade, academic_year, active, created_at, updated_at) VALUES ('XII A', '12', '2025/2026', 1, NOW(), NOW());
 INSERT IGNORE INTO classes (name, grade, academic_year, active, created_at, updated_at) VALUES ('XII B', '12', '2025/2026', 1, NOW(), NOW());
 
--- ======================
 -- TEACHING ASSIGNMENTS
--- ======================
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'VII A' AND s.name = 'PJOK';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'VIII A' AND s.name = 'PJOK';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'IX A' AND s.name = 'PJOK';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'VII B' AND s.name = 'PJOK';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'VIII B' AND s.name = 'PJOK';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'IX B' AND s.name = 'PJOK';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Setiyoko, S. Pd' AND c.name = 'X' AND s.name = 'Sosiologi';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'XI' AND s.name = 'Matematika';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'XII A' AND s.name = 'Biologi';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'XII B' AND s.name = 'Bahasa Indonesia';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'VII A' AND s.name = 'Prakarya';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Salafi Hafizh Azzikri' AND c.name = 'VIII A' AND s.name = 'Tahfidz';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Asyik Nur Rahman' AND c.name = 'IX A' AND s.name = 'Tariq';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mesya Sukmayati, S. Pd' AND c.name = 'VII B' AND s.name = 'Bahasa Inggris';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'VIII B' AND s.name = 'Bahasa Indonesia';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'IX B' AND s.name = 'Fiqih';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'X' AND s.name = 'Matematika';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Setiyoko, S. Pd' AND c.name = 'XI' AND s.name = 'Sosiologi';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XII A' AND s.name = 'Tauhid';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'XII B' AND s.name = 'Shorof';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mesya Sukmayati, S. Pd' AND c.name = 'VII A' AND s.name = 'Bahasa Inggris';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Asyik Nur Rahman' AND c.name = 'VIII A' AND s.name = 'Tariq';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'IX A' AND s.name = 'Akidah Akhlak';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Amelia Septiana Rahmadhani' AND c.name = 'VII B' AND s.name = 'Tahfidz';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'VIII B' AND s.name = 'Bahasa Jawa';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'IX B' AND s.name = 'Bahasa Indonesia';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'X' AND s.name = 'Pendidikan Kewarganegaraan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XI' AND s.name = 'Tauhid';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'XII A' AND s.name = 'Matematika';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Setiyoko, S. Pd' AND c.name = 'XII B' AND s.name = 'Sejarah';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'VIII A' AND s.name = 'IPA';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ina Rusiana, S.Pd' AND c.name = 'VII B' AND s.name = 'Matematika';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'VII A' AND s.name = 'IPS';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'IX A' AND s.name = 'Matematika Nalaria';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Asyik Nur Rahman' AND c.name = 'VIII B' AND s.name = 'Tariq';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ella Nur Fatimah' AND c.name = 'IX B' AND s.name = 'Bahasa Arab';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'X' AND s.name = 'Bahasa Indonesia';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'XI' AND s.name = 'Bahasa Jawa';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XII A' AND s.name = 'Latihan Soal';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XII B' AND s.name = 'Latihan Soal';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maria Hindun Oktavia Rahmadani' AND c.name = 'VII A' AND s.name = 'Qur\'an Hadits';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'VIII A' AND s.name = 'Pendidikan Kewarganegaraan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'IX A' AND s.name = 'IPA';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'VII B' AND s.name = 'Kemuhammadiyahan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ella Nur Fatimah' AND c.name = 'VIII B' AND s.name = 'Bahasa Arab';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'IX B' AND s.name = 'Bahasa Jawa';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'X' AND s.name = 'Qiraatul Qutub';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'XI' AND s.name = 'Qiraatul Qutub';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Setiyoko, S. Pd' AND c.name = 'XII A' AND s.name = 'Sejarah';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XII B' AND s.name = 'TIK';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Anis Musthova' AND c.name = 'VII A' AND s.name = 'Tahfidz';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'IX A' AND s.name = 'Pendidikan Kewarganegaraan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Adin Rahmatullah' AND c.name = 'IX A' AND s.name = 'Tahfidz';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'VIII B' AND s.name = 'Matematika';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Nafidzah Ilma Fajrin' AND c.name = 'IX B' AND s.name = 'Tahfidz';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'X' AND s.name = 'TIK';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'XI' AND s.name = 'Imla\'';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'XII A' AND s.name = 'Bahasa Indonesia';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'XII B' AND s.name = 'Tariq';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'VII A' AND s.name = 'Bahasa Jawa';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'VIII A' AND s.name = 'Akidah Akhlak';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'IX A' AND s.name = 'Matematika';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Amelia Septiana Rahmadhani' AND c.name = 'VIII B' AND s.name = 'Tahfidz';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mesya Sukmayati, S. Pd' AND c.name = 'IX B' AND s.name = 'Bahasa Inggris';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'X' AND s.name = 'Biologi';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'XI' AND s.name = 'Bahasa Indonesia';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XII A' AND s.name = 'TIK';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'XII B' AND s.name = 'Hadits';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ella Nur Fatimah' AND c.name = 'VII A' AND s.name = 'Bahasa Arab';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'VII B' AND s.name = 'Pendidikan Kewarganegaraan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'VIII B' AND s.name = 'Akidah Akhlak';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'VII A' AND s.name = 'Bahasa Indonesia';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mesya Sukmayati, S. Pd' AND c.name = 'VIII A' AND s.name = 'Bahasa Inggris';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'IX A' AND s.name = 'Kemuhammadiyahan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'IX B' AND s.name = 'Matematika';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'X' AND s.name = 'Tariq';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'XI' AND s.name = 'Biologi';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'XII A' AND s.name = 'Bahasa Jawa';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XII B' AND s.name = 'Fiqih';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'VII B' AND s.name = 'Akidah Akhlak';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'VIII B' AND s.name = 'Pendidikan Kewarganegaraan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'VII A' AND s.name = 'Seni Budaya';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Asyik Nur Rahman' AND c.name = 'IX B' AND s.name = 'Tariq';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'X' AND s.name = 'Matematika Nalaria';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'XI' AND s.name = 'Hadits';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'XII A' AND s.name = 'Tariq';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'IX A' AND s.name = 'Fiqih';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'VIII B' AND s.name = 'IPS';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'IX B' AND s.name = 'IPA';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'X' AND s.name = 'Imla\'';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ekasari Kurniawati, A.Md. Kom' AND c.name = 'VII A' AND s.name = 'TIK';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'VIII A' AND s.name = 'Kemuhammadiyahan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'IX A' AND s.name = 'Bahasa Indonesia';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'VII B' AND s.name = 'Seni Budaya';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'XII A' AND s.name = 'Hadits';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Nafidzah Ilma Fajrin' AND c.name = 'XII B' AND s.name = 'Tahfidz';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'XII B' AND s.name = 'Pendidikan Kewarganegaraan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'X' AND s.name = 'Fiqih';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'XI' AND s.name = 'Matematika Peminatan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'XII B' AND s.name = 'Bahasa Jawa';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ina Rusiana, S.Pd' AND c.name = 'VII A' AND s.name = 'Matematika';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'VIII A' AND s.name = 'Prakarya';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mesya Sukmayati, S. Pd' AND c.name = 'IX A' AND s.name = 'Bahasa Inggris';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'IX B' AND s.name = 'Akidah Akhlak';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ella Nur Fatimah' AND c.name = 'VII B' AND s.name = 'Bahasa Arab';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'VIII B' AND s.name = 'Seni Budaya';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Imam Aditya Ramadhan, S. Pd' AND c.name = 'XI' AND s.name = 'Kimia';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'XII A' AND s.name = 'Shorof';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XII B' AND s.name = 'Tauhid';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'VII A' AND s.name = 'Kemuhammadiyahan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'VIII A' AND s.name = 'IPS';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'IX A' AND s.name = 'Prakarya';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ekasari Kurniawati, A.Md. Kom' AND c.name = 'IX B' AND s.name = 'TIK';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'VII B' AND s.name = 'IPA';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'VIII B' AND s.name = 'Bimbingan Konseling';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Imam Aditya Ramadhan, S. Pd' AND c.name = 'X' AND s.name = 'Kimia';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'XI' AND s.name = 'Shorof';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mesya Sukmayati, S. Pd' AND c.name = 'XII A' AND s.name = 'Bahasa Inggris';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'XII B' AND s.name = 'Matematika';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'VII A' AND s.name = 'Akidah Akhlak';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ekasari Kurniawati, A.Md. Kom' AND c.name = 'IX A' AND s.name = 'TIK';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'IX B' AND s.name = 'IPS';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'VIII A' AND s.name = 'Bahasa Indonesia';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Asyik Nur Rahman' AND c.name = 'VII B' AND s.name = 'Tariq';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'VIII B' AND s.name = 'IPA';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'IX B' AND s.name = 'Matematika Nalaria';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'X' AND s.name = 'Hadits';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mesya Sukmayati, S. Pd' AND c.name = 'XI' AND s.name = 'Bahasa Inggris';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Asyik Nur Rahman' AND c.name = 'VII A' AND s.name = 'Tariq';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'VIII A' AND s.name = 'Seni Budaya';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'IX A' AND s.name = 'Bimbingan Konseling';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'VII B' AND s.name = 'IPS';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maria Hindun Oktavia Rahmadani' AND c.name = 'IX B' AND s.name = 'Qur\'an Hadits';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'X' AND s.name = 'Geografi';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XI' AND s.name = 'TIK';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'XII A' AND s.name = 'Tahfidz';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'XII B' AND s.name = 'Imla\'';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Evi Nurhayati, S. Pd' AND c.name = 'X' AND s.name = 'Fisika';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XI' AND s.name = 'Fiqih';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'VIII A' AND s.name = 'Matematika';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maria Hindun Oktavia Rahmadani' AND c.name = 'IX A' AND s.name = 'Qur\'an Hadits';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'X' AND s.name = 'Bahasa Jawa';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Evi Nurhayati, S. Pd' AND c.name = 'XI' AND s.name = 'Fisika';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XII A' AND s.name = 'Fiqih';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'XII B' AND s.name = 'Biologi';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'VII B' AND s.name = 'Bahasa Indonesia';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mesya Sukmayati, S. Pd' AND c.name = 'VIII B' AND s.name = 'Bahasa Inggris';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'IX B' AND s.name = 'Kemuhammadiyahan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'VIII A' AND s.name = 'Bahasa Jawa';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'VIII B' AND s.name = 'Prakarya';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'XII A' AND s.name = 'Imla\'';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'VII A' AND s.name = 'Pendidikan Kewarganegaraan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'VII B' AND s.name = 'Sejarah';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mesya Sukmayati, S. Pd' AND c.name = 'XII B' AND s.name = 'Bahasa Inggris';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maria Hindun Oktavia Rahmadani' AND c.name = 'VIII A' AND s.name = 'Qur\'an Hadits';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'VII B' AND s.name = 'Bahasa Jawa';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'X' AND s.name = 'Shorof';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'XI' AND s.name = 'Tahfidz';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Evi Nurhayati, S. Pd' AND c.name = 'XII A' AND s.name = 'Fisika';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'VII A' AND s.name = 'IPA';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'XI' AND s.name = 'Pendidikan Kewarganegaraan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'VIII A' AND s.name = 'Bimbingan Konseling';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'IX A' AND s.name = 'Bahasa Jawa';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ekasari Kurniawati, A.Md. Kom' AND c.name = 'VIII B' AND s.name = 'TIK';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Evi Nurhayati, S. Pd' AND c.name = 'XII B' AND s.name = 'Fisika';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'VII A' AND s.name = 'Bimbingan Konseling';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ella Nur Fatimah' AND c.name = 'VIII A' AND s.name = 'Bahasa Arab';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ekasari Kurniawati, A.Md. Kom' AND c.name = 'VII B' AND s.name = 'TIK';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maria Hindun Oktavia Rahmadani' AND c.name = 'VIII B' AND s.name = 'Qur\'an Hadits';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'XII A' AND s.name = 'Pendidikan Kewarganegaraan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'VIII B' AND s.name = 'Kemuhammadiyahan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'IX B' AND s.name = 'Bimbingan Konseling';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'VII A' AND s.name = 'Fiqih';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ekasari Kurniawati, A.Md. Kom' AND c.name = 'VIII A' AND s.name = 'TIK';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'IX A' AND s.name = 'IPS';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'VII B' AND s.name = 'Prakarya';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'IX B' AND s.name = 'Seni Budaya';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'IX A' AND s.name = 'Seni Budaya';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'VII B' AND s.name = 'Fiqih';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'VIII A' AND s.name = 'Fiqih';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ella Nur Fatimah' AND c.name = 'IX A' AND s.name = 'Bahasa Arab';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maria Hindun Oktavia Rahmadani' AND c.name = 'VII B' AND s.name = 'Qur\'an Hadits';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'IX B' AND s.name = 'Pendidikan Kewarganegaraan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'XII A' AND s.name = 'Matematika Nalaria';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Dirjo, M. Pd.' AND c.name = 'IX B' AND s.name = 'Nahwu';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Nur Wahyudi' AND c.name = 'X' AND s.name = 'Ekonomi';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'XII A' AND s.name = 'Matematika Peminatan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Nur Wahyudi' AND c.name = 'IX B' AND s.name = 'Ekonomi';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Dirjo, M. Pd.' AND c.name = 'X' AND s.name = 'Nahwu';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'XII B' AND s.name = 'Matematika Peminatan';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'IX B' AND s.name = 'Tauhid';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Vivi Nurwulan, S. Pd.' AND c.name = 'X' AND s.name = 'Bahasa Inggris';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Dirjo, M. Pd.' AND c.name = 'XII A' AND s.name = 'Nahwu';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Nur Wahyudi' AND c.name = 'XII B' AND s.name = 'Ekonomi';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Nur Wahyudi' AND c.name = 'XII A' AND s.name = 'Ekonomi';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Dirjo, M. Pd.' AND c.name = 'XII B' AND s.name = 'Nahwu';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fadholi' AND c.name = 'IX B' AND s.name = 'Qiraatul Qutub';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fadholi' AND c.name = 'XII A' AND s.name = 'Qiraatul Qutub';
-INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '2025/2026', 'Genap', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fadholi' AND c.name = 'XII B' AND s.name = 'Qiraatul Qutub';
 
--- ======================
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'VII A' AND s.name = 'PJOK';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'VIII A' AND s.name = 'PJOK';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'IX A' AND s.name = 'PJOK';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'VII B' AND s.name = 'PJOK';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'VIII B' AND s.name = 'PJOK';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'IX B' AND s.name = 'PJOK';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Setiyoko, S. Pd' AND c.name = 'X' AND s.name = 'Sosiologi';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'XI' AND s.name = 'Matematika';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'XII A' AND s.name = 'Biologi';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'XII B' AND s.name = 'Bahasa Indonesia';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'VII A' AND s.name = 'Prakarya';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Salafi Hafizh Azzikri' AND c.name = 'VIII A' AND s.name = 'Tahfidz';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Asyik Nur Rahman' AND c.name = 'IX A' AND s.name = 'Tariq';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mesya Sukmayati, S. Pd' AND c.name = 'VII B' AND s.name = 'Bahasa Inggris';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'VIII B' AND s.name = 'Bahasa Indonesia';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'IX B' AND s.name = 'Fiqih';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'X' AND s.name = 'Matematika';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Setiyoko, S. Pd' AND c.name = 'XI' AND s.name = 'Sosiologi';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XII A' AND s.name = 'Tauhid';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'XII B' AND s.name = 'Shorof';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mesya Sukmayati, S. Pd' AND c.name = 'VII A' AND s.name = 'Bahasa Inggris';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Asyik Nur Rahman' AND c.name = 'VIII A' AND s.name = 'Tariq';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'IX A' AND s.name = 'Akidah Akhlak';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Amelia Septiana Rahmadhani' AND c.name = 'VII B' AND s.name = 'Tahfidz';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'VIII B' AND s.name = 'Bahasa Jawa';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'IX B' AND s.name = 'Bahasa Indonesia';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'X' AND s.name = 'Pendidikan Kewarganegaraan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XI' AND s.name = 'Tauhid';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'XII A' AND s.name = 'Matematika';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Setiyoko, S. Pd' AND c.name = 'XII B' AND s.name = 'Sejarah';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'VIII A' AND s.name = 'IPA';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ina Rusiana, S.Pd' AND c.name = 'VII B' AND s.name = 'Matematika';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'VII A' AND s.name = 'IPS';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'IX A' AND s.name = 'Matematika Nalaria';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Asyik Nur Rahman' AND c.name = 'VIII B' AND s.name = 'Tariq';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ella Nur Fatimah' AND c.name = 'IX B' AND s.name = 'Bahasa Arab';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'X' AND s.name = 'Bahasa Indonesia';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'XI' AND s.name = 'Bahasa Jawa';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XII A' AND s.name = 'Latihan Soal';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XII B' AND s.name = 'Latihan Soal';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maria Hindun Oktavia Rahmadani' AND c.name = 'VII A' AND s.name = 'Qur\'an Hadits';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'VIII A' AND s.name = 'Pendidikan Kewarganegaraan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'IX A' AND s.name = 'IPA';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'VII B' AND s.name = 'Kemuhammadiyahan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ella Nur Fatimah' AND c.name = 'VIII B' AND s.name = 'Bahasa Arab';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'IX B' AND s.name = 'Bahasa Jawa';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'X' AND s.name = 'Qiraatul Qutub';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'XI' AND s.name = 'Qiraatul Qutub';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Setiyoko, S. Pd' AND c.name = 'XII A' AND s.name = 'Sejarah';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XII B' AND s.name = 'TIK';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Anis Musthova' AND c.name = 'VII A' AND s.name = 'Tahfidz';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'IX A' AND s.name = 'Pendidikan Kewarganegaraan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Adin Rahmatullah' AND c.name = 'IX A' AND s.name = 'Tahfidz';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'VIII B' AND s.name = 'Matematika';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Nafidzah Ilma Fajrin' AND c.name = 'IX B' AND s.name = 'Tahfidz';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'X' AND s.name = 'TIK';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'XI' AND s.name = 'Imla\'';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'XII A' AND s.name = 'Bahasa Indonesia';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'XII B' AND s.name = 'Tariq';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'VII A' AND s.name = 'Bahasa Jawa';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'VIII A' AND s.name = 'Akidah Akhlak';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'IX A' AND s.name = 'Matematika';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Amelia Septiana Rahmadhani' AND c.name = 'VIII B' AND s.name = 'Tahfidz';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mesya Sukmayati, S. Pd' AND c.name = 'IX B' AND s.name = 'Bahasa Inggris';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'X' AND s.name = 'Biologi';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'XI' AND s.name = 'Bahasa Indonesia';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XII A' AND s.name = 'TIK';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'XII B' AND s.name = 'Hadits';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ella Nur Fatimah' AND c.name = 'VII A' AND s.name = 'Bahasa Arab';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'VII B' AND s.name = 'Pendidikan Kewarganegaraan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'VIII B' AND s.name = 'Akidah Akhlak';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'VII A' AND s.name = 'Bahasa Indonesia';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mesya Sukmayati, S. Pd' AND c.name = 'VIII A' AND s.name = 'Bahasa Inggris';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'IX A' AND s.name = 'Kemuhammadiyahan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'IX B' AND s.name = 'Matematika';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'X' AND s.name = 'Tariq';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'XI' AND s.name = 'Biologi';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'XII A' AND s.name = 'Bahasa Jawa';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XII B' AND s.name = 'Fiqih';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'VII B' AND s.name = 'Akidah Akhlak';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'VIII B' AND s.name = 'Pendidikan Kewarganegaraan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'VII A' AND s.name = 'Seni Budaya';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Asyik Nur Rahman' AND c.name = 'IX B' AND s.name = 'Tariq';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'X' AND s.name = 'Matematika Nalaria';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'XI' AND s.name = 'Hadits';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'XII A' AND s.name = 'Tariq';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'IX A' AND s.name = 'Fiqih';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'VIII B' AND s.name = 'IPS';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'IX B' AND s.name = 'IPA';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'X' AND s.name = 'Imla\'';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ekasari Kurniawati, A.Md. Kom' AND c.name = 'VII A' AND s.name = 'TIK';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'VIII A' AND s.name = 'Kemuhammadiyahan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'IX A' AND s.name = 'Bahasa Indonesia';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'VII B' AND s.name = 'Seni Budaya';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'XII A' AND s.name = 'Hadits';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Nafidzah Ilma Fajrin' AND c.name = 'XII B' AND s.name = 'Tahfidz';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'XII B' AND s.name = 'Pendidikan Kewarganegaraan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'X' AND s.name = 'Fiqih';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'XI' AND s.name = 'Matematika Peminatan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'XII B' AND s.name = 'Bahasa Jawa';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ina Rusiana, S.Pd' AND c.name = 'VII A' AND s.name = 'Matematika';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'VIII A' AND s.name = 'Prakarya';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mesya Sukmayati, S. Pd' AND c.name = 'IX A' AND s.name = 'Bahasa Inggris';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'IX B' AND s.name = 'Akidah Akhlak';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ella Nur Fatimah' AND c.name = 'VII B' AND s.name = 'Bahasa Arab';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'VIII B' AND s.name = 'Seni Budaya';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Imam Aditya Ramadhan, S. Pd' AND c.name = 'XI' AND s.name = 'Kimia';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'XII A' AND s.name = 'Shorof';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XII B' AND s.name = 'Tauhid';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'VII A' AND s.name = 'Kemuhammadiyahan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'VIII A' AND s.name = 'IPS';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'IX A' AND s.name = 'Prakarya';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ekasari Kurniawati, A.Md. Kom' AND c.name = 'IX B' AND s.name = 'TIK';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'VII B' AND s.name = 'IPA';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'VIII B' AND s.name = 'Bimbingan Konseling';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Imam Aditya Ramadhan, S. Pd' AND c.name = 'X' AND s.name = 'Kimia';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'XI' AND s.name = 'Shorof';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mesya Sukmayati, S. Pd' AND c.name = 'XII A' AND s.name = 'Bahasa Inggris';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'XII B' AND s.name = 'Matematika';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'VII A' AND s.name = 'Akidah Akhlak';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ekasari Kurniawati, A.Md. Kom' AND c.name = 'IX A' AND s.name = 'TIK';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'IX B' AND s.name = 'IPS';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'VIII A' AND s.name = 'Bahasa Indonesia';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Asyik Nur Rahman' AND c.name = 'VII B' AND s.name = 'Tariq';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'VIII B' AND s.name = 'IPA';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'IX B' AND s.name = 'Matematika Nalaria';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'X' AND s.name = 'Hadits';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mesya Sukmayati, S. Pd' AND c.name = 'XI' AND s.name = 'Bahasa Inggris';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Asyik Nur Rahman' AND c.name = 'VII A' AND s.name = 'Tariq';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'VIII A' AND s.name = 'Seni Budaya';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'IX A' AND s.name = 'Bimbingan Konseling';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'VII B' AND s.name = 'IPS';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maria Hindun Oktavia Rahmadani' AND c.name = 'IX B' AND s.name = 'Qur\'an Hadits';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'X' AND s.name = 'Geografi';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XI' AND s.name = 'TIK';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'XII A' AND s.name = 'Tahfidz';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'XII B' AND s.name = 'Imla\'';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Evi Nurhayati, S. Pd' AND c.name = 'X' AND s.name = 'Fisika';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XI' AND s.name = 'Fiqih';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'VIII A' AND s.name = 'Matematika';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maria Hindun Oktavia Rahmadani' AND c.name = 'IX A' AND s.name = 'Qur\'an Hadits';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'X' AND s.name = 'Bahasa Jawa';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Evi Nurhayati, S. Pd' AND c.name = 'XI' AND s.name = 'Fisika';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'XII A' AND s.name = 'Fiqih';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'XII B' AND s.name = 'Biologi';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'VII B' AND s.name = 'Bahasa Indonesia';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mesya Sukmayati, S. Pd' AND c.name = 'VIII B' AND s.name = 'Bahasa Inggris';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'IX B' AND s.name = 'Kemuhammadiyahan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'VIII A' AND s.name = 'Bahasa Jawa';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'VIII B' AND s.name = 'Prakarya';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'XII A' AND s.name = 'Imla\'';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'VII A' AND s.name = 'Pendidikan Kewarganegaraan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'VII B' AND s.name = 'Sejarah';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mesya Sukmayati, S. Pd' AND c.name = 'XII B' AND s.name = 'Bahasa Inggris';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maria Hindun Oktavia Rahmadani' AND c.name = 'VIII A' AND s.name = 'Qur\'an Hadits';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'VII B' AND s.name = 'Bahasa Jawa';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rohmad Sigid Affandi, S.H' AND c.name = 'X' AND s.name = 'Shorof';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kasfaril Ramadani' AND c.name = 'XI' AND s.name = 'Tahfidz';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Evi Nurhayati, S. Pd' AND c.name = 'XII A' AND s.name = 'Fisika';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'VII A' AND s.name = 'IPA';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'XI' AND s.name = 'Pendidikan Kewarganegaraan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'VIII A' AND s.name = 'Bimbingan Konseling';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'IX A' AND s.name = 'Bahasa Jawa';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ekasari Kurniawati, A.Md. Kom' AND c.name = 'VIII B' AND s.name = 'TIK';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Evi Nurhayati, S. Pd' AND c.name = 'XII B' AND s.name = 'Fisika';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'VII A' AND s.name = 'Bimbingan Konseling';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ella Nur Fatimah' AND c.name = 'VIII A' AND s.name = 'Bahasa Arab';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ekasari Kurniawati, A.Md. Kom' AND c.name = 'VII B' AND s.name = 'TIK';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maria Hindun Oktavia Rahmadani' AND c.name = 'VIII B' AND s.name = 'Qur\'an Hadits';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'XII A' AND s.name = 'Pendidikan Kewarganegaraan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Alfiyaturradhiyah' AND c.name = 'VIII B' AND s.name = 'Kemuhammadiyahan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Mekha Eka Sari, S.Sos' AND c.name = 'IX B' AND s.name = 'Bimbingan Konseling';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'VII A' AND s.name = 'Fiqih';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ekasari Kurniawati, A.Md. Kom' AND c.name = 'VIII A' AND s.name = 'TIK';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'IX A' AND s.name = 'IPS';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Rosita Nova' AND c.name = 'VII B' AND s.name = 'Prakarya';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'IX B' AND s.name = 'Seni Budaya';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maya Yulaicha, S. Pd' AND c.name = 'IX A' AND s.name = 'Seni Budaya';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'VII B' AND s.name = 'Fiqih';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Muhammad Abdullah' AND c.name = 'VIII A' AND s.name = 'Fiqih';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Ella Nur Fatimah' AND c.name = 'IX A' AND s.name = 'Bahasa Arab';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Maria Hindun Oktavia Rahmadani' AND c.name = 'VII B' AND s.name = 'Qur\'an Hadits';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Rahmat Yulianto, S. H' AND c.name = 'IX B' AND s.name = 'Pendidikan Kewarganegaraan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'XII A' AND s.name = 'Matematika Nalaria';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Dirjo, M. Pd.' AND c.name = 'IX B' AND s.name = 'Nahwu';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Nur Wahyudi' AND c.name = 'X' AND s.name = 'Ekonomi';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'XII A' AND s.name = 'Matematika Peminatan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Nur Wahyudi' AND c.name = 'IX B' AND s.name = 'Ekonomi';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Dirjo, M. Pd.' AND c.name = 'X' AND s.name = 'Nahwu';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Kodir, S. T.' AND c.name = 'XII B' AND s.name = 'Matematika Peminatan';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fahmi Dwi Payana, S. H' AND c.name = 'IX B' AND s.name = 'Tauhid';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Usth. Vivi Nurwulan, S. Pd.' AND c.name = 'X' AND s.name = 'Bahasa Inggris';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Dirjo, M. Pd.' AND c.name = 'XII A' AND s.name = 'Nahwu';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Nur Wahyudi' AND c.name = 'XII B' AND s.name = 'Ekonomi';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Nur Wahyudi' AND c.name = 'XII A' AND s.name = 'Ekonomi';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Dirjo, M. Pd.' AND c.name = 'XII B' AND s.name = 'Nahwu';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fadholi' AND c.name = 'IX B' AND s.name = 'Qiraatul Qutub';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fadholi' AND c.name = 'XII A' AND s.name = 'Qiraatul Qutub';
+
+Warning: Undefined variable $ay in Command line code on line 39
+
+Warning: Undefined variable $sem in Command line code on line 39
+INSERT IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) SELECT t.id, c.id, s.id, '', '', 1, NOW(), NOW() FROM teachers t, classes c, subjects s WHERE t.name = 'Ust. Fadholi' AND c.name = 'XII B' AND s.name = 'Qiraatul Qutub';
+
 -- LESSON SCHEDULES
--- ======================
 INSERT IGNORE INTO lesson_schedules (assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time) SELECT ta.id, t.id, c.id, s.id, 1, 1, '07:00', '07:35' FROM teaching_assignments ta JOIN teachers t ON t.name = 'Ust. Kasfaril Ramadani' JOIN classes c ON c.name = 'VII A' JOIN subjects s ON s.name = 'PJOK' WHERE ta.teacher_id = t.id AND ta.class_id = c.id AND ta.subject_id = s.id AND ta.academic_year = '2025/2026' AND ta.semester = 'Genap' LIMIT 1;
 INSERT IGNORE INTO lesson_schedules (assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time) SELECT ta.id, t.id, c.id, s.id, 1, 1, '07:00', '07:35' FROM teaching_assignments ta JOIN teachers t ON t.name = 'Ust. Setiyoko, S. Pd' JOIN classes c ON c.name = 'X' JOIN subjects s ON s.name = 'Sosiologi' WHERE ta.teacher_id = t.id AND ta.class_id = c.id AND ta.subject_id = s.id AND ta.academic_year = '2025/2026' AND ta.semester = 'Genap' LIMIT 1;
 INSERT IGNORE INTO lesson_schedules (assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time) SELECT ta.id, t.id, c.id, s.id, 1, 1, '07:00', '07:35' FROM teaching_assignments ta JOIN teachers t ON t.name = 'Ust. Kodir, S. T.' JOIN classes c ON c.name = 'XI' JOIN subjects s ON s.name = 'Matematika' WHERE ta.teacher_id = t.id AND ta.class_id = c.id AND ta.subject_id = s.id AND ta.academic_year = '2025/2026' AND ta.semester = 'Genap' LIMIT 1;
@@ -760,10 +1536,3 @@ INSERT IGNORE INTO lesson_schedules (assignment_id, teacher_id, class_id, subjec
 INSERT IGNORE INTO lesson_schedules (assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time) SELECT ta.id, t.id, c.id, s.id, 6, 11, '13:25', '14:00' FROM teaching_assignments ta JOIN teachers t ON t.name = 'Ust. Fadholi' JOIN classes c ON c.name = 'IX B' JOIN subjects s ON s.name = 'Qiraatul Qutub' WHERE ta.teacher_id = t.id AND ta.class_id = c.id AND ta.subject_id = s.id AND ta.academic_year = '2025/2026' AND ta.semester = 'Genap' LIMIT 1;
 
 SET FOREIGN_KEY_CHECKS=1;
-
--- Selesai. Total:
--- Teachers: 39
--- Subjects: 41
--- Classes: 13
--- Assignments: 199
--- Schedules: 441
