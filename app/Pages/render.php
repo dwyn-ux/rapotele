@@ -181,7 +181,6 @@ function render_footer(): void
     ?>
             <footer class="footer">
                 <span><?= e(date('Y')) ?> <?= e(config('app_name')) ?></span>
-                <span>PHP shared hosting, tanpa Node.js</span>
             </footer>
             <nav class="mobile-bottom-nav" aria-label="Navigasi cepat">
                 <button type="button" class="mobile-bottom-item mobile-menu-button" data-sidebar-open aria-label="Buka menu" aria-controls="app-sidebar" aria-expanded="false">
