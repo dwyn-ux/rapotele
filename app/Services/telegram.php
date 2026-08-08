@@ -313,14 +313,15 @@ function telegram_guru_menu_buttons(?array $user = null): array
             telegram_web_app_button('Absensi Mengajar', telegram_web_login_url_for_user($user, 'teacher-attendance')),
         ],
         [
+            telegram_web_app_button('Absensi Kehadiran', telegram_web_login_url_for_user($user, 'teacher-attendance-self')),
             telegram_web_app_button('Jadwal', telegram_web_login_url_for_user($user, 'lesson-schedule')),
+        ],
+        [
             telegram_web_app_button('Jurnal', telegram_web_login_url_for_user($user, 'journals')),
-        ],
-        [
             ['text' => 'Kelas', 'callback_data' => 'home:kelas'],
-            ['text' => 'Profil', 'callback_data' => 'home:profil'],
         ],
         [
+            ['text' => 'Profil', 'callback_data' => 'home:profil'],
             ['text' => 'Keluar', 'callback_data' => 'home:logout'],
         ],
     ];
@@ -494,6 +495,7 @@ function telegram_help(): string
         '/kelas',
         '/absensi',
         '/absensiguru',
+        '/absensikehadiran',
         '/hadir ID_PEMBELAJARAN YYYY-MM-DD [PERTEMUAN] [topik]',
         '/absen ID_PEMBELAJARAN YYYY-MM-DD NIS status [catatan]',
         '/jurnal ID_PEMBELAJARAN YYYY-MM-DD | topik | kegiatan | materi | kendala | tindak_lanjut',
@@ -931,7 +933,7 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
     $command = strtolower($rawCommand);
     $plainCommands = [
         'start', 'help', 'daftar', 'login', 'profil', 'menu', 'web', 'jadwal', 'requestjadwal', 'kelas',
-        'absensi', 'absensi-siswa', 'absensiguru', 'absensi-guru', 'hadir', 'absen', 'jurnal', 'logout',
+        'absensi', 'absensi-siswa', 'absensiguru', 'absensi-guru', 'absensikehadiran', 'hadir', 'absen', 'jurnal', 'logout',
     ];
     if ($command !== '' && !str_starts_with($command, '/') && in_array($command, $plainCommands, true)) {
         $command = '/' . $command;
@@ -1072,6 +1074,15 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
             'Absensi Mengajar',
             'teacher-attendance',
             'Pilih tanggal lalu catat kehadiran guru mengajar sesuai jadwal kelas.',
+            $user
+        );
+    }
+
+    if ($command === '/absensikehadiran') {
+        return telegram_web_page_hint(
+            'Absensi Kehadiran Guru',
+            'teacher-attendance-self',
+            'Catat kehadiran masuk/pulang dengan lokasi GPS. Pastikan lokasi aktif dan berada di area sekolah.',
             $user
         );
     }
