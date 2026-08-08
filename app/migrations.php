@@ -1333,6 +1333,12 @@ function migrate_align_fk_column_types(): void
             continue;
         }
         try {
+            $fkName = 'fk_' . $table . '_' . $column;
+            try {
+                db()->exec(sprintf('ALTER TABLE %s DROP FOREIGN KEY %s', db_identifier($table), db_identifier($fkName)));
+            } catch (PDOException $e2) {
+                // FK may not exist yet
+            }
             db()->exec(sprintf('ALTER TABLE %s MODIFY %s %s', db_identifier($table), db_identifier($column), $definition));
         } catch (PDOException $e) {
             // ignore
