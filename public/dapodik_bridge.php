@@ -76,20 +76,33 @@ try {
         if ($expectedDapodikToken === '' && $expectedBridgeToken === '') {
             $reasons[] = 'Token / Key Webservice belum dikonfigurasi di menu Update Data';
         } elseif ($expectedDapodikToken === '' && $expectedBridgeToken !== '') {
-            $reasons[] = 'Token bridge diterima, namun Token / Key Webservice di server masih kosong. Isi di menu Update Data.';
+            // Auto configure server token using the first successful sync token from helper.
+            $firstCandidate = $tokenCandidates[0] ?? '';
+            if ($firstCandidate !== '' && $payloadNpsn !== '') {
+                set_app_setting('dapodik_token', $firstCandidate);
+                set_app_setting('dapodik_npsn', $payloadNpsn);
+                $expectedDapodikToken = $firstCandidate;
+                $expectedNpsn = $payloadNpsn;
+                $reasons = [];
+            } else {
+                $reasons[] = 'Token bridge diterima, namun Token / Key Webservice di server masih kosong. Isi di menu Update Data.';
+            }
         } elseif (!in_array(true, array_map(fn (string $token): bool => hash_equals($expectedDapodikToken, $token), $tokenCandidates), true)) {
             $reasons[] = 'token yang dikirim helper tidak sama dengan Token / Key Webservice di server';
         }
+
         if ($expectedNpsn !== '' && ($payloadNpsn === '' || !hash_equals($expectedNpsn, $payloadNpsn))) {
             $reasons[] = 'NPSN helper tidak sama dengan NPSN di server';
         }
 
-        http_response_code(403);
-        echo json_encode([
-            'ok' => false,
-            'message' => 'Token sinkron tidak valid. ' . ($reasons ? 'Penyebab: ' . implode('; ', $reasons) . '. ' : '') . 'Pakai Token Web Service Dapodik dan NPSN yang sama dengan konfigurasi Update Data di server e-rapor tujuan.',
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
+        if (!empty($reasons)) {
+            http_response_code(403);
+            echo json_encode([
+                'ok' => false,
+                'message' => 'Token sinkron tidak valid. ' . ($reasons ? 'Penyebab: ' . implode('; ', $reasons) . '. ' : '') . 'Pakai Token Web Service Dapodik dan NPSN yang sama dengan konfigurasi Update Data di server e-rapor tujuan.',
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
     }
 
     $type = dapodik_validate_type((string)($payload['type'] ?? 'sekolah'), true);
@@ -112,7 +125,11 @@ try {
             }
         }
 
-        echo json_encode(['ok' => true, 'type' => 'all', 'summary' => $summary, 'count' => array_sum($summary), 'warnings' => $warningPayload], JSON_UNESCAPED_UNICODE);
+        $response = ['ok' => true, 'type' => 'all', 'summary' => $summary, 'count' => array_sum($summary), 'warnings' => $warningPayload];
+        if (isset($firstCandidate) && $firstCandidate !== '') {
+            $response['auto_configured'] = true;
+        }
+        echo json_encode($response, JSON_UNESCAPED_UNICODE);
         exit;
     }
 
@@ -125,7 +142,11 @@ try {
         ['offline-bridge', $type, 'dapodik_bridge.php', 'success', "Bridge menerima $type. Data diproses: $count.", null]
     );
 
-    echo json_encode(['ok' => true, 'type' => $type, 'count' => $count] + dapodik_import_warning_payload($type), JSON_UNESCAPED_UNICODE);
+    $response = ['ok' => true, 'type' => $type, 'count' => $count] + dapodik_import_warning_payload($type);
+    if (isset($firstCandidate) && $firstCandidate !== '') {
+        $response['auto_configured'] = true;
+    }
+    echo json_encode($response, JSON_UNESCAPED_UNICODE);
 } catch (Throwable $exception) {
     http_response_code(http_response_code() >= 400 ? http_response_code() : 500);
     echo json_encode(['ok' => false, 'message' => friendly_error($exception)], JSON_UNESCAPED_UNICODE);
