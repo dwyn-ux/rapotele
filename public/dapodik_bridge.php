@@ -77,7 +77,7 @@ try {
             $reasons[] = 'Token / Key Webservice belum dikonfigurasi di menu Update Data';
         } elseif ($expectedDapodikToken === '' && $expectedBridgeToken !== '') {
             // Auto configure server token using the first successful sync token from helper.
-            $firstCandidate = $tokenCandidates[0] ?? '';
+            $firstCandidate = reset($tokenCandidates) ?: '';
             if ($firstCandidate !== '' && $payloadNpsn !== '') {
                 set_app_setting('dapodik_token', $firstCandidate);
                 set_app_setting('dapodik_npsn', $payloadNpsn);
@@ -149,5 +149,10 @@ try {
     echo json_encode($response, JSON_UNESCAPED_UNICODE);
 } catch (Throwable $exception) {
     http_response_code(http_response_code() >= 400 ? http_response_code() : 500);
-    echo json_encode(['ok' => false, 'message' => friendly_error($exception)], JSON_UNESCAPED_UNICODE);
+    log_exception($exception);
+    $msg = $exception->getMessage();
+    if (!app_debug() && !($exception instanceof InvalidArgumentException) && !($exception instanceof RuntimeException)) {
+        $msg = 'Database error: ' . $exception->getMessage();
+    }
+    echo json_encode(['ok' => false, 'message' => $msg], JSON_UNESCAPED_UNICODE);
 }
