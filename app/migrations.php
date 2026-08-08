@@ -1301,11 +1301,52 @@ function seed_demo_journal(int $assignmentId, int $teacherId, int $classId, int 
     }
 }
 
+function migrate_align_fk_column_types(): void
+{
+    if (db_driver() !== 'mysql') {
+        return;
+    }
+    $fixes = [
+        ['students', 'class_id', 'INT UNSIGNED NULL'],
+        ['teaching_assignments', 'teacher_id', 'INT UNSIGNED NOT NULL'],
+        ['teaching_assignments', 'class_id', 'INT UNSIGNED NOT NULL'],
+        ['teaching_assignments', 'subject_id', 'INT UNSIGNED NOT NULL'],
+        ['grades', 'assignment_id', 'INT UNSIGNED NOT NULL'],
+        ['grades', 'student_id', 'INT UNSIGNED NOT NULL'],
+        ['student_attendance_sessions', 'assignment_id', 'INT UNSIGNED NOT NULL'],
+        ['student_attendance_entries', 'session_id', 'INT UNSIGNED NOT NULL'],
+        ['student_attendance_entries', 'student_id', 'INT UNSIGNED NOT NULL'],
+        ['daily_journals', 'assignment_id', 'INT UNSIGNED NOT NULL'],
+        ['lesson_schedules', 'assignment_id', 'INT UNSIGNED NOT NULL'],
+        ['lesson_schedules', 'teacher_id', 'INT UNSIGNED NOT NULL'],
+        ['lesson_schedules', 'class_id', 'INT UNSIGNED NOT NULL'],
+        ['lesson_schedules', 'subject_id', 'INT UNSIGNED NOT NULL'],
+        ['teacher_teaching_attendance', 'assignment_id', 'INT UNSIGNED NULL'],
+        ['teacher_teaching_attendance', 'teacher_id', 'INT UNSIGNED NOT NULL'],
+        ['student_violations', 'student_id', 'INT UNSIGNED NOT NULL'],
+        ['final_scores', 'student_id', 'INT UNSIGNED NOT NULL'],
+        ['final_scores', 'subject_id', 'INT UNSIGNED NOT NULL'],
+        ['whatsapp_guardians', 'student_id', 'INT UNSIGNED NOT NULL'],
+    ];
+    foreach ($fixes as [$table, $column, $definition]) {
+        if (!table_exists($table) || !table_column_exists($table, $column)) {
+            continue;
+        }
+        try {
+            db()->exec(sprintf('ALTER TABLE %s MODIFY %s %s', db_identifier($table), db_identifier($column), $definition));
+        } catch (PDOException $e) {
+            // ignore
+        }
+    }
+}
+
 function migrate_foreign_keys(): int
 {
     if (db_driver() !== 'mysql') {
         return 0;
     }
+
+    migrate_align_fk_column_types();
 
     $fks = [
         'students' => [
