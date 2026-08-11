@@ -525,6 +525,20 @@ label textarea {
     box-shadow: 0 0 0 2px rgba(23, 107, 135, .15);
 }
 
+.schedule-grid-compact .schedule-grid-period {
+    min-width: 120px;
+    white-space: nowrap;
+}
+
+.schedule-grid-compact .schedule-grid-select-cell {
+    width: 100%;
+}
+
+.schedule-grid-compact .schedule-grid-select {
+    min-width: 200px;
+    width: 100%;
+}
+
 .schedule-grid-short-day {
     background: var(--amber) !important;
 }

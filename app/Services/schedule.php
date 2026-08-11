@@ -1142,139 +1142,125 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
 {
     $classes = schedule_class_options();
     $filterClassId = (int)($_GET['grid_class_id'] ?? 0);
+    $filterDay = (int)($_GET['grid_day'] ?? 0);
+    $days = schedule_days();
+    $school = get_school_profile();
+    $maxPeriods = (int)($school['max_periods'] ?? 10);
 
-    $allAssignments = schedule_assignment_options();
+    $assignmentsBySubject = [];
     if ($filterClassId > 0) {
-        $assignments = [];
         foreach (fetch_all(
-            'SELECT ta.id, t.name AS teacher_name, c.name AS class_name, s.name AS subject_name
+            'SELECT ta.id, t.name AS teacher_name, s.name AS subject_name
              FROM teaching_assignments ta
              JOIN teachers t ON t.id = ta.teacher_id
-             JOIN classes c ON c.id = ta.class_id
              JOIN subjects s ON s.id = ta.subject_id
              WHERE ta.active = 1 AND ta.class_id = ?
              ORDER BY s.name, t.name',
             [$filterClassId]
         ) as $a) {
-            $assignments[(string)$a['id']] = $a['subject_name'] . ' - ' . $a['teacher_name'];
+            $assignmentsBySubject[$a['subject_name']][] = [
+                'id' => $a['id'],
+                'teacher' => $a['teacher_name'],
+            ];
         }
-    } else {
-        $assignments = $allAssignments;
     }
 
-    $days = schedule_days();
-    $school = get_school_profile();
-    $maxPeriods = (int)($school['max_periods'] ?? 10);
-
     $existing = [];
-    $existingFilter = $filterClassId > 0 ? ['class_id' => $filterClassId] : [];
-    $rows = schedule_rows($existingFilter);
-    foreach ($rows as $row) {
-        $existing[(int)$row['day_of_week']][(int)$row['period_no']] = (int)$row['assignment_id'];
+    if ($filterClassId > 0 && $filterDay > 0) {
+        foreach (fetch_all(
+            'SELECT period_no, assignment_id, start_time, end_time FROM lesson_schedules WHERE class_id = ? AND day_of_week = ?',
+            [$filterClassId, $filterDay]
+        ) as $row) {
+            $existing[(int)$row['period_no']] = $row;
+        }
     }
     ?>
     <section class="panel">
         <?php panel_title('Input Grid Jadwal'); ?>
         <form method="get" class="grid four" style="padding:0 16px 8px;">
             <input type="hidden" name="page" value="lesson-schedule">
-            <label>Pilih Kelas <select name="grid_class_id" onchange="this.form.submit()">
-                <option value="">Semua Kelas</option>
+            <label>Kelas <select name="grid_class_id" onchange="this.form.submit()">
+                <option value="">-- Pilih Kelas --</option>
                 <?php foreach ($classes as $cid => $cname): ?>
                     <option value="<?= e($cid) ?>" <?= $filterClassId == (int)$cid ? 'selected' : '' ?>><?= e($cname) ?></option>
                 <?php endforeach; ?>
             </select></label>
+            <label>Hari <select name="grid_day" onchange="this.form.submit()">
+                <option value="">-- Pilih Hari --</option>
+                <?php foreach ($days as $dNum => $dLabel): ?>
+                    <?php $isShort = schedule_is_short_day($dNum); ?>
+                    <option value="<?= e($dNum) ?>" <?= $filterDay == $dNum ? 'selected' : '' ?>><?= e($dLabel) ?><?= $isShort ? ' (Pendek)' : '' ?></option>
+                <?php endforeach; ?>
+            </select></label>
         </form>
+    <?php if ($filterClassId > 0 && $filterDay > 0 && !empty($assignmentsBySubject)): ?>
         <form method="post" class="schedule-grid-wrap">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="save_schedule_grid">
             <input type="hidden" name="grid_class_id" value="<?= e($filterClassId) ?>">
-            <?php if ($filterClassId > 0 && empty($assignments)): ?>
-                <p style="padding:12px 16px;color:var(--muted)">Belum ada pembelajaran untuk kelas ini. Tambahkan di <a href="<?= e(route_url('assignments')) ?>">Data Pembelajaran</a> terlebih dulu.</p>
-            <?php else: ?>
+            <input type="hidden" name="grid_day" value="<?= e($filterDay) ?>">
             <div class="schedule-grid-scroll">
-                <table class="schedule-grid">
-                    <thead>
-                        <tr>
-                            <th class="schedule-grid-period">Jam</th>
-                            <?php foreach ($days as $dayNum => $dayLabel): ?>
-                                <?php $isShort = schedule_is_short_day($dayNum); ?>
-                                <th class="<?= $isShort ? 'schedule-grid-short-day' : '' ?>"><?= e($dayLabel) ?><?= $isShort ? ' *' : '' ?></th>
-                            <?php endforeach; ?>
-                        </tr>
-                        <tr>
-                            <th class="schedule-grid-period"><small>Waktu</small></th>
-                            <?php foreach ($days as $dayNum => $dayLabel): ?>
-                                <th class="schedule-grid-time-header"></th>
-                            <?php endforeach; ?>
-                        </tr>
-                    </thead>
+                <table class="schedule-grid schedule-grid-compact">
                     <tbody>
                         <?php for ($p = 1; $p <= $maxPeriods; $p++): ?>
+                            <?php [$startTime, $endTime] = schedule_time_for_period($p, $filterDay); ?>
+                            <?php $cur = $existing[$p] ?? null; ?>
                             <tr>
                                 <td class="schedule-grid-period">
                                     <strong>Jam <?= $p ?></strong>
+                                    <small><?= e($startTime) ?> - <?= e($endTime) ?></small>
                                 </td>
-                                <?php foreach ($days as $dayNum => $dayLabel): ?>
-                                    <?php [$start, $end] = schedule_time_for_period($p, $dayNum); ?>
-                                    <?php
-                                    $dbStart = $start;
-                                    $dbEnd = $end;
-                                    if (isset($existing[$dayNum][$p]) && $existing[$dayNum][$p] > 0) {
-                                        $existingRow = fetch_one('SELECT start_time, end_time FROM lesson_schedules WHERE day_of_week = ? AND period_no = ? AND class_id = ?', [$dayNum, $p, $filterClassId]);
-                                        if ($existingRow) {
-                                            $dbStart = substr((string)$existingRow['start_time'], 0, 5) ?: $start;
-                                            $dbEnd = substr((string)$existingRow['end_time'], 0, 5) ?: $end;
-                                        }
-                                    }
-                                    ?>
-                                    <td>
-                                        <div class="schedule-grid-time-inputs">
-                                            <input type="time" name="slot_time[<?= $dayNum ?>][<?= $p ?>][start]" value="<?= e($dbStart) ?>" class="schedule-grid-time-input">
-                                            <span>-</span>
-                                            <input type="time" name="slot_time[<?= $dayNum ?>][<?= $p ?>][end]" value="<?= e($dbEnd) ?>" class="schedule-grid-time-input">
-                                        </div>
-                                        <select name="slot[<?= $dayNum ?>][<?= $p ?>]" class="schedule-grid-select">
-                                            <option value="">-</option>
-                                            <?php foreach ($assignments as $id => $label): ?>
-                                                <option value="<?= e($id) ?>" <?= ($existing[$dayNum][$p] ?? 0) == (int)$id ? 'selected' : '' ?>><?= e($label) ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </td>
-                                <?php endforeach; ?>
+                                <td>
+                                    <div class="schedule-grid-time-inputs">
+                                        <input type="time" name="slot_time[<?= $filterDay ?>][<?= $p ?>][start]" value="<?= e(substr((string)($cur['start_time'] ?? $startTime), 0, 5)) ?>" class="schedule-grid-time-input">
+                                        <span>-</span>
+                                        <input type="time" name="slot_time[<?= $filterDay ?>][<?= $p ?>][end]" value="<?= e(substr((string)($cur['end_time'] ?? $endTime), 0, 5)) ?>" class="schedule-grid-time-input">
+                                    </div>
+                                </td>
+                                <td class="schedule-grid-select-cell">
+                                    <select name="slot[<?= $filterDay ?>][<?= $p ?>]" class="schedule-grid-select">
+                                        <option value="">- Kosong -</option>
+                                        <?php foreach ($assignmentsBySubject as $subjectName => $teachers): ?>
+                                            <optgroup label="<?= e($subjectName) ?>">
+                                                <?php foreach ($teachers as $t): ?>
+                                                    <option value="<?= e($t['id']) ?>" <?= ($cur && (int)$cur['assignment_id'] === (int)$t['id']) ? 'selected' : '' ?>><?= e($t['teacher']) ?></option>
+                                                <?php endforeach; ?>
+                                            </optgroup>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </td>
                             </tr>
                             <?php
                             $breakMins = schedule_break_minutes_for_after($p);
                             if ($breakMins > 0):
+                                [, $bEnd] = schedule_time_for_period($p, $filterDay);
+                                [$bNext] = schedule_time_for_period($p + 1, $filterDay);
                             ?>
                             <tr class="schedule-grid-break-row">
                                 <td class="schedule-grid-period schedule-grid-break-label">
                                     <strong>ISTIRAHAT</strong>
-                                    <small><?= $breakMins ?> menit</small>
+                                    <small><?= $breakMins ?> mnt</small>
                                 </td>
-                                <?php foreach ($days as $dayNum => $dayLabel): ?>
-                                    <?php [, $prevEnd] = schedule_time_for_period($p, $dayNum); ?>
-                                    <?php [$nextStart] = schedule_time_for_period($p + 1, $dayNum); ?>
-                                    <td class="schedule-grid-break-cell">
-                                        <div class="schedule-grid-time"><?= e($prevEnd . '-' . $nextStart) ?></div>
-                                        Istirahat
-                                    </td>
-                                <?php endforeach; ?>
+                                <td colspan="2" class="schedule-grid-break-cell">
+                                    <?= e($bEnd) ?> - <?= e($bNext) ?>
+                                </td>
                             </tr>
                             <?php endif; ?>
                         <?php endfor; ?>
                     </tbody>
                 </table>
             </div>
-            <?php if (schedule_is_short_day(5) || schedule_is_short_day(6)): ?>
-                <div style="padding:4px 16px"><small style="color:var(--muted)">* Hari pendek (jam pelajaran lebih singkat)</small></div>
-            <?php endif; ?>
             <div class="schedule-grid-actions">
                 <button class="button primary">Simpan Semua Jadwal</button>
                 <a class="button" href="<?= e(route_url('lesson-schedule')) ?>">Reset</a>
-                <span class="hint">Pilih mapel di tiap sel. Kosongkan untuk menghapus slot.</span>
+                <span class="hint">Pilih mapel (optgroup) lalu guru di bawahnya. Kosongkan untuk hapus slot.</span>
             </div>
-            <?php endif; ?>
         </form>
+    <?php elseif ($filterClassId > 0 && $filterDay > 0 && empty($assignmentsBySubject)): ?>
+        <p style="padding:12px 16px;color:var(--muted)">Belum ada pembelajaran untuk kelas ini. Tambahkan di <a href="<?= e(route_url('assignments')) ?>">Data Pembelajaran</a> terlebih dulu.</p>
+    <?php else: ?>
+        <p style="padding:12px 16px;color:var(--muted)">Pilih kelas dan hari untuk mengisi jadwal.</p>
+    <?php endif; ?>
     </section>
     <?php
 }
@@ -1294,106 +1280,106 @@ function action_save_schedule_grid(): void
     }
 
     $filterClassId = (int)($_POST['grid_class_id'] ?? 0);
-    $days = schedule_days();
+    $filterDay = (int)($_POST['grid_day'] ?? 0);
+    $school = get_school_profile();
+    $maxPeriods = (int)($school['max_periods'] ?? 10);
+    $dayLabel = schedule_days()[$filterDay] ?? '-';
     $saved = 0;
     $deleted = 0;
     $errors = [];
 
-    $whereClass = $filterClassId > 0 ? ' AND class_id = ' . $filterClassId : '';
-    $allCurrent = fetch_all("SELECT id, assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked FROM lesson_schedules WHERE 1=1 $whereClass");
     $currentMap = [];
-    foreach ($allCurrent as $row) {
-        $currentMap[(int)$row['day_of_week']][(int)$row['period_no']] = $row;
+    if ($filterClassId > 0 && $filterDay > 0) {
+        foreach (fetch_all('SELECT id, assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked FROM lesson_schedules WHERE class_id = ? AND day_of_week = ?', [$filterClassId, $filterDay]) as $row) {
+            $currentMap[(int)$row['period_no']] = $row;
+        }
     }
 
-    foreach ($days as $dayNum => $dayLabel) {
-        for ($p = 1; $p <= 12; $p++) {
-            $assignmentId = (int)($slots[$dayNum][$p] ?? 0);
-            $customStart = schedule_normalize_time($slotTimes[$dayNum][$p]['start'] ?? '') ?? null;
-            $customEnd = schedule_normalize_time($slotTimes[$dayNum][$p]['end'] ?? '') ?? null;
-            $current = $currentMap[$dayNum][$p] ?? null;
-            $currentAssignmentId = $current ? (int)$current['assignment_id'] : 0;
+    for ($p = 1; $p <= $maxPeriods; $p++) {
+        $assignmentId = (int)($slots[$filterDay][$p] ?? 0);
+        $customStart = schedule_normalize_time($slotTimes[$filterDay][$p]['start'] ?? '') ?? null;
+        $customEnd = schedule_normalize_time($slotTimes[$filterDay][$p]['end'] ?? '') ?? null;
+        $current = $currentMap[$p] ?? null;
+        $currentAssignmentId = $current ? (int)$current['assignment_id'] : 0;
 
-            if ($assignmentId === 0 && !$current) {
+        if ($assignmentId === 0 && !$current) {
+            continue;
+        }
+
+        if ($assignmentId === $currentAssignmentId) {
+            if ($current && ($customStart !== null || $customEnd !== null)) {
+                $dbStart = $customStart ?? (string)$current['start_time'];
+                $dbEnd = $customEnd ?? (string)$current['end_time'];
+                if (substr($dbStart, 0, 5) !== substr((string)$current['start_time'], 0, 5) || substr($dbEnd, 0, 5) !== substr((string)$current['end_time'], 0, 5)) {
+                    execute_sql('UPDATE lesson_schedules SET start_time = ?, end_time = ?, updated_at = ? WHERE id = ?', [$dbStart, $dbEnd, now_string(), (int)$current['id']]);
+                }
+            }
+            continue;
+        }
+
+        if ($current && $assignmentId === 0) {
+            if ((int)$current['locked'] === 1) {
+                $errors[] = "Jam ke-{$p} terkunci, tidak bisa dihapus.";
+                continue;
+            }
+            execute_sql('DELETE FROM lesson_schedules WHERE id = ?', [(int)$current['id']]);
+            $deleted++;
+            continue;
+        }
+
+        if ($assignmentId > 0) {
+            $assignment = schedule_assignment_by_id($assignmentId);
+            if (!$assignment) {
+                $errors[] = "Pembelajaran tidak valid di jam ke-{$p}.";
                 continue;
             }
 
-            if ($assignmentId === $currentAssignmentId) {
-                if ($current && ($customStart !== null || $customEnd !== null)) {
-                    $dbStart = $customStart ?? (string)$current['start_time'];
-                    $dbEnd = $customEnd ?? (string)$current['end_time'];
-                    if (substr($dbStart, 0, 5) !== substr((string)$current['start_time'], 0, 5) || substr($dbEnd, 0, 5) !== substr((string)$current['end_time'], 0, 5)) {
-                        execute_sql('UPDATE lesson_schedules SET start_time = ?, end_time = ?, updated_at = ? WHERE id = ?', [$dbStart, $dbEnd, now_string(), (int)$current['id']]);
-                    }
-                }
+            if ($current && (int)$current['locked'] === 1) {
+                $errors[] = "Jam ke-{$p} terkunci, tidak bisa diubah.";
                 continue;
             }
 
-            if ($current && $assignmentId === 0) {
-                if ((int)$current['locked'] === 1) {
-                    $errors[] = "Slot {$dayLabel} jam ke-{$p} terkunci, tidak bisa dihapus.";
-                    continue;
-                }
-                execute_sql('DELETE FROM lesson_schedules WHERE id = ?', [(int)$current['id']]);
-                $deleted++;
+            [$defaultStart, $defaultEnd] = schedule_time_for_period($p, $filterDay);
+            $startTime = $customStart ?? $defaultStart;
+            $endTime = $customEnd ?? $defaultEnd;
+
+            $conflictClass = fetch_one(
+                'SELECT id FROM lesson_schedules WHERE class_id = ? AND day_of_week = ? AND period_no = ? AND id <> ?',
+                [(int)$assignment['class_id'], $filterDay, $p, $current ? (int)$current['id'] : 0]
+            );
+            if ($conflictClass) {
+                $errors[] = "Kelas sudah ada jadwal di jam ke-{$p}.";
                 continue;
             }
 
-            if ($assignmentId > 0) {
-                $assignment = schedule_assignment_by_id($assignmentId);
-                if (!$assignment) {
-                    $errors[] = "Pembelajaran tidak valid di {$dayLabel} jam ke-{$p}.";
-                    continue;
-                }
+            $conflictTeacher = fetch_one(
+                'SELECT id FROM lesson_schedules WHERE teacher_id = ? AND day_of_week = ? AND period_no = ? AND id <> ?',
+                [(int)$assignment['teacher_id'], $filterDay, $p, $current ? (int)$current['id'] : 0]
+            );
+            if ($conflictTeacher) {
+                $errors[] = "Guru sudah ada jadwal di jam ke-{$p}.";
+                continue;
+            }
 
-                if ($current && (int)$current['locked'] === 1) {
-                    $errors[] = "Slot {$dayLabel} jam ke-{$p} terkunci, tidak bisa diubah.";
-                    continue;
-                }
-
-                [$defaultStart, $defaultEnd] = schedule_time_for_period($p, $dayNum);
-                $startTime = $customStart ?? $defaultStart;
-                $endTime = $customEnd ?? $defaultEnd;
-
-                $conflictClass = fetch_one(
-                    'SELECT id FROM lesson_schedules WHERE class_id = ? AND day_of_week = ? AND period_no = ? AND id <> ?',
-                    [(int)$assignment['class_id'], $dayNum, $p, $current ? (int)$current['id'] : 0]
+            if ($current) {
+                execute_sql(
+                    'UPDATE lesson_schedules SET assignment_id = ?, teacher_id = ?, class_id = ?, subject_id = ?, start_time = ?, end_time = ?, updated_at = ? WHERE id = ?',
+                    [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $startTime, $endTime, now_string(), (int)$current['id']]
                 );
-                if ($conflictClass) {
-                    $errors[] = "Kelas sudah ada jadwal di {$dayLabel} jam ke-{$p}.";
-                    continue;
-                }
-
-                $conflictTeacher = fetch_one(
-                    'SELECT id FROM lesson_schedules WHERE teacher_id = ? AND day_of_week = ? AND period_no = ? AND id <> ?',
-                    [(int)$assignment['teacher_id'], $dayNum, $p, $current ? (int)$current['id'] : 0]
+            } else {
+                execute_sql(
+                    'INSERT INTO lesson_schedules (assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked, generated_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)',
+                    [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $filterDay, $p, $startTime, $endTime, (int)current_user()['id'], now_string(), now_string()]
                 );
-                if ($conflictTeacher) {
-                    $errors[] = "Guru sudah ada jadwal di {$dayLabel} jam ke-{$p}.";
-                    continue;
-                }
-
-                if ($current) {
-                    execute_sql(
-                        'UPDATE lesson_schedules SET assignment_id = ?, teacher_id = ?, class_id = ?, subject_id = ?, start_time = ?, end_time = ?, updated_at = ? WHERE id = ?',
-                        [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $startTime, $endTime, now_string(), (int)$current['id']]
-                    );
-                } else {
-                    execute_sql(
-                        'INSERT INTO lesson_schedules (assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked, generated_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)',
-                        [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $dayNum, $p, $startTime, $endTime, (int)current_user()['id'], now_string(), now_string()]
-                    );
-                }
-                $saved++;
             }
+            $saved++;
         }
     }
 
     if ($errors) {
         flash('warning', 'Tersimpan, tapi ada konflik: ' . implode(' ', $errors));
     } else {
-        flash('success', "Jadwal tersimpan. {$saved} slot diperbarui, {$deleted} slot dihapus.");
+        flash('success', "Jadwal {$dayLabel} tersimpan. {$saved} slot diperbarui, {$deleted} dihapus.");
     }
-    $redirectParams = $filterClassId > 0 ? ['grid_class_id' => $filterClassId] : [];
-    redirect_to('lesson-schedule', $redirectParams);
+    redirect_to('lesson-schedule', ['grid_class_id' => $filterClassId, 'grid_day' => $filterDay]);
 }
