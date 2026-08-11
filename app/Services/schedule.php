@@ -150,18 +150,31 @@ function schedule_reminder_message(array $row, int $remainingMinutes): string
 {
     $start = substr((string)$row['start_time'], 0, 5);
     $end = substr((string)$row['end_time'], 0, 5);
-    $remaining = $remainingMinutes > 0 ? 'sekitar ' . $remainingMinutes . ' menit lagi' : 'sekarang';
+    $remaining = $remainingMinutes > 0 ? $remainingMinutes . ' menit lagi' : 'sedang berlangsung';
+    $dayName = schedule_days()[(int)$row['day_of_week']] ?? '-';
+    $period = (int)$row['period_no'];
+    $isNow = $remainingMinutes <= 0;
+
+    $statusIcon = $isNow ? '🔴' : '🟡';
+    $statusText = $isNow ? 'Sedang Berlangsung' : 'Akan Dimulai';
+
     $lines = [
-        '<b>Pengingat Jadwal Pelajaran</b>',
-        'Assalamu\'alaikum, ' . e($row['teacher_name']) . '.',
-        e($row['subject_name']) . ' - Kelas ' . e($row['class_name']),
-        e(schedule_days()[(int)$row['day_of_week']] ?? '-') . ', Jam ke-' . (int)$row['period_no'] . ' (' . e($start . ' - ' . $end) . ')',
-        'Mulai ' . $remaining . '.',
+        $statusIcon . ' <b>' . $statusText . '</b>',
+        '',
+        'Assalamu\'alaikum, <b>' . e($row['teacher_name']) . '</b> 🙏',
+        '',
+        '📚 ' . e($row['subject_name']),
+        '👥 Kelas ' . e($row['class_name']),
+        '📅 ' . e($dayName) . ', Jam ke-' . $period,
+        '⏰ ' . e($start) . ' - ' . e($end),
+        '',
+        '⏳ ' . $remaining,
     ];
 
     $url = telegram_web_login_url('lesson-schedule');
     if ($url !== '') {
-        $lines[] = '<a href="' . e($url) . '">Buka Jadwal Pelajaran</a>';
+        $lines[] = '';
+        $lines[] = '📋 <a href="' . e($url) . '">Buka Jadwal Pelajaran</a>';
     }
 
     return implode("\n", $lines);

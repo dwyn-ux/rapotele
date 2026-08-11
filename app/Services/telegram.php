@@ -1134,7 +1134,12 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
             save_student_attendance_entry($sessionId, (int)$student['id'], 'hadir', '');
         }
 
-        return 'Absensi hadir tersimpan untuk ' . count($students) . ' siswa di ' . $assignment['class_name'] . ' - ' . $assignment['subject_name'] . '.';
+        return '✅ <b>Absensi tersimpan</b>'
+            . "\n" . '📚 ' . e($assignment['subject_name'])
+            . "\n" . '👥 ' . e($assignment['class_name'])
+            . "\n" . '👨‍🎓 ' . count($students) . ' siswa hadir'
+            . "\n" . '📅 ' . e($date)
+            . "\n" . '💡 Topik: ' . e($topic);
     }
 
     if ($command === '/absen') {
@@ -1143,18 +1148,18 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
         }
         $assignment = telegram_assignment_for_user((int)$parts[1], $user);
         if (!$assignment) {
-            return 'Pembelajaran tidak ditemukan atau bukan milik akun ini.';
+            return '❌ Pembelajaran tidak ditemukan atau bukan milik akun ini.';
         }
         $status = strtolower($parts[4]);
         if (!array_key_exists($status, allowed_statuses())) {
-            return 'Status tidak valid. Pakai: ' . implode(', ', array_keys(allowed_statuses()));
+            return '❌ Status tidak valid. Pakai: ' . implode(', ', array_keys(allowed_statuses()));
         }
         $student = fetch_one(
             'SELECT * FROM students WHERE class_id = ? AND active = 1 AND (nis = ? OR nisn = ?)',
             [(int)$assignment['class_id'], $parts[3], $parts[3]]
         );
         if (!$student) {
-            return 'Siswa dengan NIS/NISN ' . $parts[3] . ' tidak ditemukan di kelas pembelajaran.';
+            return '❌ Siswa dengan NIS/NISN ' . $parts[3] . ' tidak ditemukan di kelas pembelajaran.';
         }
 
         $date = date_ymd($parts[2]);
@@ -1162,7 +1167,8 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
         $sessionId = save_attendance_session((int)$assignment['id'], $date, 1, 'Absensi via Telegram', (int)$user['id']);
         save_student_attendance_entry($sessionId, (int)$student['id'], $status, $notes);
 
-        return 'Absensi ' . $student['name'] . ' tersimpan: ' . allowed_statuses()[$status] . '.';
+        $statusEmoji = ['hadir' => '✅', 'sakit' => '🤒', 'izin' => '📝', 'alpa' => '❌', 'terlambat' => '⏰'][$status] ?? '📌';
+        return $statusEmoji . ' <b>' . e($student['name']) . '</b>: ' . allowed_statuses()[$status] . '.';
     }
 
     if ($command === '/jurnal') {
@@ -1203,7 +1209,11 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
             now_string(),
         ]);
 
-        return 'Jurnal tersimpan untuk ' . $assignment['class_name'] . ' - ' . $assignment['subject_name'] . '.';
+        return '📝 <b>Jurnal tersimpan</b>'
+            . "\n" . '📚 ' . e($assignment['subject_name'])
+            . "\n" . '👥 ' . e($assignment['class_name'])
+            . "\n" . '📅 ' . e($date)
+            . "\n" . '💡 Topik: ' . e($topic);
     }
 
     return 'Perintah belum dikenal.' . "\n\n" . telegram_help();
