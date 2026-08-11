@@ -87,7 +87,8 @@ function page_teachers(): void
                 <label>Username Login <input name="username" value="<?= e($existingUser['username'] ?? '') ?>" readonly></label>
                 <label>Password Baru <input type="password" name="password" placeholder="Kosongkan jika tidak diganti"></label>
             <?php else: ?>
-                <label>Username Login <input name="username" value="<?= e($edit['username'] ?? '') ?>" placeholder="untuk login guru"></label>
+                <?php $autoUsername = $edit['name'] ? generate_username_from_name($edit['name']) : ''; ?>
+                <label>Username Login <input name="username" data-autofill-username value="<?= e($edit['username'] ?? '') ?>" placeholder="otomatis: <?= e($autoUsername) ?>"></label>
                 <label>Password Login <input type="password" name="password" value="<?= e(config('default_teacher_password', 'guru123')) ?>" placeholder="default: <?= e(config('default_teacher_password', 'guru123')) ?>"></label>
             <?php endif; ?>
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>

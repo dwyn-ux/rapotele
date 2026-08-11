@@ -97,4 +97,19 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
+
+    const nameInput = document.querySelector('input[name="name"]');
+    const usernameInput = document.querySelector('input[name="username"][data-autofill-username]');
+    if (nameInput && usernameInput && !usernameInput.readOnly) {
+        const generateUsername = (name) => {
+            const words = name.trim().split(/\s+/).slice(0, 2);
+            const slug = words.join('').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+            return slug || 'guru';
+        };
+        const updatePlaceholder = () => {
+            usernameInput.placeholder = 'otomatis: ' + generateUsername(nameInput.value);
+        };
+        nameInput.addEventListener('input', updatePlaceholder);
+        updatePlaceholder();
+    }
 });

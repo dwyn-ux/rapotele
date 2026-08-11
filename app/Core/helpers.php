@@ -283,4 +283,26 @@ function signature_media_url(string $type = 'logo', ?int $id = null): string
     return app_url('media.php') . '?' . http_build_query($params);
 }
 
+function generate_username_from_name(string $name): string
+{
+    $words = preg_split('/\s+/', trim($name));
+    if (!$words) {
+        return 'guru';
+    }
+    $username = strtolower(iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', implode('', array_slice($words, 0, 2))));
+    $username = preg_replace('/[^a-z0-9]/', '', $username);
+    return $username !== '' ? $username : 'guru';
+}
+
+function unique_username(string $base): string
+{
+    $username = $base;
+    $counter = 1;
+    while (fetch_one('SELECT id FROM users WHERE username = ?', [$username])) {
+        $counter++;
+        $username = $base . $counter;
+    }
+    return $username;
+}
+
 

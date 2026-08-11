@@ -83,7 +83,13 @@ function action_save_teacher(): void
             execute_sql('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [password_hash($password, PASSWORD_DEFAULT), now_string(), (int)$existingUser['id']]);
             flash('success', 'Password guru berhasil diubah.');
         }
-    } elseif ($username !== '' && $password !== '') {
+    } else {
+        if ($username === '') {
+            $username = unique_username(generate_username_from_name(trim((string)$_POST['name'])));
+        }
+        if ($password === '') {
+            $password = config('default_teacher_password', 'guru123');
+        }
         $taken = fetch_one('SELECT id FROM users WHERE username = ?', [$username]);
         if ($taken) {
             flash('danger', 'Username "' . $username . '" sudah dipakai user lain.');
@@ -93,9 +99,7 @@ function action_save_teacher(): void
             'INSERT INTO users (username, password_hash, name, role, teacher_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [$username, password_hash($password, PASSWORD_DEFAULT), trim((string)$_POST['name']), 'guru', $teacherId, 1, now_string(), now_string()]
         );
-        flash('success', 'Data guru & akun login tersimpan. Username: ' . $username);
-    } elseif ($username !== '' && $password === '') {
-        flash('warning', 'Password kosong, akun login tidak dibuat.');
+        flash('success', 'Data guru & akun login tersimpan. Username: ' . $username . ' | Password: ' . $password);
     }
 
     flash('success', 'Data guru tersimpan.');
