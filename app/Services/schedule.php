@@ -1210,15 +1210,29 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                     </thead>
                     <tbody>
                         <?php for ($p = 1; $p <= $maxPeriods; $p++): ?>
-                            <?php [$pStart] = schedule_time_for_period($p, 1); ?>
                             <tr>
                                 <td class="schedule-grid-period">
                                     <strong>Jam <?= $p ?></strong>
                                 </td>
                                 <?php foreach ($days as $dayNum => $dayLabel): ?>
                                     <?php [$start, $end] = schedule_time_for_period($p, $dayNum); ?>
+                                    <?php
+                                    $dbStart = $start;
+                                    $dbEnd = $end;
+                                    if (isset($existing[$dayNum][$p]) && $existing[$dayNum][$p] > 0) {
+                                        $existingRow = fetch_one('SELECT start_time, end_time FROM lesson_schedules WHERE day_of_week = ? AND period_no = ? AND class_id = ?', [$dayNum, $p, $filterClassId]);
+                                        if ($existingRow) {
+                                            $dbStart = substr((string)$existingRow['start_time'], 0, 5) ?: $start;
+                                            $dbEnd = substr((string)$existingRow['end_time'], 0, 5) ?: $end;
+                                        }
+                                    }
+                                    ?>
                                     <td>
-                                        <div class="schedule-grid-time"><?= e($start . '-' . $end) ?></div>
+                                        <div class="schedule-grid-time-inputs">
+                                            <input type="time" name="slot_time[<?= $dayNum ?>][<?= $p ?>][start]" value="<?= e($dbStart) ?>" class="schedule-grid-time-input">
+                                            <span>-</span>
+                                            <input type="time" name="slot_time[<?= $dayNum ?>][<?= $p ?>][end]" value="<?= e($dbEnd) ?>" class="schedule-grid-time-input">
+                                        </div>
                                         <select name="slot[<?= $dayNum ?>][<?= $p ?>]" class="schedule-grid-select">
                                             <option value="">-</option>
                                             <?php foreach ($assignments as $id => $label): ?>
@@ -1231,10 +1245,6 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                             <?php
                             $breakMins = schedule_break_minutes_for_after($p);
                             if ($breakMins > 0):
-                                [$breakStart] = schedule_time_for_period($p, 1);
-                                $breakStartMin = $breakStart;
-                                [$pe, $pend] = schedule_time_for_period($p, 1);
-                                $breakEndMin = $pend;
                             ?>
                             <tr class="schedule-grid-break-row">
                                 <td class="schedule-grid-period schedule-grid-break-label">
@@ -1242,7 +1252,7 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                                     <small><?= $breakMins ?> menit</small>
                                 </td>
                                 <?php foreach ($days as $dayNum => $dayLabel): ?>
-                                    <?php [$prevStart, $prevEnd] = schedule_time_for_period($p, $dayNum); ?>
+                                    <?php [, $prevEnd] = schedule_time_for_period($p, $dayNum); ?>
                                     <?php [$nextStart] = schedule_time_for_period($p + 1, $dayNum); ?>
                                     <td class="schedule-grid-break-cell">
                                         <div class="schedule-grid-time"><?= e($prevEnd . '-' . $nextStart) ?></div>
@@ -1278,6 +1288,10 @@ function action_save_schedule_grid(): void
     if (!is_array($slots)) {
         $slots = [];
     }
+    $slotTimes = $_POST['slot_time'] ?? [];
+    if (!is_array($slotTimes)) {
+        $slotTimes = [];
+    }
 
     $filterClassId = (int)($_POST['grid_class_id'] ?? 0);
     $days = schedule_days();
@@ -1292,15 +1306,26 @@ function action_save_schedule_grid(): void
         $currentMap[(int)$row['day_of_week']][(int)$row['period_no']] = $row;
     }
 
-    $periodTimes = schedule_period_times();
-
     foreach ($days as $dayNum => $dayLabel) {
         for ($p = 1; $p <= 12; $p++) {
             $assignmentId = (int)($slots[$dayNum][$p] ?? 0);
+            $customStart = schedule_normalize_time($slotTimes[$dayNum][$p]['start'] ?? '') ?? null;
+            $customEnd = schedule_normalize_time($slotTimes[$dayNum][$p]['end'] ?? '') ?? null;
             $current = $currentMap[$dayNum][$p] ?? null;
             $currentAssignmentId = $current ? (int)$current['assignment_id'] : 0;
 
+            if ($assignmentId === 0 && !$current) {
+                continue;
+            }
+
             if ($assignmentId === $currentAssignmentId) {
+                if ($current && ($customStart !== null || $customEnd !== null)) {
+                    $dbStart = $customStart ?? (string)$current['start_time'];
+                    $dbEnd = $customEnd ?? (string)$current['end_time'];
+                    if (substr($dbStart, 0, 5) !== substr((string)$current['start_time'], 0, 5) || substr($dbEnd, 0, 5) !== substr((string)$current['end_time'], 0, 5)) {
+                        execute_sql('UPDATE lesson_schedules SET start_time = ?, end_time = ?, updated_at = ? WHERE id = ?', [$dbStart, $dbEnd, now_string(), (int)$current['id']]);
+                    }
+                }
                 continue;
             }
 
@@ -1327,6 +1352,8 @@ function action_save_schedule_grid(): void
                 }
 
                 [$defaultStart, $defaultEnd] = schedule_time_for_period($p, $dayNum);
+                $startTime = $customStart ?? $defaultStart;
+                $endTime = $customEnd ?? $defaultEnd;
 
                 $conflictClass = fetch_one(
                     'SELECT id FROM lesson_schedules WHERE class_id = ? AND day_of_week = ? AND period_no = ? AND id <> ?',
@@ -1349,12 +1376,12 @@ function action_save_schedule_grid(): void
                 if ($current) {
                     execute_sql(
                         'UPDATE lesson_schedules SET assignment_id = ?, teacher_id = ?, class_id = ?, subject_id = ?, start_time = ?, end_time = ?, updated_at = ? WHERE id = ?',
-                        [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $defaultStart, $defaultEnd, now_string(), (int)$current['id']]
+                        [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $startTime, $endTime, now_string(), (int)$current['id']]
                     );
                 } else {
                     execute_sql(
                         'INSERT INTO lesson_schedules (assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked, generated_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)',
-                        [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $dayNum, $p, $defaultStart, $defaultEnd, (int)current_user()['id'], now_string(), now_string()]
+                        [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $dayNum, $p, $startTime, $endTime, (int)current_user()['id'], now_string(), now_string()]
                     );
                 }
                 $saved++;

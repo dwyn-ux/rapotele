@@ -536,6 +536,33 @@ label textarea {
     white-space: nowrap;
 }
 
+.schedule-grid-time-inputs {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-bottom: 2px;
+}
+
+.schedule-grid-time-input {
+    width: 62px;
+    min-width: 62px;
+    padding: 2px 3px;
+    font-size: 11px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    text-align: center;
+}
+
+.schedule-grid-time-input:focus {
+    border-color: var(--primary);
+    outline: none;
+}
+
+.schedule-grid-time-inputs span {
+    color: var(--muted);
+    font-size: 11px;
+}
+
 .schedule-grid-time-header {
     background: #e8edf3 !important;
     font-size: 11px;
