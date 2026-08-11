@@ -1083,21 +1083,56 @@ function schedule_request_actions(int $id): string
 
 function render_schedule_grid_form(int $maxPeriod = 8): void
 {
-    $assignments = schedule_assignment_options();
+    $classes = schedule_class_options();
+    $filterClassId = (int)($_GET['grid_class_id'] ?? 0);
+
+    $allAssignments = schedule_assignment_options();
+    if ($filterClassId > 0) {
+        $assignments = [];
+        foreach (fetch_all(
+            'SELECT ta.id, t.name AS teacher_name, c.name AS class_name, s.name AS subject_name
+             FROM teaching_assignments ta
+             JOIN teachers t ON t.id = ta.teacher_id
+             JOIN classes c ON c.id = ta.class_id
+             JOIN subjects s ON s.id = ta.subject_id
+             WHERE ta.active = 1 AND ta.class_id = ?
+             ORDER BY s.name, t.name',
+            [$filterClassId]
+        ) as $a) {
+            $assignments[(string)$a['id']] = $a['subject_name'] . ' - ' . $a['teacher_name'];
+        }
+    } else {
+        $assignments = $allAssignments;
+    }
+
     $days = schedule_days();
     $periodTimes = schedule_period_times();
 
     $existing = [];
-    $rows = schedule_rows([]);
+    $existingFilter = $filterClassId > 0 ? ['class_id' => $filterClassId] : [];
+    $rows = schedule_rows($existingFilter);
     foreach ($rows as $row) {
         $existing[(int)$row['day_of_week']][(int)$row['period_no']] = (int)$row['assignment_id'];
     }
     ?>
     <section class="panel">
         <?php panel_title('Input Grid Jadwal'); ?>
+        <form method="get" class="grid four" style="padding:0 16px 8px;">
+            <input type="hidden" name="page" value="lesson-schedule">
+            <label>Pilih Kelas <select name="grid_class_id" onchange="this.form.submit()">
+                <option value="">Semua Kelas</option>
+                <?php foreach ($classes as $cid => $cname): ?>
+                    <option value="<?= e($cid) ?>" <?= $filterClassId == (int)$cid ? 'selected' : '' ?>><?= e($cname) ?></option>
+                <?php endforeach; ?>
+            </select></label>
+        </form>
         <form method="post" class="schedule-grid-wrap">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="save_schedule_grid">
+            <input type="hidden" name="grid_class_id" value="<?= e($filterClassId) ?>">
+            <?php if ($filterClassId > 0 && empty($assignments)): ?>
+                <p style="padding:12px 16px;color:var(--muted)">Belum ada pembelajaran untuk kelas ini. Tambahkan di <a href="<?= e(route_url('assignments')) ?>">Data Pembelajaran</a> terlebih dulu.</p>
+            <?php else: ?>
             <div class="schedule-grid-scroll">
                 <table class="schedule-grid">
                     <thead>
@@ -1135,8 +1170,9 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
             <div class="schedule-grid-actions">
                 <button class="button primary">Simpan Semua Jadwal</button>
                 <a class="button" href="<?= e(route_url('lesson-schedule')) ?>">Reset</a>
-                <span class="hint">Pilih pembelajaran di tiap sel. Kosongkan untuk menghapus slot.</span>
+                <span class="hint">Pilih mapel di tiap sel. Kosongkan untuk menghapus slot.</span>
             </div>
+            <?php endif; ?>
         </form>
     </section>
     <?php
@@ -1152,12 +1188,14 @@ function action_save_schedule_grid(): void
         $slots = [];
     }
 
+    $filterClassId = (int)($_POST['grid_class_id'] ?? 0);
     $days = schedule_days();
     $saved = 0;
     $deleted = 0;
     $errors = [];
 
-    $allCurrent = fetch_all('SELECT id, assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked FROM lesson_schedules');
+    $whereClass = $filterClassId > 0 ? ' AND class_id = ' . $filterClassId : '';
+    $allCurrent = fetch_all("SELECT id, assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked FROM lesson_schedules WHERE 1=1 $whereClass");
     $currentMap = [];
     foreach ($allCurrent as $row) {
         $currentMap[(int)$row['day_of_week']][(int)$row['period_no']] = $row;
@@ -1238,5 +1276,6 @@ function action_save_schedule_grid(): void
     } else {
         flash('success', "Jadwal tersimpan. {$saved} slot diperbarui, {$deleted} slot dihapus.");
     }
-    redirect_to('lesson-schedule');
+    $redirectParams = $filterClassId > 0 ? ['grid_class_id' => $filterClassId] : [];
+    redirect_to('lesson-schedule', $redirectParams);
 }
