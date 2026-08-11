@@ -21,6 +21,10 @@ function page_school(): void
             <label>Lat. Sekolah <input type="number" step="any" name="location_lat" id="school_lat" value="<?= e($school['location_lat'] ?? '') ?>" placeholder="-6.2088"></label>
             <label>Lng. Sekolah <input type="number" step="any" name="location_lng" id="school_lng" value="<?= e($school['location_lng'] ?? '') ?>" placeholder="106.8456"></label>
             <label>Radius Absensi (meter) <input type="number" min="0" name="attendance_radius_meters" value="<?= e($school['attendance_radius_meters'] ?? '500') ?>" placeholder="500"></label>
+            <label>Jam Pelajaran Normal (menit) <input type="number" min="10" max="60" name="regular_period_minutes" value="<?= e($school['regular_period_minutes'] ?? '35') ?>" placeholder="35"></label>
+            <label>Jam Pelajaran Pendek (menit) <input type="number" min="10" max="60" name="short_period_minutes" value="<?= e($school['short_period_minutes'] ?? '25') ?>" placeholder="25"></label>
+            <label>Hari Pendek <input name="short_days" value="<?= e($school['short_days'] ?? '') ?>" placeholder="Contoh: 5 atau 5,6 (Jumat, Sabtu)"></label>
+            <label>Jam Maksimal <input type="number" min="1" max="12" name="max_periods" value="<?= e($school['max_periods'] ?? '10') ?>" placeholder="10"></label>
             <div class="wide">
                 <label style="margin-bottom:4px">Peta Lokasi Sekolah <small>(klik peta untuk set lokasi)</small></label>
                 <div id="school-map" style="height:350px;width:100%;border-radius:8px;border:1px solid #ccc;z-index:0;"></div>

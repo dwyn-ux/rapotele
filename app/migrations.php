@@ -662,6 +662,11 @@ function run_migrations(): void
     migration_add_column('extracurriculars', 'updated_at', 'DATETIME NULL');
     migration_add_column('extracurricular_members', 'updated_at', 'DATETIME NULL');
 
+    migration_add_column('school_profile', 'short_days', 'VARCHAR(64) NULL');
+    migration_add_column('school_profile', 'regular_period_minutes', 'INT NULL DEFAULT 35');
+    migration_add_column('school_profile', 'short_period_minutes', 'INT NULL DEFAULT 25');
+    migration_add_column('school_profile', 'max_periods', 'INT NULL DEFAULT 10');
+
     migrate_foreign_keys();
 }
 

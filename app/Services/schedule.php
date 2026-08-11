@@ -47,8 +47,39 @@ function schedule_period_times(): array
     ];
 }
 
-function schedule_time_for_period(int $period): array
+function schedule_is_short_day(int $dayOfWeek): bool
 {
+    $school = get_school_profile();
+    $shortDays = trim((string)($school['short_days'] ?? ''));
+    if ($shortDays === '') {
+        return false;
+    }
+    $days = array_map('intval', array_map('trim', explode(',', $shortDays)));
+    return in_array($dayOfWeek, $days, true);
+}
+
+function schedule_period_duration(int $dayOfWeek): int
+{
+    $school = get_school_profile();
+    if (schedule_is_short_day($dayOfWeek)) {
+        return (int)($school['short_period_minutes'] ?? 25);
+    }
+    return (int)($school['regular_period_minutes'] ?? 35);
+}
+
+function schedule_time_for_period(int $period, ?int $dayOfWeek = null): array
+{
+    if ($dayOfWeek !== null && schedule_is_short_day($dayOfWeek)) {
+        $duration = schedule_period_duration($dayOfWeek);
+        $gap = 5;
+        $startMinute = (7 * 60) + (($period - 1) * ($duration + $gap));
+        $endMinute = $startMinute + $duration;
+        return [
+            sprintf('%02d:%02d', intdiv($startMinute, 60), $startMinute % 60),
+            sprintf('%02d:%02d', intdiv($endMinute, 60), $endMinute % 60),
+        ];
+    }
+
     $times = schedule_period_times();
     if (isset($times[$period])) {
         return $times[$period];
@@ -1106,7 +1137,8 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
     }
 
     $days = schedule_days();
-    $periodTimes = schedule_period_times();
+    $school = get_school_profile();
+    $maxPeriods = (int)($school['max_periods'] ?? 10);
 
     $existing = [];
     $existingFilter = $filterClassId > 0 ? ['class_id' => $filterClassId] : [];
@@ -1139,21 +1171,27 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                         <tr>
                             <th class="schedule-grid-period">Jam</th>
                             <?php foreach ($days as $dayNum => $dayLabel): ?>
-                                <th><?= e($dayLabel) ?></th>
+                                <?php $isShort = schedule_is_short_day($dayNum); ?>
+                                <th class="<?= $isShort ? 'schedule-grid-short-day' : '' ?>"><?= e($dayLabel) ?><?= $isShort ? ' *' : '' ?></th>
+                            <?php endforeach; ?>
+                        </tr>
+                        <tr>
+                            <th class="schedule-grid-period"><small>Waktu</small></th>
+                            <?php foreach ($days as $dayNum => $dayLabel): ?>
+                                <th class="schedule-grid-time-header"></th>
                             <?php endforeach; ?>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php for ($p = 1; $p <= $maxPeriod; $p++): ?>
+                        <?php for ($p = 1; $p <= $maxPeriods; $p++): ?>
                             <tr>
                                 <td class="schedule-grid-period">
                                     <strong>Jam <?= $p ?></strong>
-                                    <?php if (isset($periodTimes[$p])): ?>
-                                        <small><?= e($periodTimes[$p][0] . '-' . $periodTimes[$p][1]) ?></small>
-                                    <?php endif; ?>
                                 </td>
                                 <?php foreach ($days as $dayNum => $dayLabel): ?>
+                                    <?php [$start, $end] = schedule_time_for_period($p, $dayNum); ?>
                                     <td>
+                                        <div class="schedule-grid-time"><?= e($start . '-' . $end) ?></div>
                                         <select name="slot[<?= $dayNum ?>][<?= $p ?>]" class="schedule-grid-select">
                                             <option value="">-</option>
                                             <?php foreach ($assignments as $id => $label): ?>
@@ -1167,6 +1205,9 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                     </tbody>
                 </table>
             </div>
+            <?php if (schedule_is_short_day(5) || schedule_is_short_day(6)): ?>
+                <div style="padding:4px 16px"><small style="color:var(--muted)">* Hari pendek (jam pelajaran lebih singkat)</small></div>
+            <?php endif; ?>
             <div class="schedule-grid-actions">
                 <button class="button primary">Simpan Semua Jadwal</button>
                 <a class="button" href="<?= e(route_url('lesson-schedule')) ?>">Reset</a>
@@ -1235,7 +1276,7 @@ function action_save_schedule_grid(): void
                     continue;
                 }
 
-                [$defaultStart, $defaultEnd] = schedule_time_for_period($p);
+                [$defaultStart, $defaultEnd] = schedule_time_for_period($p, $dayNum);
 
                 $conflictClass = fetch_one(
                     'SELECT id FROM lesson_schedules WHERE class_id = ? AND day_of_week = ? AND period_no = ? AND id <> ?',

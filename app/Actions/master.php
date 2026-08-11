@@ -23,6 +23,10 @@ function action_save_school(): void
     $lat = trim((string)($_POST['location_lat'] ?? ''));
     $lng = trim((string)($_POST['location_lng'] ?? ''));
     $radius = trim((string)($_POST['attendance_radius_meters'] ?? ''));
+    $regularMinutes = trim((string)($_POST['regular_period_minutes'] ?? ''));
+    $shortMinutes = trim((string)($_POST['short_period_minutes'] ?? ''));
+    $shortDays = trim((string)($_POST['short_days'] ?? ''));
+    $maxPeriods = trim((string)($_POST['max_periods'] ?? ''));
     $data = [
         trim((string)$_POST['name']),
         trim((string)($_POST['npsn'] ?? '')),
@@ -34,10 +38,14 @@ function action_save_school(): void
         $lat !== '' ? (float)$lat : null,
         $lng !== '' ? (float)$lng : null,
         $radius !== '' ? (int)$radius : null,
+        $regularMinutes !== '' ? (int)$regularMinutes : 35,
+        $shortMinutes !== '' ? (int)$shortMinutes : 25,
+        $shortDays !== '' ? $shortDays : null,
+        $maxPeriods !== '' ? (int)$maxPeriods : 10,
         now_string(),
     ];
     execute_sql(
-        'UPDATE school_profile SET name = ?, npsn = ?, address = ?, principal_name = ?, principal_nip = ?, academic_year = ?, semester = ?, location_lat = ?, location_lng = ?, attendance_radius_meters = ?, updated_at = ? WHERE id = ?',
+        'UPDATE school_profile SET name = ?, npsn = ?, address = ?, principal_name = ?, principal_nip = ?, academic_year = ?, semester = ?, location_lat = ?, location_lng = ?, attendance_radius_meters = ?, regular_period_minutes = ?, short_period_minutes = ?, short_days = ?, max_periods = ?, updated_at = ? WHERE id = ?',
         array_merge($data, [(int)$school['id']])
     );
     set_app_setting('promotion.enabled', !empty($_POST['promotion_enabled']) ? '1' : '0');
