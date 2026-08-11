@@ -456,6 +456,82 @@ label textarea {
     color: var(--primary);
 }
 
+.schedule-grid-wrap {
+    padding: 0;
+}
+
+.schedule-grid-scroll {
+    overflow-x: auto;
+}
+
+.schedule-grid {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 700px;
+}
+
+.schedule-grid th,
+.schedule-grid td {
+    border: 1px solid var(--line);
+    padding: 6px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.schedule-grid th {
+    background: var(--primary);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 8px 6px;
+}
+
+.schedule-grid-period {
+    background: #f0f4f8;
+    font-size: 12px;
+    white-space: nowrap;
+    min-width: 80px;
+}
+
+.schedule-grid-period strong {
+    display: block;
+    color: var(--text);
+}
+
+.schedule-grid-period small {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.schedule-grid-select {
+    width: 100%;
+    min-width: 160px;
+    font-size: 12px;
+    padding: 5px 4px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: #fff;
+}
+
+.schedule-grid-select:focus {
+    border-color: var(--primary);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(23, 107, 135, .15);
+}
+
+.schedule-grid-actions {
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.schedule-grid-actions .hint {
+    color: var(--muted);
+    font-size: 12px;
+}
+
 .grid {
     display: grid;
     gap: 14px;

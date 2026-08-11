@@ -25,6 +25,7 @@ return [
     'generate_lesson_schedule' => 'action_generate_lesson_schedule',
     'save_lesson_schedule' => 'action_save_lesson_schedule',
     'delete_lesson_schedule' => 'action_delete_lesson_schedule',
+    'save_schedule_grid' => 'action_save_schedule_grid',
     'save_schedule_request' => 'action_save_schedule_request',
     'delete_schedule_request' => 'action_delete_schedule_request',
     'save_journal' => 'action_save_journal',

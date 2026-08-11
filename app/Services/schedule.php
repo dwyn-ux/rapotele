@@ -825,6 +825,7 @@ function render_lesson_schedule_admin_page(): void
     ]);
     render_schedule_template_panel();
     render_schedule_generate_panel();
+    render_schedule_grid_form();
     render_schedule_filter_panel($filterClassId, $filterTeacherId);
     render_lesson_schedule_form($editSchedule);
     render_lesson_schedule_table($rows, true);
@@ -1078,4 +1079,164 @@ function schedule_request_actions(int $id): string
         . '<form method="post" onsubmit="return confirm(\'Hapus request ini?\')">' . csrf_field()
         . '<input type="hidden" name="action" value="delete_schedule_request"><input type="hidden" name="id" value="' . e($id) . '">'
         . '<button class="button small danger">Hapus</button></form></div>';
+}
+
+function render_schedule_grid_form(int $maxPeriod = 8): void
+{
+    $assignments = schedule_assignment_options();
+    $days = schedule_days();
+    $periodTimes = schedule_period_times();
+
+    $existing = [];
+    $rows = schedule_rows([]);
+    foreach ($rows as $row) {
+        $existing[(int)$row['day_of_week']][(int)$row['period_no']] = (int)$row['assignment_id'];
+    }
+    ?>
+    <section class="panel">
+        <?php panel_title('Input Grid Jadwal'); ?>
+        <form method="post" class="schedule-grid-wrap">
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="save_schedule_grid">
+            <div class="schedule-grid-scroll">
+                <table class="schedule-grid">
+                    <thead>
+                        <tr>
+                            <th class="schedule-grid-period">Jam</th>
+                            <?php foreach ($days as $dayNum => $dayLabel): ?>
+                                <th><?= e($dayLabel) ?></th>
+                            <?php endforeach; ?>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php for ($p = 1; $p <= $maxPeriod; $p++): ?>
+                            <tr>
+                                <td class="schedule-grid-period">
+                                    <strong>Jam <?= $p ?></strong>
+                                    <?php if (isset($periodTimes[$p])): ?>
+                                        <small><?= e($periodTimes[$p][0] . '-' . $periodTimes[$p][1]) ?></small>
+                                    <?php endif; ?>
+                                </td>
+                                <?php foreach ($days as $dayNum => $dayLabel): ?>
+                                    <td>
+                                        <select name="slot[<?= $dayNum ?>][<?= $p ?>]" class="schedule-grid-select">
+                                            <option value="">-</option>
+                                            <?php foreach ($assignments as $id => $label): ?>
+                                                <option value="<?= e($id) ?>" <?= ($existing[$dayNum][$p] ?? 0) == (int)$id ? 'selected' : '' ?>><?= e($label) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </td>
+                                <?php endforeach; ?>
+                            </tr>
+                        <?php endfor; ?>
+                    </tbody>
+                </table>
+            </div>
+            <div class="schedule-grid-actions">
+                <button class="button primary">Simpan Semua Jadwal</button>
+                <a class="button" href="<?= e(route_url('lesson-schedule')) ?>">Reset</a>
+                <span class="hint">Pilih pembelajaran di tiap sel. Kosongkan untuk menghapus slot.</span>
+            </div>
+        </form>
+    </section>
+    <?php
+}
+
+function action_save_schedule_grid(): void
+{
+    require_role(['admin']);
+    schedule_require_tables();
+
+    $slots = $_POST['slot'] ?? [];
+    if (!is_array($slots)) {
+        $slots = [];
+    }
+
+    $days = schedule_days();
+    $saved = 0;
+    $deleted = 0;
+    $errors = [];
+
+    $allCurrent = fetch_all('SELECT id, assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked FROM lesson_schedules');
+    $currentMap = [];
+    foreach ($allCurrent as $row) {
+        $currentMap[(int)$row['day_of_week']][(int)$row['period_no']] = $row;
+    }
+
+    $periodTimes = schedule_period_times();
+
+    foreach ($days as $dayNum => $dayLabel) {
+        for ($p = 1; $p <= 12; $p++) {
+            $assignmentId = (int)($slots[$dayNum][$p] ?? 0);
+            $current = $currentMap[$dayNum][$p] ?? null;
+            $currentAssignmentId = $current ? (int)$current['assignment_id'] : 0;
+
+            if ($assignmentId === $currentAssignmentId) {
+                continue;
+            }
+
+            if ($current && $assignmentId === 0) {
+                if ((int)$current['locked'] === 1) {
+                    $errors[] = "Slot {$dayLabel} jam ke-{$p} terkunci, tidak bisa dihapus.";
+                    continue;
+                }
+                execute_sql('DELETE FROM lesson_schedules WHERE id = ?', [(int)$current['id']]);
+                $deleted++;
+                continue;
+            }
+
+            if ($assignmentId > 0) {
+                $assignment = schedule_assignment_by_id($assignmentId);
+                if (!$assignment) {
+                    $errors[] = "Pembelajaran tidak valid di {$dayLabel} jam ke-{$p}.";
+                    continue;
+                }
+
+                if ($current && (int)$current['locked'] === 1) {
+                    $errors[] = "Slot {$dayLabel} jam ke-{$p} terkunci, tidak bisa diubah.";
+                    continue;
+                }
+
+                [$defaultStart, $defaultEnd] = schedule_time_for_period($p);
+
+                $conflictClass = fetch_one(
+                    'SELECT id FROM lesson_schedules WHERE class_id = ? AND day_of_week = ? AND period_no = ? AND id <> ?',
+                    [(int)$assignment['class_id'], $dayNum, $p, $current ? (int)$current['id'] : 0]
+                );
+                if ($conflictClass) {
+                    $errors[] = "Kelas sudah ada jadwal di {$dayLabel} jam ke-{$p}.";
+                    continue;
+                }
+
+                $conflictTeacher = fetch_one(
+                    'SELECT id FROM lesson_schedules WHERE teacher_id = ? AND day_of_week = ? AND period_no = ? AND id <> ?',
+                    [(int)$assignment['teacher_id'], $dayNum, $p, $current ? (int)$current['id'] : 0]
+                );
+                if ($conflictTeacher) {
+                    $errors[] = "Guru sudah ada jadwal di {$dayLabel} jam ke-{$p}.";
+                    continue;
+                }
+
+                if ($current) {
+                    execute_sql(
+                        'UPDATE lesson_schedules SET assignment_id = ?, teacher_id = ?, class_id = ?, subject_id = ?, start_time = ?, end_time = ?, updated_at = ? WHERE id = ?',
+                        [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $defaultStart, $defaultEnd, now_string(), (int)$current['id']]
+                    );
+                } else {
+                    execute_sql(
+                        'INSERT INTO lesson_schedules (assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked, generated_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)',
+                        [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $dayNum, $p, $defaultStart, $defaultEnd, (int)current_user()['id'], now_string(), now_string()]
+                    );
+                }
+                $saved++;
+            }
+        }
+    }
+
+    if ($errors) {
+        flash('warning', 'Tersimpan, tapi ada konflik: ' . implode(' ', $errors));
+    } else {
+        flash('success', "Jadwal tersimpan. {$saved} slot diperbarui, {$deleted} slot dihapus.");
+    }
+    redirect_to('lesson-schedule');
 }
