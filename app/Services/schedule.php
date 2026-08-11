@@ -67,28 +67,42 @@ function schedule_period_duration(int $dayOfWeek): int
     return (int)($school['regular_period_minutes'] ?? 35);
 }
 
+function schedule_break_minutes_for_after(int $afterPeriod): int
+{
+    $school = get_school_profile();
+    $break1After = (int)($school['break1_after'] ?? 3);
+    $break1Minutes = (int)($school['break1_minutes'] ?? 15);
+    $break2After = (int)($school['break2_after'] ?? 6);
+    $break2Minutes = (int)($school['break2_minutes'] ?? 15);
+    if ($afterPeriod === $break1After) {
+        return $break1Minutes;
+    }
+    if ($afterPeriod === $break2After) {
+        return $break2Minutes;
+    }
+    return 0;
+}
+
 function schedule_time_for_period(int $period, ?int $dayOfWeek = null): array
 {
-    if ($dayOfWeek !== null && schedule_is_short_day($dayOfWeek)) {
-        $duration = schedule_period_duration($dayOfWeek);
-        $gap = 5;
-        $startMinute = (7 * 60) + (($period - 1) * ($duration + $gap));
-        $endMinute = $startMinute + $duration;
-        return [
-            sprintf('%02d:%02d', intdiv($startMinute, 60), $startMinute % 60),
-            sprintf('%02d:%02d', intdiv($endMinute, 60), $endMinute % 60),
-        ];
+    $school = get_school_profile();
+    $startTime = trim((string)($school['start_time'] ?? '07:00'));
+    [$startHour, $startMin] = array_map('intval', explode(':', $startTime));
+    $baseMinute = $startHour * 60 + $startMin;
+    $duration = schedule_period_duration($dayOfWeek ?? 1);
+
+    $currentMinute = $baseMinute;
+    for ($p = 1; $p < $period; $p++) {
+        $currentMinute += $duration;
+        $breakMinutes = schedule_break_minutes_for_after($p);
+        if ($breakMinutes > 0) {
+            $currentMinute += $breakMinutes;
+        }
     }
 
-    $times = schedule_period_times();
-    if (isset($times[$period])) {
-        return $times[$period];
-    }
-
-    $startMinute = (7 * 60) + (($period - 1) * 40);
-    $endMinute = $startMinute + 35;
+    $endMinute = $currentMinute + $duration;
     return [
-        sprintf('%02d:%02d', intdiv($startMinute, 60), $startMinute % 60),
+        sprintf('%02d:%02d', intdiv($currentMinute, 60), $currentMinute % 60),
         sprintf('%02d:%02d', intdiv($endMinute, 60), $endMinute % 60),
     ];
 }
@@ -948,9 +962,21 @@ function render_schedule_template_panel(): void
             <?php endforeach; ?>
         </div>
         <div class="schedule-period-strip">
-            <?php foreach (schedule_period_times() as $period => $time): ?>
-                <span><strong><?= e($period) ?></strong><?= e($time[0] . '-' . $time[1]) ?></span>
-            <?php endforeach; ?>
+            <?php
+            $school = get_school_profile();
+            $maxPeriods = (int)($school['max_periods'] ?? 10);
+            for ($p = 1; $p <= $maxPeriods; $p++):
+                [$start, $end] = schedule_time_for_period($p, 1);
+            ?>
+                <span><strong><?= e($p) ?></strong><?= e($start . '-' . $end) ?></span>
+            <?php
+                $breakMins = schedule_break_minutes_for_after($p);
+                if ($breakMins > 0):
+                    [, $bEnd] = schedule_time_for_period($p, 1);
+                    [$bNext] = schedule_time_for_period($p + 1, 1);
+            ?>
+                <span class="schedule-period-break"><strong>☕</strong><?= e($bEnd . '-' . $bNext) ?></span>
+            <?php endif; endfor; ?>
         </div>
     </section>
     <?php
@@ -1184,6 +1210,7 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                     </thead>
                     <tbody>
                         <?php for ($p = 1; $p <= $maxPeriods; $p++): ?>
+                            <?php [$pStart] = schedule_time_for_period($p, 1); ?>
                             <tr>
                                 <td class="schedule-grid-period">
                                     <strong>Jam <?= $p ?></strong>
@@ -1201,6 +1228,29 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                                     </td>
                                 <?php endforeach; ?>
                             </tr>
+                            <?php
+                            $breakMins = schedule_break_minutes_for_after($p);
+                            if ($breakMins > 0):
+                                [$breakStart] = schedule_time_for_period($p, 1);
+                                $breakStartMin = $breakStart;
+                                [$pe, $pend] = schedule_time_for_period($p, 1);
+                                $breakEndMin = $pend;
+                            ?>
+                            <tr class="schedule-grid-break-row">
+                                <td class="schedule-grid-period schedule-grid-break-label">
+                                    <strong>ISTIRAHAT</strong>
+                                    <small><?= $breakMins ?> menit</small>
+                                </td>
+                                <?php foreach ($days as $dayNum => $dayLabel): ?>
+                                    <?php [$prevStart, $prevEnd] = schedule_time_for_period($p, $dayNum); ?>
+                                    <?php [$nextStart] = schedule_time_for_period($p + 1, $dayNum); ?>
+                                    <td class="schedule-grid-break-cell">
+                                        <div class="schedule-grid-time"><?= e($prevEnd . '-' . $nextStart) ?></div>
+                                        Istirahat
+                                    </td>
+                                <?php endforeach; ?>
+                            </tr>
+                            <?php endif; ?>
                         <?php endfor; ?>
                     </tbody>
                 </table>

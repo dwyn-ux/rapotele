@@ -24,6 +24,11 @@ function page_school(): void
             <label>Jam Pelajaran Normal (menit) <input type="number" min="10" max="60" name="regular_period_minutes" value="<?= e($school['regular_period_minutes'] ?? '35') ?>" placeholder="35"></label>
             <label>Jam Pelajaran Pendek (menit) <input type="number" min="10" max="60" name="short_period_minutes" value="<?= e($school['short_period_minutes'] ?? '25') ?>" placeholder="25"></label>
             <label>Hari Pendek <input name="short_days" value="<?= e($school['short_days'] ?? '') ?>" placeholder="Contoh: 5 atau 5,6 (Jumat, Sabtu)"></label>
+            <label>Jam Mulai Pelajaran <input type="time" name="start_time" value="<?= e($school['start_time'] ?? '07:00') ?>"></label>
+            <label>Istirahat 1 Setelah Jam <select name="break1_after"><?php for ($i = 1; $i <= 9; $i++): ?><option value="<?= $i ?>" <?= ($school['break1_after'] ?? 3) == $i ? 'selected' : '' ?>>Jam <?= $i ?></option><?php endfor; ?></select></label>
+            <label>Durasi Istirahat 1 (menit) <input type="number" min="5" max="60" name="break1_minutes" value="<?= e($school['break1_minutes'] ?? '15') ?>" placeholder="15"></label>
+            <label>Istirahat 2 Setelah Jam <select name="break2_after"><?php for ($i = 1; $i <= 9; $i++): ?><option value="<?= $i ?>" <?= ($school['break2_after'] ?? 6) == $i ? 'selected' : '' ?>>Jam <?= $i ?></option><?php endfor; ?></select></label>
+            <label>Durasi Istirahat 2 (menit) <input type="number" min="5" max="60" name="break2_minutes" value="<?= e($school['break2_minutes'] ?? '15') ?>" placeholder="15"></label>
             <label>Jam Maksimal <input type="number" min="1" max="12" name="max_periods" value="<?= e($school['max_periods'] ?? '10') ?>" placeholder="10"></label>
             <div class="wide">
                 <label style="margin-bottom:4px">Peta Lokasi Sekolah <small>(klik peta untuk set lokasi)</small></label>

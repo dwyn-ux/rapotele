@@ -27,6 +27,11 @@ function action_save_school(): void
     $shortMinutes = trim((string)($_POST['short_period_minutes'] ?? ''));
     $shortDays = trim((string)($_POST['short_days'] ?? ''));
     $maxPeriods = trim((string)($_POST['max_periods'] ?? ''));
+    $startTime = trim((string)($_POST['start_time'] ?? ''));
+    $break1After = trim((string)($_POST['break1_after'] ?? ''));
+    $break1Minutes = trim((string)($_POST['break1_minutes'] ?? ''));
+    $break2After = trim((string)($_POST['break2_after'] ?? ''));
+    $break2Minutes = trim((string)($_POST['break2_minutes'] ?? ''));
     $data = [
         trim((string)$_POST['name']),
         trim((string)($_POST['npsn'] ?? '')),
@@ -42,10 +47,15 @@ function action_save_school(): void
         $shortMinutes !== '' ? (int)$shortMinutes : 25,
         $shortDays !== '' ? $shortDays : null,
         $maxPeriods !== '' ? (int)$maxPeriods : 10,
+        $startTime !== '' ? $startTime : '07:00',
+        $break1After !== '' ? (int)$break1After : 3,
+        $break1Minutes !== '' ? (int)$break1Minutes : 15,
+        $break2After !== '' ? (int)$break2After : 6,
+        $break2Minutes !== '' ? (int)$break2Minutes : 15,
         now_string(),
     ];
     execute_sql(
-        'UPDATE school_profile SET name = ?, npsn = ?, address = ?, principal_name = ?, principal_nip = ?, academic_year = ?, semester = ?, location_lat = ?, location_lng = ?, attendance_radius_meters = ?, regular_period_minutes = ?, short_period_minutes = ?, short_days = ?, max_periods = ?, updated_at = ? WHERE id = ?',
+        'UPDATE school_profile SET name = ?, npsn = ?, address = ?, principal_name = ?, principal_nip = ?, academic_year = ?, semester = ?, location_lat = ?, location_lng = ?, attendance_radius_meters = ?, regular_period_minutes = ?, short_period_minutes = ?, short_days = ?, max_periods = ?, start_time = ?, break1_after = ?, break1_minutes = ?, break2_after = ?, break2_minutes = ?, updated_at = ? WHERE id = ?',
         array_merge($data, [(int)$school['id']])
     );
     set_app_setting('promotion.enabled', !empty($_POST['promotion_enabled']) ? '1' : '0');

@@ -666,6 +666,11 @@ function run_migrations(): void
     migration_add_column('school_profile', 'regular_period_minutes', 'INT NULL DEFAULT 35');
     migration_add_column('school_profile', 'short_period_minutes', 'INT NULL DEFAULT 25');
     migration_add_column('school_profile', 'max_periods', 'INT NULL DEFAULT 10');
+    migration_add_column('school_profile', 'start_time', 'VARCHAR(10) NULL DEFAULT \'07:00\'');
+    migration_add_column('school_profile', 'break1_after', 'INT NULL DEFAULT 3');
+    migration_add_column('school_profile', 'break1_minutes', 'INT NULL DEFAULT 15');
+    migration_add_column('school_profile', 'break2_after', 'INT NULL DEFAULT 6');
+    migration_add_column('school_profile', 'break2_minutes', 'INT NULL DEFAULT 15');
 
     migrate_foreign_keys();
 }

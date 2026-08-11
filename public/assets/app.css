@@ -456,6 +456,12 @@ label textarea {
     color: var(--primary);
 }
 
+.schedule-period-break {
+    background: #fef3cd !important;
+    border-color: var(--amber) !important;
+    color: var(--amber) !important;
+}
+
 .schedule-grid-wrap {
     padding: 0;
 }
@@ -535,6 +541,37 @@ label textarea {
     font-size: 11px;
     color: var(--muted);
     font-weight: normal;
+}
+
+.schedule-grid-break-row td {
+    background: #fef3cd !important;
+    text-align: center;
+    color: var(--amber);
+    font-weight: 700;
+    font-size: 12px;
+    padding: 4px 6px;
+}
+
+.schedule-grid-break-label {
+    text-align: right !important;
+    padding-right: 10px !important;
+}
+
+.schedule-grid-break-label strong {
+    display: block;
+    color: var(--amber);
+    font-size: 11px;
+}
+
+.schedule-grid-break-label small {
+    color: var(--muted);
+    font-weight: normal;
+    font-size: 10px;
+}
+
+.schedule-grid-break-cell {
+    color: var(--amber);
+    font-size: 11px;
 }
 
 .schedule-grid-actions {
