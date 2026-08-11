@@ -112,4 +112,25 @@ document.addEventListener('DOMContentLoaded', () => {
         nameInput.addEventListener('input', updatePlaceholder);
         updatePlaceholder();
     }
+
+    document.querySelectorAll('.table-search-input').forEach((input) => {
+        const panel = input.closest('.table-panel');
+        if (!panel) return;
+        const tbody = panel.querySelector('tbody');
+        if (!tbody) return;
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const emptyRow = rows.find((r) => r.querySelector('.empty'));
+        input.addEventListener('input', () => {
+            const q = input.value.toLowerCase().trim();
+            let visible = 0;
+            rows.forEach((row) => {
+                if (row === emptyRow) return;
+                const text = row.textContent.toLowerCase();
+                const match = q === '' || text.includes(q);
+                row.style.display = match ? '' : 'none';
+                if (match) visible++;
+            });
+            if (emptyRow) emptyRow.style.display = visible === 0 ? '' : 'none';
+        });
+    });
 });

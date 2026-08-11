@@ -31,11 +31,14 @@ function row_actions(string $page, int $id, string $deleteAction): string
         . '<button class="button small danger">Hapus</button></form></div>';
 }
 
-function table_panel(string $title, array $headers, array $rows, callable $renderer, string $actions = ''): void
+function table_panel(string $title, array $headers, array $rows, callable $renderer, string $actions = '', bool $search = false): void
 {
     ?>
     <section class="panel table-panel">
         <?php panel_title($title, '', $actions); ?>
+        <?php if ($search): ?>
+        <div class="table-search"><input type="text" class="table-search-input" placeholder="Cari..."></div>
+        <?php endif; ?>
         <div class="table-wrap">
             <table>
                 <thead><tr><?php foreach ($headers as $header): ?><th><?= e($header) ?></th><?php endforeach; ?></tr></thead>

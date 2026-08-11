@@ -97,7 +97,7 @@ function page_teachers(): void
     <?php input_panel_end(); ?>
     <?php table_panel('Daftar Guru', ['Nama', 'NIP', 'JK', 'Jabatan', 'Telegram', 'Status', 'Aksi'], $rows, function ($row) { ?>
         <td><?= e($row['name']) ?></td><td><?= e($row['nip']) ?></td><td><?= e($row['gender']) ?></td><td><?= e($row['position']) ?></td><td><?= e($row['telegram_chat_id']) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('teachers', (int)$row['id'], 'delete_teacher') ?></td>
-    <?php }); ?>
+    <?php }, '', true); ?>
     <?php render_footer();
 }
 
@@ -124,7 +124,7 @@ function page_classes(): void
     <?php table_panel('Daftar Kelas', ['Kelas', 'Tingkat', 'Wali Kelas', 'Jumlah Siswa', 'Status', 'Aksi'], $rows, function ($row) {
         $count = (int)fetch_one('SELECT COUNT(*) AS c FROM students WHERE class_id = ?', [(int)$row['id']])['c'];
         ?><td><?= e($row['name']) ?></td><td><?= e($row['grade']) ?></td><td><?= e($row['teacher_name']) ?></td><td><?= e($count) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('classes', (int)$row['id'], 'delete_class') ?></td><?php
-    }); ?>
+    }, '', true); ?>
     <?php render_footer();
 }
 
@@ -161,7 +161,7 @@ function page_students(): void
     <?php input_panel_end(); ?>
     <?php table_panel('Daftar Siswa', ['Nama', 'NIS', 'NISN', 'JK', 'Kelas', 'Status', 'Aksi'], $rows, function ($row) { ?>
         <td><?= e($row['name']) ?></td><td><?= e($row['nis']) ?></td><td><?= e($row['nisn']) ?></td><td><?= e($row['gender']) ?></td><td><?= e($row['class_name']) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('students', (int)$row['id'], 'delete_student') ?></td>
-    <?php }); ?>
+    <?php }, '', true); ?>
     <?php render_footer();
 }
 
@@ -184,7 +184,7 @@ function page_subjects(): void
     <?php input_panel_end(); ?>
     <?php table_panel('Daftar Mapel', ['Nama Mapel', 'Singkat', 'Kelompok', 'Status', 'Aksi'], $rows, function ($row) { ?>
         <td><?= e($row['name']) ?></td><td><?= e($row['short_name']) ?></td><td><?= e($row['group_name']) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('subjects', (int)$row['id'], 'delete_subject') ?></td>
-    <?php }); ?>
+    <?php }, '', true); ?>
     <?php render_footer();
 }
 
@@ -212,7 +212,7 @@ function page_assignments(): void
     <?php input_panel_end(); ?>
     <?php table_panel('Daftar Pembelajaran', ['Guru', 'Kelas', 'Mapel', 'Tahun', 'Semester', 'Status', 'Aksi'], $rows, function ($row) { ?>
         <td><?= e($row['teacher_name']) ?></td><td><?= e($row['class_name']) ?></td><td><?= e($row['subject_name']) ?></td><td><?= e($row['academic_year']) ?></td><td><?= e($row['semester']) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('assignments', (int)$row['id'], 'delete_assignment') ?></td>
-    <?php }); ?>
+    <?php }, '', true); ?>
     <?php render_footer();
 }
 
@@ -242,7 +242,7 @@ function page_users(): void
     <?php input_panel_end(); ?>
     <?php table_panel('Daftar Pengguna', ['Username', 'Nama', 'Role', 'Guru/Siswa', 'Telegram', 'Status', 'Aksi'], $rows, function ($row) { ?>
         <td><?= e($row['username']) ?></td><td><?= e($row['name']) ?></td><td><?= e($row['role']) ?></td><td><?= e($row['role'] === 'siswa' ? $row['student_name'] : $row['teacher_name']) ?></td><td><?= e($row['telegram_chat_id']) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('users', (int)$row['id'], 'delete_user') ?></td>
-    <?php }); ?>
+    <?php }, '', true); ?>
     <?php render_footer();
 }
 

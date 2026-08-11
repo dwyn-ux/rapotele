@@ -540,6 +540,18 @@ label textarea {
     width: 100%;
 }
 
+.table-search {
+    padding: 8px 16px 0;
+}
+
+.table-search-input {
+    max-width: 300px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 13px;
+}
+
 .table-wrap {
     width: 100%;
     overflow-x: auto;
