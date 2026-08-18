@@ -120,19 +120,228 @@ function assignment_options(array $assignments, mixed $selected): string
     return options($options, $selected);
 }
 
+/**
+ * Build cascading data JSON from assignments.
+ * Returns structure: { classId: { name: "Kelas 7A", subjects: { subjectId: { name: "Matematika", teachers: [{id, name}] } } } }
+ */
+function assignment_cascading_data(array $assignments): array
+{
+    $data = [];
+    foreach ($assignments as $a) {
+        $cid = (string)$a['class_id'];
+        $sid = (string)$a['subject_id'];
+        if (!isset($data[$cid])) {
+            $data[$cid] = ['name' => $a['class_name'], 'subjects' => []];
+        }
+        if (!isset($data[$cid]['subjects'][$sid])) {
+            $data[$cid]['subjects'][$sid] = ['name' => $a['subject_name'], 'teachers' => []];
+        }
+        $data[$cid]['subjects'][$sid]['teachers'][] = [
+            'id' => (int)$a['id'],
+            'name' => $a['teacher_name'],
+        ];
+    }
+    return $data;
+}
+
+/**
+ * Determine pre-selected class/subject from a selected assignment_id.
+ */
+function assignment_preselect(array $assignments, int $selected): array
+{
+    if ($selected <= 0) {
+        return [0, 0, 0];
+    }
+    foreach ($assignments as $a) {
+        if ((int)$a['id'] === $selected) {
+            return [(int)$a['class_id'], (int)$a['subject_id'], (int)$a['id']];
+        }
+    }
+    return [0, 0, 0];
+}
+
+/**
+ * Cascading assignment picker: Kelas → Mapel → auto-submit
+ * Used by page_grades and other pages with a standalone picker section.
+ */
 function assignment_picker(string $page, array $assignments, int $selected): void
 {
+    $data = assignment_cascading_data($assignments);
+    [$preClass, $preSubject, $preTeacher] = assignment_preselect($assignments, $selected);
+    $pickerId = 'picker-' . $page;
     ?>
     <section class="panel">
-        <form method="get" class="grid four">
+        <form method="get" id="<?= e($pickerId) ?>" class="grid four">
             <input type="hidden" name="page" value="<?= e($page) ?>">
-            <label>Pembelajaran <select name="assignment_id"><?= assignment_options($assignments, $selected) ?></select></label>
-            <div class="actions"><button class="button primary">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                Tampilkan
-            </button></div>
+            <input type="hidden" name="assignment_id" id="<?= e($pickerId) ?>-assignment" value="<?= e($selected ?: '') ?>">
+            <label>Kelas
+                <select id="<?= e($pickerId) ?>-class" data-cascade-class="<?= e($pickerId) ?>">
+                    <option value="">Pilih Kelas</option>
+                </select>
+            </label>
+            <label>Mapel
+                <select id="<?= e($pickerId) ?>-subject" data-cascade-subject="<?= e($pickerId) ?>" disabled>
+                    <option value="">Pilih Mapel</option>
+                </select>
+            </label>
+            <div class="actions" style="align-self:end">
+                <button type="submit" class="button primary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    Tampilkan
+                </button>
+            </div>
         </form>
     </section>
+    <script>
+    (function(){
+        var data = <?= json_encode($data, JSON_UNESCAPED_UNICODE) ?>;
+        var pickerId = <?= json_encode($pickerId) ?>;
+        var preClass = <?= json_encode($preClass) ?>;
+        var preSubject = <?= json_encode($preSubject) ?>;
+        var preAssignment = <?= json_encode($preSubject ? $selected : 0) ?>;
+        var classEl = document.getElementById(pickerId + '-class');
+        var subjectEl = document.getElementById(pickerId + '-subject');
+        var assignmentEl = document.getElementById(pickerId + '-assignment');
+
+        /* Populate class dropdown */
+        Object.keys(data).sort(function(a,b){ return data[a].name.localeCompare(data[b].name); }).forEach(function(cid){
+            var opt = document.createElement('option');
+            opt.value = cid;
+            opt.textContent = data[cid].name;
+            classEl.appendChild(opt);
+        });
+
+        /* If pre-selected, set class */
+        if (preClass && data[preClass]) {
+            classEl.value = preClass;
+        }
+
+        function updateSubjects() {
+            var cid = classEl.value;
+            subjectEl.innerHTML = '<option value="">Pilih Mapel</option>';
+            assignmentEl.value = '';
+            if (!cid || !data[cid]) {
+                subjectEl.disabled = true;
+                return;
+            }
+            subjectEl.disabled = false;
+            var subjects = data[cid].subjects;
+            Object.keys(subjects).sort(function(a,b){ return subjects[a].name.localeCompare(subjects[b].name); }).forEach(function(sid){
+                var opt = document.createElement('option');
+                opt.value = sid;
+                opt.textContent = subjects[sid].name;
+                subjectEl.appendChild(opt);
+            });
+            /* If pre-selected, set subject */
+            if (preSubject && subjects[preSubject]) {
+                subjectEl.value = preSubject;
+            } else {
+                /* Auto-select if only one subject */
+                var keys = Object.keys(subjects);
+                if (keys.length === 1) {
+                    subjectEl.value = keys[0];
+                }
+            }
+            selectAssignment();
+        }
+
+        function selectAssignment() {
+            var cid = classEl.value;
+            var sid = subjectEl.value;
+            if (!cid || !sid || !data[cid] || !data[cid].subjects[sid]) {
+                assignmentEl.value = '';
+                return;
+            }
+            var teachers = data[cid].subjects[sid].teachers;
+            if (teachers.length === 1) {
+                assignmentEl.value = teachers[0].id;
+            } else if (preAssignment && teachers.some(function(t){ return t.id === preAssignment; })) {
+                assignmentEl.value = preAssignment;
+            } else {
+                assignmentEl.value = teachers[0].id;
+            }
+        }
+
+        classEl.addEventListener('change', function(){
+            preSubject = 0;
+            preAssignment = 0;
+            updateSubjects();
+        });
+        subjectEl.addEventListener('change', function(){
+            preAssignment = 0;
+            selectAssignment();
+        });
+
+        updateSubjects();
+    })();
+    </script>
+    <?php
+}
+
+function render_cascading_assignment_selects(array $assignments, int $selected, string $pickerId): void
+{
+    $data = assignment_cascading_data($assignments);
+    [$preClass, $preSubject] = assignment_preselect($assignments, $selected);
+    ?>
+    <div class="cascade-assignment" id="<?= e($pickerId) ?>">
+        <input type="hidden" name="assignment_id" id="<?= e($pickerId) ?>-assignment" value="<?= e($selected ?: '') ?>">
+        <label>Kelas
+            <select id="<?= e($pickerId) ?>-class" data-cascade-inline="<?= e($pickerId) ?>">
+                <option value="">Pilih Kelas</option>
+            </select>
+        </label>
+        <label>Mapel
+            <select id="<?= e($pickerId) ?>-subject" data-cascade-inline-subject="<?= e($pickerId) ?>" disabled>
+                <option value="">Pilih Mapel</option>
+            </select>
+        </label>
+    </div>
+    <script>
+    (function(){
+        var data = <?= json_encode($data, JSON_UNESCAPED_UNICODE) ?>;
+        var pickerId = <?= json_encode($pickerId) ?>;
+        var preClass = <?= json_encode($preClass) ?>;
+        var preSubject = <?= json_encode($preSubject) ?>;
+        var classEl = document.getElementById(pickerId + '-class');
+        var subjectEl = document.getElementById(pickerId + '-subject');
+        var assignmentEl = document.getElementById(pickerId + '-assignment');
+        Object.keys(data).sort(function(a,b){ return data[a].name.localeCompare(data[b].name); }).forEach(function(cid){
+            var opt = document.createElement('option');
+            opt.value = cid; opt.textContent = data[cid].name;
+            classEl.appendChild(opt);
+        });
+        if (preClass && data[preClass]) classEl.value = preClass;
+        function updateSubjects() {
+            var cid = classEl.value;
+            subjectEl.innerHTML = '<option value="">Pilih Mapel</option>';
+            assignmentEl.value = '';
+            if (!cid || !data[cid]) { subjectEl.disabled = true; return; }
+            subjectEl.disabled = false;
+            var subjects = data[cid].subjects;
+            Object.keys(subjects).sort(function(a,b){ return subjects[a].name.localeCompare(subjects[b].name); }).forEach(function(sid){
+                var opt = document.createElement('option');
+                opt.value = sid; opt.textContent = subjects[sid].name;
+                subjectEl.appendChild(opt);
+            });
+            if (preSubject && subjects[preSubject]) {
+                subjectEl.value = preSubject;
+            } else {
+                var keys = Object.keys(subjects);
+                if (keys.length === 1) subjectEl.value = keys[0];
+            }
+            selectAssignment();
+        }
+        function selectAssignment() {
+            var cid = classEl.value, sid = subjectEl.value;
+            if (!cid || !sid || !data[cid] || !data[cid].subjects[sid]) { assignmentEl.value = ''; return; }
+            var teachers = data[cid].subjects[sid].teachers;
+            assignmentEl.value = teachers[0].id;
+        }
+        classEl.addEventListener('change', function(){ preSubject = 0; updateSubjects(); });
+        subjectEl.addEventListener('change', function(){ selectAssignment(); });
+        updateSubjects();
+    })();
+    </script>
     <?php
 }
 

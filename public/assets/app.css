@@ -1701,6 +1701,20 @@ code.block {
 }
 
 /* ================================================================
+   CASCADE ASSIGNMENT PICKER
+   ================================================================ */
+
+.cascade-assignment {
+  display: contents;
+}
+
+.cascade-assignment label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* ================================================================
    SCHOOL DATA PAGE
    ================================================================ */
 

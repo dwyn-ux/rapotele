@@ -249,7 +249,7 @@ function page_student_attendance(): void
     <section class="panel">
         <form method="get" class="grid four">
             <input type="hidden" name="page" value="student-attendance">
-            <label>Pembelajaran <select name="assignment_id"><?= assignment_options($assignments, $assignment['id'] ?? '') ?></select></label>
+            <?php render_cascading_assignment_selects($assignments, (int)($assignment['id'] ?? 0), 'sa-picker'); ?>
             <label>Tanggal <input type="date" name="date" value="<?= e($date) ?>"></label>
             <label>Pertemuan <input type="number" min="1" name="meeting_no" value="<?= e($meetingNo) ?>"></label>
             <div class="actions"><button class="button">Tampilkan</button></div>
@@ -461,7 +461,7 @@ function page_journals(): void
     ?>
         <form method="post" class="grid two">
             <?= csrf_field() ?><input type="hidden" name="action" value="save_journal"><input type="hidden" name="id" value="<?= e($edit['id'] ?? 0) ?>">
-            <label>Pembelajaran <select name="assignment_id" required><?= assignment_options($assignments, $edit['assignment_id'] ?? '') ?></select></label>
+            <?php render_cascading_assignment_selects($assignments, (int)($edit['assignment_id'] ?? 0), 'journal-picker'); ?>
             <label>Tanggal <input type="date" name="date" required value="<?= e($edit['date'] ?? date('Y-m-d')) ?>"></label>
             <label>Pertemuan <input type="number" min="1" name="meeting_no" value="<?= e($edit['meeting_no'] ?? 1) ?>"></label>
             <label>Topik <input name="topic" required value="<?= e($edit['topic'] ?? '') ?>"></label>
