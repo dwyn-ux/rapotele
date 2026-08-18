@@ -644,6 +644,13 @@ function run_migrations(): void
     migration_add_column('students', 'class_id', 'INT NULL');
     migration_add_column('students', 'active', migration_bool() . ' NOT NULL DEFAULT 1');
     migration_add_column('students', 'updated_at', 'DATETIME NULL');
+    migration_add_column('students', 'address', 'TEXT NULL');
+    migration_add_column('students', 'phone', 'VARCHAR(32) NULL');
+    migration_add_column('students', 'father_name', 'VARCHAR(160) NULL');
+    migration_add_column('students', 'father_occupation', 'VARCHAR(120) NULL');
+    migration_add_column('students', 'mother_name', 'VARCHAR(160) NULL');
+    migration_add_column('students', 'mother_occupation', 'VARCHAR(120) NULL');
+    migration_add_column('students', 'guardian_name', 'VARCHAR(160) NULL');
     migration_add_column('subjects', 'dapodik_id', 'VARCHAR(64) NULL');
     migration_add_column('subjects', 'short_name', 'VARCHAR(40) NULL');
     migration_add_column('subjects', 'group_name', 'VARCHAR(80) NULL');

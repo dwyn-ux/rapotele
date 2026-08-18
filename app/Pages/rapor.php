@@ -31,22 +31,56 @@ function page_print_document(string $type): void
         <form method="get" class="grid four">
             <input type="hidden" name="page" value="<?= e($type) ?>">
             <label>Pilih Kelas <select name="class_id"><?= options(array_column_map($classes, 'id', 'name'), $classId) ?></select></label>
-            <label>Posisi Tanda Tangan KS <select name="posisittdks"><?= options(['sejajar' => 'Sejajar Wali Kelas', 'bawah' => 'Di Bawah Wali Kelas'], $_GET['posisittdks'] ?? 'sejajar') ?></select></label>
-            <label>Posisi Tanda Tangan <select name="isittd"><?= options(['tanpa' => 'Tanpa Tanda Tangan', 'dengan' => 'Dengan Tanda Tangan'], $_GET['isittd'] ?? 'tanpa') ?></select></label>
-            <label>Ukuran Kertas <select name="kertas"><?= options(['A4' => 'A4', 'F4' => 'F4'], $_GET['kertas'] ?? 'A4') ?></select></label>
-            <label>Batas Kiri (mm) <input type="number" name="kiri" value="<?= e($_GET['kiri'] ?? 20) ?>"></label>
-            <label>Batas Kanan (mm) <input type="number" name="kanan" value="<?= e($_GET['kanan'] ?? 20) ?>"></label>
-            <label>Batas Atas (mm) <input type="number" name="atas" value="<?= e($_GET['atas'] ?? 20) ?>"></label>
-            <label>Batas Bawah (mm) <input type="number" name="bawah" value="<?= e($_GET['bawah'] ?? 10) ?>"></label>
+            <?php if ($type === 'cetak-pelengkap-rapor'): ?>
+                <label>Posisi Tanda Tangan KS <select name="posisittdks"><?= options(['sejajar' => 'Sejajar Wali Kelas', 'bawah' => 'Di Bawah Wali Kelas'], $_GET['posisittdks'] ?? 'sejajar') ?></select></label>
+                <label>Ukuran Kertas <select name="kertas"><?= options(['A4' => 'A4', 'F4' => 'F4'], $_GET['kertas'] ?? 'A4') ?></select></label>
+            <?php else: ?>
+                <label>Posisi Tanda Tangan KS <select name="posisittdks"><?= options(['sejajar' => 'Sejajar Wali Kelas', 'bawah' => 'Di Bawah Wali Kelas'], $_GET['posisittdks'] ?? 'sejajar') ?></select></label>
+                <label>Posisi Tanda Tangan <select name="isittd"><?= options(['tanpa' => 'Tanpa Tanda Tangan', 'dengan' => 'Dengan Tanda Tangan'], $_GET['isittd'] ?? 'tanpa') ?></select></label>
+                <label>Ukuran Kertas <select name="kertas"><?= options(['A4' => 'A4', 'F4' => 'F4'], $_GET['kertas'] ?? 'A4') ?></select></label>
+                <label>Batas Kiri (mm) <input type="number" name="kiri" value="<?= e($_GET['kiri'] ?? 20) ?>"></label>
+                <label>Batas Kanan (mm) <input type="number" name="kanan" value="<?= e($_GET['kanan'] ?? 20) ?>"></label>
+                <label>Batas Atas (mm) <input type="number" name="atas" value="<?= e($_GET['atas'] ?? 20) ?>"></label>
+                <label>Batas Bawah (mm) <input type="number" name="bawah" value="<?= e($_GET['bawah'] ?? 10) ?>"></label>
+            <?php endif; ?>
             <div class="actions wide"><button class="button primary">Tampilkan</button></div>
         </form>
     </section>
+    <?php if ($type === 'cetak-pelengkap-rapor'): ?>
+    <section class="panel">
+        <?php panel_title('Biodata Siswa (PDF)'); ?>
+        <div class="row-actions" style="gap:8px;margin-bottom:12px;">
+            <a class="button warning" href="<?= e(route_url('biodata-generate-class', ['class_id' => $classId])) ?>">Generate Biodata Kelas Ini</a>
+            <a class="button success" href="<?= e(route_url('biodata-download-class', ['class_id' => $classId])) ?>">Download ZIP Biodata Kelas</a>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>No</th><th>Nama Siswa</th><th>NISN</th><th>Kelas</th><th>File</th><th>Aksi</th></tr></thead><tbody>
+        <?php $no = 1; foreach ($students as $student):
+            $pdfPath = biodata_file_path((int)$student['id']);
+            $exists = is_file($pdfPath);
+        ?>
+        <tr>
+            <td><?= e($no++) ?></td>
+            <td><?= e($student['name']) ?></td>
+            <td><?= e($student['nisn']) ?></td>
+            <td><?= e($class['name'] ?? '-') ?></td>
+            <td><?= $exists ? '<span class="badge ok">Siap</span>' : '<span class="badge off">Belum Ada</span>' ?></td>
+            <td>
+                <div class="row-actions">
+                    <a href="<?= e(route_url('biodata-download-student', ['student_id' => (int)$student['id']])) ?>">Download</a>
+                    <a href="<?= e(route_url('biodata-generate-student', ['student_id' => (int)$student['id'], 'class_id' => $classId])) ?>">Generate</a>
+                    <a target="_blank" href="<?= e(route_url('biodata-download-student', ['student_id' => (int)$student['id'], 'inline' => 1])) ?>">Tampilkan</a>
+                </div>
+            </td>
+        </tr>
+        <?php endforeach; ?></tbody></table></div>
+    </section>
+    <?php else: ?>
     <section class="panel print-panel">
         <?php panel_title($titles[$type] ?? 'Cetak', '', '<button type="button" class="button warning" onclick="window.print()">Generate ' . e($titles[$type] ?? 'Cetak') . '</button><button type="button" class="button success" onclick="window.print()">Download/Cetak</button>'); ?>
         <h2><?= e($titles[$type] ?? 'Cetak') ?> <?= e($class['name'] ?? '') ?></h2>
         <?php if (in_array($type, ['cetak-leger-rapor', 'cetak-leger-pts'], true)): ?>
             <?php render_leger_table($students); ?>
-        <?php elseif ($type === 'cetak-buku-induk' || $type === 'cetak-pelengkap-rapor'): ?>
+        <?php elseif ($type === 'cetak-buku-induk'): ?>
             <?php render_biodata_table($students); ?>
         <?php elseif (in_array($type, ['cetak-skl', 'cetak-transkrip-ijazah'], true)): ?>
             <?php render_skl_table($students); ?>
@@ -54,6 +88,7 @@ function page_print_document(string $type): void
             <?php foreach ($students as $student): render_student_report_card($student, $type); endforeach; ?>
         <?php endif; ?>
     </section>
+    <?php endif; ?>
     <?php render_footer();
 }
 

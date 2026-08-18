@@ -996,6 +996,7 @@ function draw_report_page_two(SimplePdf $pdf, array $payload, int $pageNo = 2): 
     $place = $reportDate['principal_place'] ?? 'Jakarta';
     $date = $reportDate['report_date'] ?? '2025-11-23';
     $dateText = $place . ', ' . format_indonesian_date($date);
+    $showSignature = ($_GET['isittd'] ?? 'tanpa') === 'dengan';
 
     $gap = 14.17;
     $sectionTop = 711.50;
@@ -1025,14 +1026,16 @@ function draw_report_page_two(SimplePdf $pdf, array $payload, int $pageNo = 2): 
     $pdf->text(81.30, $sigTop - 11.34, 'Orang Tua Murid,', 10);
     $pdf->text(237.51, $sigTop - 11.34, 'Kepala Sekolah,', 10);
     $pdf->text(427.49, $sigTop - 11.34, ' Wali Kelas', 10);
-    draw_report_signature_marker($pdf, 230.00, $sigTop - 32.34, 'TTD Digital', (string)($principalSignature['file_path'] ?? ''));
-    draw_report_signature_marker($pdf, 418.00, $sigTop - 32.34, 'TTD Digital', (string)($homeroomSignature['file_path'] ?? ''));
+    if ($showSignature) {
+        draw_report_signature_marker($pdf, 230.00, $sigTop - 32.34, 'TTD Digital', (string)($principalSignature['file_path'] ?? ''));
+        draw_report_signature_marker($pdf, 418.00, $sigTop - 32.34, 'TTD Digital', (string)($homeroomSignature['file_path'] ?? ''));
+    }
     $pdf->text(80.43, $sigTop - 73.73, '............................', 10);
     $pdf->text(234.28, $sigTop - 73.73, $principalName, 10, true);
     $pdf->text(419.02, $sigTop - 73.73, $homeroomName, 10, true);
     $pdf->setFont('Helvetica', 10);
     $pdf->text(211.80, $sigTop - 85.07, 'NIP. ' . $principalNip, 10);
-    $pdf->text(441.87, $sigTop - 85.07, 'NIP. ' . $homeroomNip, 10);
+    $pdf->text(410.67, $sigTop - 85.07, 'NIP. ' . $homeroomNip, 10);
 }
 
 function draw_report_signature_marker(SimplePdf $pdf, float $x, float $topY, string $label, string $filePath = ''): void
@@ -1305,6 +1308,389 @@ function page_rapor_download_class(): void
 
     header('Content-Type: application/zip');
     header('Content-Disposition: attachment; filename="Rapor_Kelas_' . preg_replace('/[^A-Za-z0-9_-]/', '_', (string)$class['name']) . '.zip"');
+    header('Content-Length: ' . filesize($zipPath));
+    readfile($zipPath);
+    exit;
+}
+
+function biodata_file_path(int $studentId): string
+{
+    return report_storage_dir() . '/biodata-siswa-' . $studentId . '.pdf';
+}
+
+function generate_student_biodata_pdf(int $studentId): string
+{
+    $student = fetch_one(
+        'SELECT s.*, c.name AS class_name, c.grade, c.homeroom_teacher_id, t.name AS homeroom_name, t.nip AS homeroom_nip
+         FROM students s
+         LEFT JOIN classes c ON c.id = s.class_id
+         LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id
+         WHERE s.id = ?',
+        [$studentId]
+    );
+    if (!$student) {
+        throw new RuntimeException('Siswa tidak ditemukan.');
+    }
+
+    $school = report_get_school_profile();
+    $schoolLogo = report_logo_signature();
+    $agencyLogo = report_agency_logo_signature();
+    $photo = report_student_photo($studentId);
+
+    $pdf = new SimplePdf();
+    $marginLeft = 56.69;
+    $marginRight = 538.58;
+    $contentWidth = $marginRight - $marginLeft;
+    $centerX = $marginLeft + ($contentWidth / 2);
+
+    // ==========================================
+    // HALAMAN 1: SAMPUL DEPAN
+    // ==========================================
+    $pdf->addPage();
+
+    // Logo 1 (Agency/Dinas/Kemdikbud) di atas
+    $logoW = 75.00;
+    $logoH = 75.00;
+    $logoTopY = 750.00;
+    if ($agencyLogo && ($assetPath = report_asset_path((string)($agencyLogo['file_path'] ?? ''))) !== '') {
+        $pdf->image($assetPath, $centerX - ($logoW / 2), $logoTopY, $logoW, $logoH);
+    }
+
+    // Judul
+    $pdf->setFont('Helvetica', 16, true);
+    $pdf->centerText($marginLeft, $logoTopY - $logoH - 40.00, $contentWidth, 'SEKOLAH DASAR', 16, true);
+    $pdf->centerText($marginLeft, $logoTopY - $logoH - 60.00, $contentWidth, '( SD )', 16, true);
+
+    // Logo 2 (Sekolah) di tengah
+    $logo2W = 100.00;
+    $logo2H = 100.00;
+    $logo2TopY = $logoTopY - $logoH - 100.00;
+    if ($schoolLogo && ($assetPath = report_asset_path((string)($schoolLogo['file_path'] ?? ''))) !== '') {
+        $pdf->image($assetPath, $centerX - ($logo2W / 2), $logo2TopY, $logo2W, $logo2H);
+    } else {
+        $pdf->rect($centerX - ($logo2W / 2), $logo2TopY, $logo2W, -$logo2H, 'S');
+        $pdf->centerText($centerX - ($logo2W / 2), $logo2TopY - ($logo2H / 2) - 3, $logo2W, 'LOGO SEKOLAH', 10);
+    }
+
+    // Box Nama
+    $boxTopY = $logo2TopY - $logo2H - 50.00;
+    $pdf->setFont('Helvetica', 12, true);
+    $pdf->centerText($marginLeft, $boxTopY, $contentWidth, 'Nama Peserta Didik', 12, true);
+    $pdf->rect($centerX - 150.00, $boxTopY - 15.00, 300.00, -30.00, 'S');
+    $pdf->centerText($centerX - 150.00, $boxTopY - 35.00, 300.00, strtoupper((string)$student['name']), 12, true);
+
+    // Box NISN / NIS
+    $box2TopY = $boxTopY - 70.00;
+    $pdf->centerText($marginLeft, $box2TopY, $contentWidth, 'NISN / NIS', 12, true);
+    $pdf->rect($centerX - 150.00, $box2TopY - 15.00, 300.00, -30.00, 'S');
+    $nisnNis = trim((string)($student['nisn'] ?: '-')) . ' / ' . trim((string)($student['nis'] ?: '-'));
+    $pdf->centerText($centerX - 150.00, $box2TopY - 35.00, 300.00, $nisnNis, 12, true);
+
+    // Footer
+    $pdf->setFont('Helvetica', 14, true);
+    $pdf->centerText($marginLeft, 100.00, $contentWidth, 'KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH', 14, true);
+    $pdf->centerText($marginLeft, 80.00, $contentWidth, 'REPUBLIK INDONESIA', 14, true);
+
+
+    // ==========================================
+    // HALAMAN 2: IDENTITAS SEKOLAH & PESERTA DIDIK
+    // ==========================================
+    $pdf->addPage();
+
+    $y = 780.00;
+    $pdf->setFont('Helvetica', 12, true);
+    $pdf->centerText($marginLeft, $y, $contentWidth, 'SEKOLAH DASAR', 12, true);
+    $pdf->centerText($marginLeft, $y - 15.00, $contentWidth, '( SD )', 12, true);
+    $y -= 45.00;
+
+    $pdf->setFont('Helvetica', 10);
+    $schoolFields = [
+        'Nama Sekolah' => (string)$school['name'],
+        'NPSN' => (string)($school['npsn'] ?: '-'),
+        'NIS/NSS/NDS' => '001098304321', // Dummy placeholder as requested
+        'Alamat Sekolah' => (string)($school['address'] ?: '-'),
+        'Kelurahan/Desa' => '-',
+        'Kecamatan' => '-',
+        'Kota/Kabupaten' => '-',
+        'Provinsi' => '-',
+        'Website' => '-',
+        'E-mail' => '-',
+    ];
+    $fieldW = 120.00;
+    foreach ($schoolFields as $label => $value) {
+        $pdf->text($marginLeft, $y, $label, 10);
+        $pdf->text($marginLeft + $fieldW, $y, ': ' . $value, 10);
+        $y -= 14.00;
+    }
+
+    $y -= 20.00;
+    $pdf->setFont('Helvetica', 12, true);
+    $pdf->centerText($marginLeft, $y, $contentWidth, 'IDENTITAS PESERTA DIDIK', 12, true);
+    $y -= 25.00;
+
+    $pdf->setFont('Helvetica', 10);
+    $numX = $marginLeft;
+    $labelX = $marginLeft + 15.00;
+    $valX = $marginLeft + 170.00;
+
+    $studentFields = [
+        ['Nama Lengkap Peserta Didik', strtoupper((string)$student['name'])],
+        ['Nomor Induk/NISN', $nisnNis],
+        ['Tempat, Tanggal Lahir', trim(($student['birth_place'] ?: '-') . ', ' . ($student['birth_date'] ? format_indonesian_date((string)$student['birth_date']) : '-'), ', ')],
+        ['Jenis Kelamin', (string)($student['gender'] === 'L' ? 'Laki-Laki' : ($student['gender'] === 'P' ? 'Perempuan' : '-'))],
+        ['Agama', (string)($student['religion'] ?: '-')],
+        ['Status dalam Keluarga', 'Anak Kandung'],
+        ['Anak ke', ''],
+        ['Alamat Peserta Didik', (string)($student['address'] ?: '-')],
+        ['Nomor Telepon Rumah', (string)($student['phone'] ?: '-')],
+        ['Sekolah Asal', ''],
+        ['Diterima di sekolah ini', ''],
+        ['Di kelas', (string)($student['class_name'] ?: '-')],
+        ['Pada tanggal', ''],
+        ['Nama Orang Tua', ''],
+        ['  a. Ayah', (string)($student['father_name'] ?: '-')],
+        ['  b. Ibu', (string)($student['mother_name'] ?: '-')],
+        ['Alamat Orang Tua', (string)($student['address'] ?: '-')],
+        ['Nomor Telepon Rumah', (string)($student['phone'] ?: '-')],
+        ['Pekerjaan Orang Tua', ''],
+        ['  a. Ayah', (string)($student['father_occupation'] ?: '-')],
+        ['  b. Ibu', (string)($student['mother_occupation'] ?: '-')],
+        ['Nama Wali Siswa', (string)($student['guardian_name'] ?: '-')],
+        ['Alamat Wali Peserta Didik', '-'],
+        ['Nomor Telepon Rumah', '-'],
+        ['Pekerjaan Wali Peserta Didik', '-'],
+    ];
+
+    $no = 1;
+    foreach ($studentFields as $idx => [$label, $val]) {
+        if (!str_starts_with($label, '  ') && !str_starts_with($label, 'Di kelas') && !str_starts_with($label, 'Pada tanggal')) {
+            $pdf->text($numX, $y, $no . '.', 10);
+            $no++;
+        }
+        $pdf->text($labelX, $y, $label, 10);
+        if ($val !== '') {
+            $pdf->text($valX, $y, ': ' . $val, 10);
+        }
+        $y -= 14.00;
+    }
+
+    $y -= 10.00;
+
+    // Foto
+    $photoW = 85.04; // 3x4 ratio
+    $photoH = 113.39;
+    if ($photo && ($photoPath = report_asset_path((string)($photo['file_path'] ?? ''))) !== '') {
+        $pdf->image($photoPath, $marginLeft, $y, $photoW, $photoH);
+    } else {
+        $pdf->rect($marginLeft, $y, $photoW, -$photoH, 'S');
+        $pdf->setFont('Helvetica', 8);
+        $pdf->centerText($marginLeft, $y - ($photoH / 2) - 3, $photoW, 'Pas Foto 3x4', 8);
+    }
+
+    // TTD Kepala Sekolah
+    $sigX = $marginRight - 150.00;
+    $pdf->setFont('Helvetica', 10);
+    $pdf->text($sigX, $y - 10.00, '................, ....................', 10);
+    $pdf->text($sigX, $y - 25.00, 'Kepala Sekolah,', 10);
+    
+    if (($_GET['isittd'] ?? 'tanpa') === 'dengan') {
+        $principalSignature = report_signature_by_type('ttd_kepsek');
+        draw_report_signature_marker($pdf, $sigX, $y - 35.00, 'TTD Digital', (string)($principalSignature['file_path'] ?? ''));
+    }
+    
+    $pdf->text($sigX, $y - 95.00, (string)($school['principal_name'] ?: '............................'), 10, true);
+    $pdf->text($sigX, $y - 109.00, 'NIP. ' . (string)($school['principal_nip'] ?? ''), 10);
+
+
+    // ==========================================
+    // HALAMAN 3: MUTASI KELUAR
+    // ==========================================
+    $pdf->addPage();
+    $pdf->setFont('Helvetica', 12, true);
+    $pdf->centerText($marginLeft, 780.00, $contentWidth, 'KETERANGAN PINDAH SEKOLAH', 12, true);
+    
+    $pdf->setFont('Helvetica', 10);
+    $pdf->text($marginLeft, 750.00, 'Nama Peserta Didik : ' . (string)$student['name'], 10);
+    $pdf->setFont('Helvetica', 10, true);
+    $pdf->text($marginLeft, 730.00, 'KELUAR', 10, true);
+
+    $y = 710.00;
+    for ($i = 0; $i < 3; $i++) {
+        // Table Header
+        $pdf->setFont('Helvetica', 10, true);
+        $pdf->rect($marginLeft, $y, 80.00, -25.00, 'S');
+        $pdf->centerText($marginLeft, $y - 15.00, 80.00, 'Tanggal', 10, true);
+        
+        $pdf->rect($marginLeft + 80.00, $y, 100.00, -25.00, 'S');
+        $pdf->centerText($marginLeft + 80.00, $y - 10.00, 100.00, 'Kelas yang', 10, true);
+        $pdf->centerText($marginLeft + 80.00, $y - 20.00, 100.00, 'ditinggalkan', 10, true);
+        
+        $pdf->rect($marginLeft + 180.00, $y, $contentWidth - 180.00, -25.00, 'S');
+        $pdf->centerText($marginLeft + 180.00, $y - 15.00, $contentWidth - 180.00, 'Sebab-sebab Keluar atau Atas Permintaan (Tertulis)', 10, true);
+        
+        $y -= 25.00;
+        
+        // Table Body
+        $pdf->rect($marginLeft, $y, 80.00, -110.00, 'S');
+        $pdf->rect($marginLeft + 80.00, $y, 100.00, -110.00, 'S');
+        $pdf->rect($marginLeft + 180.00, $y, $contentWidth - 180.00, -110.00, 'S');
+        
+        $pdf->setFont('Helvetica', 10);
+        $sigRight = $marginLeft + 190.00;
+        $pdf->text($sigRight, $y - 15.00, '................, ....................', 10);
+        $pdf->text($sigRight, $y - 30.00, 'Kepala Sekolah,', 10);
+        $pdf->text($sigRight, $y - 80.00, '..............................................', 10);
+        $pdf->text($sigRight, $y - 95.00, 'NIP.', 10);
+        
+        $sigParent = $marginLeft + 360.00;
+        $pdf->text($sigParent, $y - 30.00, 'Orang Tua/Wali,', 10);
+        $pdf->text($sigParent, $y - 80.00, '..............................................', 10);
+
+        $y -= 130.00;
+    }
+
+    // ==========================================
+    // HALAMAN 4: MUTASI MASUK
+    // ==========================================
+    $pdf->addPage();
+    $pdf->setFont('Helvetica', 12, true);
+    $pdf->centerText($marginLeft, 780.00, $contentWidth, 'KETERANGAN PINDAH SEKOLAH', 12, true);
+    
+    $pdf->setFont('Helvetica', 10);
+    $pdf->text($marginLeft, 750.00, 'Nama Peserta Didik : ' . (string)$student['name'], 10);
+    $pdf->setFont('Helvetica', 10, true);
+    $pdf->text($marginLeft, 730.00, 'MASUK', 10, true);
+
+    $y = 710.00;
+    $pdf->setFont('Helvetica', 10);
+    for ($i = 1; $i <= 3; $i++) {
+        $pdf->line($marginLeft, $y, $marginRight, $y);
+        $y -= 15.00;
+        
+        $pdf->text($marginLeft, $y, '1. Nama Siswa', 10);
+        $pdf->text($marginLeft + 100.00, $y, '________________________', 10);
+        
+        $pdf->text($marginLeft + 250.00, $y, '................, ....................', 10);
+        $y -= 15.00;
+        
+        $pdf->text($marginLeft, $y, '2. Nomor Induk', 10);
+        $pdf->text($marginLeft + 100.00, $y, '________________________', 10);
+        
+        $pdf->text($marginLeft + 250.00, $y, 'Kepala Sekolah,', 10);
+        $y -= 15.00;
+        
+        $pdf->text($marginLeft, $y, '3. Nama Sekolah', 10);
+        $pdf->text($marginLeft + 100.00, $y, '________________________', 10);
+        $y -= 15.00;
+        
+        $pdf->text($marginLeft, $y, '4. Masuk di Sekolah ini:', 10);
+        $y -= 15.00;
+        
+        $pdf->text($marginLeft, $y, '    a. Tanggal', 10);
+        $pdf->text($marginLeft + 100.00, $y, '________________________', 10);
+        
+        $pdf->text($marginLeft + 250.00, $y - 5.00, '..............................................', 10);
+        $y -= 15.00;
+        
+        $pdf->text($marginLeft, $y, '    b. Di Kelas', 10);
+        $pdf->text($marginLeft + 100.00, $y, '________________________', 10);
+        
+        $pdf->text($marginLeft + 250.00, $y - 5.00, 'NIP.', 10);
+        $y -= 15.00;
+        
+        $pdf->text($marginLeft, $y, '5. Tahun Pelajaran', 10);
+        $pdf->text($marginLeft + 100.00, $y, '________________________', 10);
+        
+        $y -= 25.00;
+    }
+    $pdf->line($marginLeft, $y + 15.00, $marginRight, $y + 15.00);
+
+    $path = biodata_file_path($studentId);
+    file_put_contents($path, $pdf->output());
+    return $path;
+}
+
+function page_biodata_download_student(): void
+{
+    require_role(['admin', 'guru']);
+    $studentId = (int)($_GET['student_id'] ?? 0);
+    $student = fetch_one('SELECT * FROM students WHERE id = ?', [$studentId]);
+    if (!$student) {
+        http_response_code(404);
+        exit('Siswa tidak ditemukan.');
+    }
+    require_class_access((int)$student['class_id']);
+    $path = biodata_file_path($studentId);
+    if (!is_file($path)) {
+        $path = generate_student_biodata_pdf($studentId);
+    }
+    $name = preg_replace('/[^A-Za-z0-9 _-]/', '', (string)$student['name']);
+    $name = trim((string)$name) ?: 'Siswa';
+    header('Content-Type: application/pdf');
+    $disposition = !empty($_GET['inline']) ? 'inline' : 'attachment';
+    header('Content-Disposition: ' . $disposition . '; filename="Biodata_' . str_replace(' ', '_', $name) . '.pdf"');
+    header('Content-Length: ' . filesize($path));
+    readfile($path);
+    exit;
+}
+
+function page_biodata_generate_student(): void
+{
+    require_role(['admin', 'guru']);
+    $studentId = (int)($_GET['student_id'] ?? 0);
+    $student = fetch_one('SELECT class_id FROM students WHERE id = ?', [$studentId]);
+    if (!$student) {
+        http_response_code(404);
+        exit('Siswa tidak ditemukan.');
+    }
+    require_class_access((int)$student['class_id']);
+    generate_student_biodata_pdf($studentId);
+    flash('success', 'PDF biodata siswa berhasil digenerate.');
+    redirect_to('cetak-pelengkap-rapor', ['class_id' => (int)($_GET['class_id'] ?? 0)]);
+}
+
+function page_biodata_generate_class(): void
+{
+    require_role(['admin', 'guru']);
+    $classId = (int)($_GET['class_id'] ?? 0);
+    require_class_access($classId);
+    $students = fetch_all('SELECT id FROM students WHERE class_id = ? AND active = 1 ORDER BY name', [$classId]);
+    foreach ($students as $student) {
+        generate_student_biodata_pdf((int)$student['id']);
+    }
+    flash('success', 'PDF biodata kelas berhasil digenerate.');
+    redirect_to('cetak-pelengkap-rapor', ['class_id' => $classId]);
+}
+
+function page_biodata_download_class(): void
+{
+    require_role(['admin', 'guru']);
+    $classId = (int)($_GET['class_id'] ?? 0);
+    require_class_access($classId);
+    $class = fetch_one('SELECT * FROM classes WHERE id = ?', [$classId]);
+    $students = fetch_all('SELECT * FROM students WHERE class_id = ? AND active = 1 ORDER BY name', [$classId]);
+    if (!$class || !$students) {
+        http_response_code(404);
+        exit('Kelas tidak ditemukan atau tidak punya siswa.');
+    }
+    $zipPath = report_storage_dir() . '/biodata-kelas-' . preg_replace('/[^A-Za-z0-9_-]/', '-', (string)$class['name']) . '.zip';
+    $zip = new ZipArchive();
+    if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+        throw new RuntimeException('Gagal membuat file ZIP.');
+    }
+    foreach ($students as $student) {
+        $pdfPath = biodata_file_path((int)$student['id']);
+        if (!is_file($pdfPath)) {
+            $pdfPath = generate_student_biodata_pdf((int)$student['id']);
+        }
+        $name = preg_replace('/[^A-Za-z0-9 _-]/', '', (string)$student['name']);
+        $name = trim((string)$name) ?: 'Siswa';
+        $zip->addFile($pdfPath, 'Biodata_' . str_replace(' ', '_', $name) . '.pdf');
+    }
+    $zip->close();
+
+    header('Content-Type: application/zip');
+    header('Content-Disposition: attachment; filename="Biodata_Kelas_' . preg_replace('/[^A-Za-z0-9_-]/', '_', (string)$class['name']) . '.zip"');
     header('Content-Length: ' . filesize($zipPath));
     readfile($zipPath);
     exit;

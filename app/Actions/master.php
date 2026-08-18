@@ -164,19 +164,26 @@ function action_save_student(): void
         trim((string)($_POST['birth_place'] ?? '')),
         $_POST['birth_date'] ?: null,
         trim((string)($_POST['religion'] ?? '')),
+        trim((string)($_POST['address'] ?? '')),
+        trim((string)($_POST['phone'] ?? '')),
+        trim((string)($_POST['father_name'] ?? '')),
+        trim((string)($_POST['father_occupation'] ?? '')),
+        trim((string)($_POST['mother_name'] ?? '')),
+        trim((string)($_POST['mother_occupation'] ?? '')),
+        trim((string)($_POST['guardian_name'] ?? '')),
         (int)($_POST['class_id'] ?? 0) ?: null,
         isset($_POST['active']) ? 1 : 0,
         now_string(),
     ];
     if ($id > 0) {
         execute_sql(
-            'UPDATE students SET nis = ?, nisn = ?, name = ?, gender = ?, birth_place = ?, birth_date = ?, religion = ?, class_id = ?, active = ?, updated_at = ? WHERE id = ?',
+            'UPDATE students SET nis = ?, nisn = ?, name = ?, gender = ?, birth_place = ?, birth_date = ?, religion = ?, address = NULLIF(?, \'\'), phone = NULLIF(?, \'\'), father_name = NULLIF(?, \'\'), father_occupation = NULLIF(?, \'\'), mother_name = NULLIF(?, \'\'), mother_occupation = NULLIF(?, \'\'), guardian_name = NULLIF(?, \'\'), class_id = ?, active = ?, updated_at = ? WHERE id = ?',
             array_merge($data, [$id])
         );
         $studentId = $id;
     } else {
         execute_sql(
-            'INSERT INTO students (nis, nisn, name, gender, birth_place, birth_date, religion, class_id, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO students (nis, nisn, name, gender, birth_place, birth_date, religion, address, phone, father_name, father_occupation, mother_name, mother_occupation, guardian_name, class_id, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULLIF(?, \'\'), NULLIF(?, \'\'), NULLIF(?, \'\'), NULLIF(?, \'\'), NULLIF(?, \'\'), NULLIF(?, \'\'), NULLIF(?, \'\'), ?, ?, ?)',
             $data
         );
         $studentId = (int)db()->lastInsertId();

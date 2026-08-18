@@ -17,7 +17,9 @@ function checked(mixed $value): string
 
 function status_badge(int $active): string
 {
-    return $active ? '<span class="badge ok">Aktif</span>' : '<span class="badge off">Nonaktif</span>';
+    return $active
+        ? '<span class="badge ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Aktif</span>'
+        : '<span class="badge off"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Nonaktif</span>';
 }
 
 function row_actions(string $page, int $id, string $deleteAction): string
@@ -25,10 +27,12 @@ function row_actions(string $page, int $id, string $deleteAction): string
     if (!is_admin()) {
         return '<span class="hint">-</span>';
     }
-    return '<div class="row-actions"><a class="button small" href="' . e(route_url($page, ['edit' => $id])) . '">Edit</a>'
-        . '<form method="post" onsubmit="return confirm(\'Hapus data ini?\')">' . csrf_field()
+    return '<div class="row-actions">'
+        . '<a class="button small" href="' . e(route_url($page, ['edit' => $id])) . '">'
+        . '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit</a>'
+        . '<form method="post" onsubmit="return confirm(\'Hapus data ini? Aksi ini tidak dapat dibatalkan.\')">' . csrf_field()
         . '<input type="hidden" name="action" value="' . e($deleteAction) . '"><input type="hidden" name="id" value="' . e($id) . '">'
-        . '<button class="button small danger">Hapus</button></form></div>';
+        . '<button class="button small danger"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Hapus</button></form></div>';
 }
 
 function table_panel(string $title, array $headers, array $rows, callable $renderer, string $actions = '', bool $search = false): void
@@ -37,14 +41,19 @@ function table_panel(string $title, array $headers, array $rows, callable $rende
     <section class="panel table-panel">
         <?php panel_title($title, '', $actions); ?>
         <?php if ($search): ?>
-        <div class="table-search"><input type="text" class="table-search-input" placeholder="Cari..."></div>
+        <div class="table-search">
+            <div style="position:relative;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);pointer-events:none;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" class="table-search-input" placeholder="Cari data..." style="padding-left:40px;">
+            </div>
+        </div>
         <?php endif; ?>
         <div class="table-wrap">
             <table>
                 <thead><tr><?php foreach ($headers as $header): ?><th><?= e($header) ?></th><?php endforeach; ?></tr></thead>
                 <tbody>
                 <?php if (!$rows): ?>
-                    <tr><td colspan="<?= e(count($headers)) ?>" class="empty">Belum ada data.</td></tr>
+                    <tr><td colspan="<?= e(count($headers)) ?>" class="empty"><div class="empty"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><p>Belum ada data.</p></div></td></tr>
                 <?php else: foreach ($rows as $row): ?>
                     <tr><?php $renderer($row); ?></tr>
                 <?php endforeach; endif; ?>
@@ -118,7 +127,10 @@ function assignment_picker(string $page, array $assignments, int $selected): voi
         <form method="get" class="grid four">
             <input type="hidden" name="page" value="<?= e($page) ?>">
             <label>Pembelajaran <select name="assignment_id"><?= assignment_options($assignments, $selected) ?></select></label>
-            <div class="actions"><button class="button">Tampilkan</button></div>
+            <div class="actions"><button class="button primary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                Tampilkan
+            </button></div>
         </form>
     </section>
     <?php

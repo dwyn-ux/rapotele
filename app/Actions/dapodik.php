@@ -995,19 +995,35 @@ function dapodik_import_student(array $row): bool
     $birthDate = dapodik_nullable_date(dapodik_row_value($row, ['tanggal_lahir', 'tgl_lahir']));
     $religion = dapodik_limit(dapodik_row_value($row, ['agama', 'agama_id_str']), 64);
     $classId = dapodik_class_id_from_row($row);
+
+    $address = trim(implode(', ', array_filter([
+        dapodik_row_value($row, ['alamat_jalan', 'alamat']),
+        'RT ' . dapodik_row_value($row, ['rt']) . ' RW ' . dapodik_row_value($row, ['rw']),
+        dapodik_row_value($row, ['desa_kelurahan', 'kelurahan', 'nama_desa']),
+        dapodik_row_value($row, ['kecamatan']),
+        dapodik_row_value($row, ['kabupaten_kota', 'kabupaten']),
+        dapodik_row_value($row, ['provinsi']),
+    ])));
+    $phone = dapodik_limit(dapodik_row_value($row, ['no_telepon', 'telepon', 'phone']), 32);
+    $fatherName = dapodik_limit(dapodik_row_value($row, ['nama_ayah', 'nama_ortu_ayah']), 160);
+    $fatherOccupation = dapodik_limit(dapodik_row_value($row, ['pekerjaan_ayah', 'pekerjaan_ortu_ayah']), 120);
+    $motherName = dapodik_limit(dapodik_row_value($row, ['nama_ibu', 'nama_ortu_ibu']), 160);
+    $motherOccupation = dapodik_limit(dapodik_row_value($row, ['pekerjaan_ibu', 'pekerjaan_ortu_ibu']), 120);
+    $guardianName = dapodik_limit(dapodik_row_value($row, ['nama_wali']), 160);
+
     $existingId = dapodik_student_id_from_row($row);
 
     if ($existingId) {
         execute_sql(
-            'UPDATE students SET dapodik_id = COALESCE(NULLIF(?, \'\'), dapodik_id), nis = ?, nisn = ?, name = ?, gender = ?, birth_place = ?, birth_date = ?, religion = ?, class_id = COALESCE(?, class_id), active = 1, updated_at = ? WHERE id = ?',
-            [$dapodikId, $nis, $nisn, $name, $gender, $birthPlace, $birthDate, $religion, $classId, now_string(), $existingId]
+            'UPDATE students SET dapodik_id = COALESCE(NULLIF(?, \'\'), dapodik_id), nis = ?, nisn = ?, name = ?, gender = ?, birth_place = ?, birth_date = ?, religion = ?, address = NULLIF(?, \'\'), phone = NULLIF(?, \'\'), father_name = NULLIF(?, \'\'), father_occupation = NULLIF(?, \'\'), mother_name = NULLIF(?, \'\'), mother_occupation = NULLIF(?, \'\'), guardian_name = NULLIF(?, \'\'), class_id = COALESCE(?, class_id), active = 1, updated_at = ? WHERE id = ?',
+            [$dapodikId, $nis, $nisn, $name, $gender, $birthPlace, $birthDate, $religion, $address, $phone, $fatherName, $fatherOccupation, $motherName, $motherOccupation, $guardianName, $classId, now_string(), $existingId]
         );
         return true;
     }
 
     execute_sql(
-        'INSERT INTO students (dapodik_id, nis, nisn, name, gender, birth_place, birth_date, religion, class_id, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)',
-        [$dapodikId, $nis, $nisn, $name, $gender, $birthPlace, $birthDate, $religion, $classId, now_string()]
+        'INSERT INTO students (dapodik_id, nis, nisn, name, gender, birth_place, birth_date, religion, address, phone, father_name, father_occupation, mother_name, mother_occupation, guardian_name, class_id, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, \'\'), NULLIF(?, \'\'), NULLIF(?, \'\'), NULLIF(?, \'\'), NULLIF(?, \'\'), NULLIF(?, \'\'), NULLIF(?, \'\'), ?, 1, ?)',
+        [$dapodikId, $nis, $nisn, $name, $gender, $birthPlace, $birthDate, $religion, $address, $phone, $fatherName, $fatherOccupation, $motherName, $motherOccupation, $guardianName, $classId, now_string()]
     );
 
     return true;

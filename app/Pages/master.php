@@ -156,6 +156,13 @@ function page_students(): void
             <label>Tempat Lahir <input name="birth_place" value="<?= e($edit['birth_place'] ?? '') ?>"></label>
             <label>Tanggal Lahir <input type="date" name="birth_date" value="<?= e($edit['birth_date'] ?? '') ?>"></label>
             <label>Agama <input name="religion" value="<?= e($edit['religion'] ?? '') ?>"></label>
+            <label>Alamat <input name="address" value="<?= e($edit['address'] ?? '') ?>"></label>
+            <label>No. HP <input name="phone" value="<?= e($edit['phone'] ?? '') ?>"></label>
+            <label>Nama Ayah <input name="father_name" value="<?= e($edit['father_name'] ?? '') ?>"></label>
+            <label>Pekerjaan Ayah <input name="father_occupation" value="<?= e($edit['father_occupation'] ?? '') ?>"></label>
+            <label>Nama Ibu <input name="mother_name" value="<?= e($edit['mother_name'] ?? '') ?>"></label>
+            <label>Pekerjaan Ibu <input name="mother_occupation" value="<?= e($edit['mother_occupation'] ?? '') ?>"></label>
+            <label>Nama Wali <input name="guardian_name" value="<?= e($edit['guardian_name'] ?? '') ?>"></label>
             <label>Kelas <select name="class_id"><option value="">-</option><?= options($classes, $edit['class_id'] ?? '') ?></select></label>
             <?php if ($existingUser): ?>
                 <label>Username Login <input name="username" value="<?= e($existingUser['username'] ?? '') ?>" readonly></label>
