@@ -126,6 +126,7 @@ function render_header(string $title): void
         <?php if ($appLogoUrl !== ''): ?>
             <link rel="icon" href="<?= e($appLogoUrl) ?>">
             <link rel="apple-touch-icon" href="<?= e($appLogoUrl) ?>">
+            <link rel="preload" as="image" href="<?= e($appLogoUrl) ?>">
         <?php endif; ?>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -351,6 +352,7 @@ function render_public_header(string $title): void
         <?php if ($appLogoUrl !== ''): ?>
             <link rel="icon" href="<?= e($appLogoUrl) ?>">
             <link rel="apple-touch-icon" href="<?= e($appLogoUrl) ?>">
+            <link rel="preload" as="image" href="<?= e($appLogoUrl) ?>">
         <?php endif; ?>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
