@@ -181,28 +181,111 @@ function page_import_nomor_ijazah(): void
 
 function page_setting_transkrip(): void
 {
-    page_settings_form('Setting Transkrip', 'setting-transkrip', 'save_transcript_settings', ['setnamasiswa', 'desimal_nilai', 'ada_ratarata', 'desimal_ratarata', 'ket_tempat_ttd', 'nama_kepsek', 'nip_kepsek', 'ada_ttd']);
+    $labels = [
+        'setnamasiswa' => 'Teks Nama Siswa',
+        'desimal_nilai' => 'Desimal Nilai',
+        'ada_ratarata' => 'Tampilkan Rata-rata',
+        'desimal_ratarata' => 'Desimal Rata-rata',
+        'ket_tempat_ttd' => 'Keterangan TTD (Kota/Tanggal)',
+        'nama_kepsek' => 'Nama Kepala Sekolah',
+        'nip_kepsek' => 'NIP Kepala Sekolah',
+        'ada_ttd' => 'Tampilkan Tanda Tangan',
+    ];
+    page_settings_form('Setting Transkrip', 'setting-transkrip', 'save_transcript_settings', [
+        ['field' => 'setnamasiswa', 'type' => 'text'],
+        ['field' => 'desimal_nilai', 'type' => 'number'],
+        ['field' => 'ada_ratarata', 'type' => 'checkbox'],
+        ['field' => 'desimal_ratarata', 'type' => 'number'],
+        ['field' => 'ket_tempat_ttd', 'type' => 'text'],
+        ['field' => 'nama_kepsek', 'type' => 'text'],
+        ['field' => 'nip_kepsek', 'type' => 'text'],
+        ['field' => 'ada_ttd', 'type' => 'checkbox'],
+    ], $labels);
 }
 
 function page_setting_skl(): void
 {
-    page_settings_form('Setting SKL', 'setting-skl', 'save_skl_settings', ['ada_kop', 'judul_1', 'nomor_skl', 'isi_text1', 'setnamasiswa', 'isi_text2', 'statuslulus', 'ada_nilai', 'judul_nilai', 'desimal_nilai', 'ada_ratarata', 'ket_tempat_ttd', 'nama_kepsek', 'nip_kepsek', 'ada_foto', 'ada_ttd']);
+    $labels = [
+        'ada_kop' => 'Tampilkan Kop Surat',
+        'judul_1' => 'Judul SKL',
+        'nomor_skl' => 'Nomor SKL',
+        'isi_text1' => 'Isi Teks SKL (Bagian Awal)',
+        'setnamasiswa' => 'Teks Nama Siswa',
+        'isi_text2' => 'Isi Teks SKL (Bagian Akhir)',
+        'statuslulus' => 'Status Kelulusan',
+        'ada_nilai' => 'Tampilkan Nilai',
+        'judul_nilai' => 'Judul Tabel Nilai',
+        'desimal_nilai' => 'Desimal Nilai',
+        'ada_ratarata' => 'Tampilkan Rata-rata',
+        'ket_tempat_ttd' => 'Keterangan TTD (Kota/Tanggal)',
+        'nama_kepsek' => 'Nama Kepala Sekolah',
+        'nip_kepsek' => 'NIP Kepala Sekolah',
+        'ada_foto' => 'Tampilkan Foto',
+        'ada_ttd' => 'Tampilkan Tanda Tangan',
+    ];
+    page_settings_form('Setting SKL', 'setting-skl', 'save_skl_settings', [
+        ['field' => 'ada_kop', 'type' => 'checkbox'],
+        ['field' => 'judul_1', 'type' => 'text'],
+        ['field' => 'nomor_skl', 'type' => 'text'],
+        ['field' => 'isi_text1', 'type' => 'textarea'],
+        ['field' => 'setnamasiswa', 'type' => 'text'],
+        ['field' => 'isi_text2', 'type' => 'textarea'],
+        ['field' => 'statuslulus', 'type' => 'text'],
+        ['field' => 'ada_nilai', 'type' => 'checkbox'],
+        ['field' => 'judul_nilai', 'type' => 'text'],
+        ['field' => 'desimal_nilai', 'type' => 'number'],
+        ['field' => 'ada_ratarata', 'type' => 'checkbox'],
+        ['field' => 'ket_tempat_ttd', 'type' => 'text'],
+        ['field' => 'nama_kepsek', 'type' => 'text'],
+        ['field' => 'nip_kepsek', 'type' => 'text'],
+        ['field' => 'ada_foto', 'type' => 'checkbox'],
+        ['field' => 'ada_ttd', 'type' => 'checkbox'],
+    ], $labels);
 }
 
-function page_settings_form(string $title, string $page, string $action, array $fields): void
+function page_settings_form(string $title, string $page, string $action, array $fields, array $labels = []): void
 {
     require_role(['admin']);
     render_header($title);
-    echo '<section class="panel"><form method="post" class="grid two">' . csrf_field() . '<input type="hidden" name="action" value="' . e($action) . '">';
-    foreach ($fields as $field) {
-        $value = get_app_setting($page . '.' . $field, '');
-        if (str_starts_with($field, 'isi_')) {
-            echo '<label class="wide">' . e($field) . '<textarea name="' . e($field) . '">' . e($value) . '</textarea></label>';
-        } else {
-            echo '<label>' . e($field) . '<input name="' . e($field) . '" value="' . e($value) . '"></label>';
-        }
-    }
-    echo '<div class="wide actions"><button class="button primary">Simpan Data</button></div></form></section>';
+    ?>
+    <section class="panel">
+        <form method="post" class="grid two">
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="<?= e($action) ?>">
+            <?php foreach ($fields as $fieldDef):
+                $field = $fieldDef['field'];
+                $type = $fieldDef['type'] ?? 'text';
+                $value = get_app_setting($page . '.' . $field, '');
+                $label = $labels[$field] ?? $field;
+            ?>
+                <?php if ($type === 'checkbox'): ?>
+                    <label class="check">
+                        <input type="checkbox" name="<?= e($field) ?>" value="1" <?= checked((int)$value === 1 || strtolower((string)$value) === 'ya' || strtolower((string)$value) === 'on') ?>>
+                        <?= e($label) ?>
+                    </label>
+                <?php elseif ($type === 'textarea'): ?>
+                    <label class="wide">
+                        <?= e($label) ?>
+                        <textarea name="<?= e($field) ?>" rows="4"><?= e($value) ?></textarea>
+                    </label>
+                <?php elseif ($type === 'number'): ?>
+                    <label>
+                        <?= e($label) ?>
+                        <input type="number" step="any" name="<?= e($field) ?>" value="<?= e($value) ?>">
+                    </label>
+                <?php else: ?>
+                    <label>
+                        <?= e($label) ?>
+                        <input type="text" name="<?= e($field) ?>" value="<?= e($value) ?>">
+                    </label>
+                <?php endif; ?>
+            <?php endforeach; ?>
+            <div class="wide actions">
+                <button class="button primary">Simpan Data</button>
+            </div>
+        </form>
+    </section>
+    <?php
     render_footer();
 }
 
