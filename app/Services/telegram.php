@@ -998,7 +998,7 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
             if (!$linkedUsers) {
                 return '⚠️ <b>Akun Telegram ini belum terhubung.</b>'
                     . "\n\n📋 Ketik <code>/daftar</code> untuk daftar lewat miniweb."
-                    . "\n🔑 Atau pakai <code>/login username password</code> untuk akun lama.';
+                    . "\n🔑 Atau pakai <code>/login username password</code> untuk akun lama.";
             }
 
             $user = null;
@@ -1025,7 +1025,7 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
 
             return '✅ <b>Login berhasil!</b>'
                 . "\n" . '👤 Masuk sebagai <b>' . e($user['name']) . '</b>'
-                . "\n" . "\n💡 Ketik <code>/menu</code> untuk membuka menu atau <code>/kelas</code> untuk melihat pembelajaran.';
+                . "\n\n💡 Ketik <code>/menu</code> untuk membuka menu atau <code>/kelas</code> untuk melihat pembelajaran.";
         }
 
         if (count($parts) < 3) {
@@ -1047,7 +1047,7 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
 
         return '✅ <b>Login berhasil!</b>'
             . "\n" . '👤 Masuk sebagai <b>' . e($user['name']) . '</b>'
-            . "\n\n💡 Ketik <code>/menu</code> untuk membuka menu atau <code>/kelas</code> untuk melihat pembelajaran.';
+            . "\n\n💡 Ketik <code>/menu</code> untuk membuka menu atau <code>/kelas</code> untuk melihat pembelajaran.";
     }
 
     $user = telegram_user_by_chat($chatId);
@@ -1067,7 +1067,7 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
             }
         }
         return '👋 <b>Logout berhasil!</b>'
-            . "\n\n🔐 Ketik <code>/login password</code> untuk masuk lagi.';
+            . "\n\n🔐 Ketik <code>/login password</code> untuk masuk lagi.";
     }
 
     if ($command === '/profil') {
