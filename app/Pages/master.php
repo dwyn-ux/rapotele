@@ -291,32 +291,32 @@ function page_classes(): void
     render_header('Data Kelas');
     input_panel_start($edit ? 'Edit Kelas' : 'Input Kelas', 'Tambah Kelas', (bool)$edit || isset($_GET['add']));
     ?>
-        <form method="post" class="grid two" style="padding:var(--space-5) var(--space-6)">
+        <form method="post" class="grid two form-body">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="save_class">
             <input type="hidden" name="id" value="<?= e($edit['id'] ?? 0) ?>">
             <label>
-                <span style="display:flex;align-items:center;gap:6px"><i data-lucide="hash" style="width:14px;height:14px;color:var(--text-muted)"></i> Nama Kelas</span>
+                <span class="field-icon"><i data-lucide="hash"></i> Nama Kelas</span>
                 <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>" placeholder="Contoh: 7A, 8B, 9C">
             </label>
             <label>
-                <span style="display:flex;align-items:center;gap:6px"><i data-lucide="layers" style="width:14px;height:14px;color:var(--text-muted)"></i> Tingkat / Grade</span>
+                <span class="field-icon"><i data-lucide="layers"></i> Tingkat / Grade</span>
                 <input type="text" name="grade" required value="<?= e($edit['grade'] ?? '') ?>" placeholder="Contoh: 7, 8, 9">
             </label>
             <label>
-                <span style="display:flex;align-items:center;gap:6px"><i data-lucide="bookmark" style="width:14px;height:14px;color:var(--text-muted)"></i> Jurusan / Fase</span>
+                <span class="field-icon"><i data-lucide="bookmark"></i> Jurusan / Fase</span>
                 <input type="text" name="major" value="<?= e($edit['major'] ?? '') ?>" placeholder="Contoh: Reguler">
             </label>
             <label>
-                <span style="display:flex;align-items:center;gap:6px"><i data-lucide="user" style="width:14px;height:14px;color:var(--text-muted)"></i> Wali Kelas</span>
+                <span class="field-icon"><i data-lucide="user"></i> Wali Kelas</span>
                 <select name="homeroom_teacher_id"><option value="">Pilih Wali Kelas</option><?= options($teachers, $edit['homeroom_teacher_id'] ?? '') ?></select>
             </label>
             <label>
-                <span style="display:flex;align-items:center;gap:6px"><i data-lucide="calendar" style="width:14px;height:14px;color:var(--text-muted)"></i> Tahun Ajaran</span>
+                <span class="field-icon"><i data-lucide="calendar"></i> Tahun Ajaran</span>
                 <input type="text" name="academic_year" required value="<?= e($edit['academic_year'] ?? config('school.academic_year')) ?>" placeholder="Contoh: 2026/2027">
             </label>
-            <label class="check" style="align-self:end;padding-bottom:4px"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> <span>Kelas Aktif</span></label>
-            <div class="wide actions" style="margin-top:var(--space-2)"><button type="submit" class="button primary"><i data-lucide="save"></i> Simpan</button><a class="button" href="<?= e(route_url('classes')) ?>"><i data-lucide="rotate-ccw"></i> Reset</a></div>
+            <label class="check field-check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> <span>Kelas Aktif</span></label>
+            <div class="wide actions form-actions-top"><button type="submit" class="button primary"><i data-lucide="save"></i> Simpan</button><a class="button" href="<?= e(route_url('classes')) ?>"><i data-lucide="rotate-ccw"></i> Reset</a></div>
         </form>
     <?php input_panel_end(); ?>
     <?php table_panel('Daftar Kelas', ['Kelas', 'Tingkat', 'Wali Kelas', 'Jumlah Siswa', 'Status', 'Aksi'], $rows, function ($row) {

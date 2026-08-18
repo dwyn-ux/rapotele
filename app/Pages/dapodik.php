@@ -55,7 +55,7 @@ function page_update_data(): void
                 Mode Update dari Dapodik
             </div>
         </div>
-        <div style="padding:var(--space-5) var(--space-6)">
+        <div class="form-info">
             <p style="margin:0 0 var(--space-2)">Isi Link Dapodik Lokal, Token / Key Webservice, dan NPSN di atas, lalu gunakan tombol <strong>Simpan & Unduh</strong> agar konfigurasi server tersimpan sebelum helper portable dibuat.</p>
             <p class="hint" style="margin:0">Link Web Raport: <code style="background:var(--surface-secondary);padding:2px 8px;border-radius:var(--radius-sm);font-size:13px"><?= e($reportUrl) ?></code></p>
         </div>
@@ -67,31 +67,31 @@ function page_update_data(): void
                 Import JSON Offline dari Helper
             </div>
         </div>
-        <form method="post" enctype="multipart/form-data" class="grid three" style="padding:var(--space-6)">
+        <form method="post" enctype="multipart/form-data" class="grid three form-body">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="import_dapodik_offline">
             <label>
-                <span style="display:flex;align-items:center;gap:6px">
-                    <i data-lucide="list" style="width:14px;height:14px;color:var(--text-muted)"></i>
+                <span class="field-icon">
+                    <i data-lucide="list"></i>
                     Jenis Data
                 </span>
                 <select name="data_type"><?= options(dapodik_data_types(true), 'all') ?></select>
             </label>
             <label>
-                <span style="display:flex;align-items:center;gap:6px">
-                    <i data-lucide="file-json" style="width:14px;height:14px;color:var(--text-muted)"></i>
+                <span class="field-icon">
+                    <i data-lucide="file-json"></i>
                     File JSON
                 </span>
                 <input type="file" name="json_file" accept=".json,application/json" style="height:auto;padding:var(--space-3)">
             </label>
             <label class="wide">
-                <span style="display:flex;align-items:center;gap:6px">
-                    <i data-lucide="clipboard" style="width:14px;height:14px;color:var(--text-muted)"></i>
+                <span class="field-icon">
+                    <i data-lucide="clipboard"></i>
                     Tempel JSON
                 </span>
                 <textarea name="json_payload" rows="4" placeholder='{"type":"all","items":[{"type":"guru","data":[...]}]}'></textarea>
             </label>
-            <div class="actions wide" style="margin-top:var(--space-2)">
+            <div class="actions wide form-actions-top">
                 <button type="submit" class="button primary">
                     <i data-lucide="upload"></i> Import Offline
                 </button>
@@ -117,12 +117,12 @@ function page_kirim_data_dapodik(): void
                 Upload Nilai ke Dapodik
             </div>
         </div>
-        <div class="grid two" style="padding:var(--space-6)">
+        <div class="grid two form-body">
             <form method="post">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="send_dapodik">
                 <input type="hidden" name="kind" value="matev">
-                <button type="submit" class="button primary" style="width:100%">
+                <button type="submit" class="button primary" class="btn-full">
                     <i data-lucide="send"></i> Kirim Data Matev
                 </button>
             </form>
@@ -130,7 +130,7 @@ function page_kirim_data_dapodik(): void
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="send_dapodik">
                 <input type="hidden" name="kind" value="nilai">
-                <button type="submit" class="button primary" style="width:100%">
+                <button type="submit" class="button primary" class="btn-full">
                     <i data-lucide="send"></i> Kirim Data Nilai
                 </button>
             </form>
@@ -153,32 +153,32 @@ function page_dapodik_settings_form(string $returnPage): void
                 Konfigurasi Web Service Dapodik
             </div>
         </div>
-        <form method="post" class="grid three" style="padding:var(--space-6)">
+        <form method="post" class="grid three form-body">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="save_dapodik_settings">
             <input type="hidden" name="return_page" value="<?= e($returnPage) ?>">
             <label>
-                <span style="display:flex;align-items:center;gap:6px">
-                    <i data-lucide="link" style="width:14px;height:14px;color:var(--text-muted)"></i>
+                <span class="field-icon">
+                    <i data-lucide="link"></i>
                     Link Dapodik Lokal
                 </span>
                 <input type="url" name="url" placeholder="http://127.0.0.1:5774" value="<?= e(get_app_setting('dapodik_url', '')) ?>">
             </label>
             <label>
-                <span style="display:flex;align-items:center;gap:6px">
-                    <i data-lucide="key" style="width:14px;height:14px;color:var(--text-muted)"></i>
+                <span class="field-icon">
+                    <i data-lucide="key"></i>
                     Token / Key Webservice
                 </span>
                 <input type="password" name="token" placeholder="Masukkan token webservice" value="<?= e(get_app_setting('dapodik_token', '')) ?>">
             </label>
             <label>
-                <span style="display:flex;align-items:center;gap:6px">
-                    <i data-lucide="hash" style="width:14px;height:14px;color:var(--text-muted)"></i>
+                <span class="field-icon">
+                    <i data-lucide="hash"></i>
                     NPSN
                 </span>
                 <input type="text" name="npsn" placeholder="Masukkan NPSN sekolah" value="<?= e(get_app_setting('dapodik_npsn', '')) ?>">
             </label>
-            <div class="actions wide" style="margin-top:var(--space-2)">
+            <div class="actions wide form-actions-top">
                 <button type="submit" class="button primary">
                     <i data-lucide="save"></i> Simpan
                 </button>
