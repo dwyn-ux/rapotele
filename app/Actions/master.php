@@ -454,6 +454,13 @@ function action_import_bulk(): void
             $birthPlace = trim((string)($data['birth_place'] ?? ''));
             $birthDate = trim((string)($data['birth_date'] ?? '')) ?: null;
             $religion = trim((string)($data['religion'] ?? ''));
+            $address = trim((string)($data['address'] ?? ''));
+            $phone = trim((string)($data['phone'] ?? ''));
+            $fatherName = trim((string)($data['father_name'] ?? ''));
+            $fatherOccupation = trim((string)($data['father_occupation'] ?? ''));
+            $motherName = trim((string)($data['mother_name'] ?? ''));
+            $motherOccupation = trim((string)($data['mother_occupation'] ?? ''));
+            $guardianName = trim((string)($data['guardian_name'] ?? ''));
             $className = trim((string)($data['class_name'] ?? ''));
 
             $classId = null;
@@ -463,8 +470,8 @@ function action_import_bulk(): void
             }
 
             execute_sql(
-                'INSERT INTO students (nis, nisn, name, gender, birth_place, birth_date, religion, class_id, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)',
-                [$nis, $nisn, $name, $gender, $birthPlace, $birthDate, $religion, $classId, now_string()]
+                'INSERT INTO students (nis, nisn, name, gender, birth_place, birth_date, religion, address, phone, father_name, father_occupation, mother_name, mother_occupation, guardian_name, class_id, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULLIF(?, \'\'), NULLIF(?, \'\'), NULLIF(?, \'\'), NULLIF(?, \'\'), NULLIF(?, \'\'), NULLIF(?, \'\'), NULLIF(?, \'\'), ?, 1, ?)',
+                [$nis, $nisn, $name, $gender, $birthPlace, $birthDate, $religion, $address, $phone, $fatherName, $fatherOccupation, $motherName, $motherOccupation, $guardianName, $classId, now_string()]
             );
             $studentId = (int)db()->lastInsertId();
 

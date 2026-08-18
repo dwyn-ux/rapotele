@@ -52,9 +52,9 @@ function action_import_bulk_download(): void
         fputcsv($output, ['guru_budi', 'guru123', 'Budi Santoso, S.Pd', '198410102009011002', '', 'L', '70010002', 'budi@sekolah.local', 'Guru Mapel', '']);
         fputcsv($output, ['guru_rina', 'guru123', 'Rina Lestari, S.Pd', '199003032015022003', '', 'P', '70010003', 'rina@sekolah.local', 'Guru Mapel', '']);
     } else {
-        fputcsv($output, ['username', 'password', 'name', 'nis', 'nisn', 'gender', 'birth_place', 'birth_date', 'religion', 'class_name']);
-        fputcsv($output, ['0081234001', 'siswa123', 'Ahmad Rizki', '0081234001', '0081234001', 'L', 'Jakarta', '2010-05-15', 'Islam', '7A']);
-        fputcsv($output, ['0081234002', 'siswa123', 'Siti Nurhaliza', '0081234002', '0081234002', 'P', 'Bandung', '2010-03-20', 'Islam', '7A']);
+        fputcsv($output, ['username', 'password', 'name', 'nis', 'nisn', 'gender', 'birth_place', 'birth_date', 'religion', 'address', 'phone', 'father_name', 'father_occupation', 'mother_name', 'mother_occupation', 'guardian_name', 'class_name']);
+        fputcsv($output, ['0081234001', 'siswa123', 'Ahmad Rizki', '0081234001', '0081234001', 'L', 'Jakarta', '2010-05-15', 'Islam', 'Jl. Merdeka No. 10, Kel. Sukamaju, Bandung 40123', '081234567890', 'H. Rizki Pratama', 'Wiraswasta', 'Siti Aminah', 'Guru', '', '7A']);
+        fputcsv($output, ['0081234002', 'siswa123', 'Siti Nurhaliza', '0081234002', '0081234002', 'P', 'Bandung', '2010-03-20', 'Islam', 'Jl. Cendana No. 5, Kel. Mekar Jaya, Bandung 40124', '081234567891', 'Nursalam', 'Petani', 'Rohmah', 'IRT', '', '7A']);
     }
     fclose($output);
     exit;
