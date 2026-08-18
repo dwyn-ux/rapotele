@@ -8,36 +8,208 @@ function page_school(): void
     ?>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <section class="panel">
-        <form method="post" class="grid two">
-            <?= csrf_field() ?><input type="hidden" name="action" value="save_school">
-            <label>Nama Sekolah <input name="name" required value="<?= e($school['name'] ?? '') ?>"></label>
-            <label>NPSN <input name="npsn" value="<?= e($school['npsn'] ?? '') ?>"></label>
-            <label class="wide">Alamat <textarea name="address"><?= e($school['address'] ?? '') ?></textarea></label>
-            <label>Nama Kepala Sekolah <input name="principal_name" value="<?= e($school['principal_name'] ?? '') ?>"></label>
-            <label>NIP Kepala Sekolah <input name="principal_nip" value="<?= e($school['principal_nip'] ?? '') ?>"></label>
-            <label>Tahun Ajaran <input name="academic_year" required value="<?= e($school['academic_year'] ?? '') ?>"></label>
-            <label>Semester <input name="semester" required value="<?= e($school['semester'] ?? '') ?>"></label>
-            <label>Lat. Sekolah <input type="number" step="any" name="location_lat" id="school_lat" value="<?= e($school['location_lat'] ?? '') ?>" placeholder="-6.2088"></label>
-            <label>Lng. Sekolah <input type="number" step="any" name="location_lng" id="school_lng" value="<?= e($school['location_lng'] ?? '') ?>" placeholder="106.8456"></label>
-            <label>Radius Absensi (meter) <input type="number" min="0" name="attendance_radius_meters" value="<?= e($school['attendance_radius_meters'] ?? '500') ?>" placeholder="500"></label>
-            <label>Jam Pelajaran Normal (menit) <input type="number" min="10" max="60" name="regular_period_minutes" value="<?= e($school['regular_period_minutes'] ?? '35') ?>" placeholder="35"></label>
-            <label>Jam Pelajaran Pendek (menit) <input type="number" min="10" max="60" name="short_period_minutes" value="<?= e($school['short_period_minutes'] ?? '25') ?>" placeholder="25"></label>
-            <label>Hari Pendek <input name="short_days" value="<?= e($school['short_days'] ?? '') ?>" placeholder="Contoh: 5 atau 5,6 (Jumat, Sabtu)"></label>
-            <label>Jam Mulai Pelajaran <input type="time" name="start_time" value="<?= e($school['start_time'] ?? '07:00') ?>"></label>
-            <label>Istirahat 1 Setelah Jam <select name="break1_after"><?php for ($i = 1; $i <= 9; $i++): ?><option value="<?= $i ?>" <?= ($school['break1_after'] ?? 3) == $i ? 'selected' : '' ?>>Jam <?= $i ?></option><?php endfor; ?></select></label>
-            <label>Durasi Istirahat 1 (menit) <input type="number" min="5" max="60" name="break1_minutes" value="<?= e($school['break1_minutes'] ?? '15') ?>" placeholder="15"></label>
-            <label>Istirahat 2 Setelah Jam <select name="break2_after"><?php for ($i = 1; $i <= 9; $i++): ?><option value="<?= $i ?>" <?= ($school['break2_after'] ?? 6) == $i ? 'selected' : '' ?>>Jam <?= $i ?></option><?php endfor; ?></select></label>
-            <label>Durasi Istirahat 2 (menit) <input type="number" min="5" max="60" name="break2_minutes" value="<?= e($school['break2_minutes'] ?? '15') ?>" placeholder="15"></label>
-            <label>Jam Maksimal <input type="number" min="1" max="12" name="max_periods" value="<?= e($school['max_periods'] ?? '10') ?>" placeholder="10"></label>
-            <div class="wide">
-                <label style="margin-bottom:4px">Peta Lokasi Sekolah <small>(klik peta untuk set lokasi)</small></label>
-                <div id="school-map" style="height:350px;width:100%;border-radius:8px;border:1px solid #ccc;z-index:0;"></div>
+
+    <!-- Page Header -->
+    <div class="school-page-header">
+        <div class="school-page-header-left">
+            <div class="school-page-header-icon">
+                <i data-lucide="building-2"></i>
             </div>
-            <label class="check"><input type="checkbox" name="promotion_enabled" value="1" <?= checked(get_app_setting('promotion.enabled', '1') === '1') ?>> Aktifkan Keterangan Naik Kelas (semester genap)</label>
-            <div class="wide actions"><button class="button primary">Simpan</button></div>
-        </form>
-    </section>
+            <div>
+                <h1 class="school-page-title">Data Sekolah</h1>
+                <p class="school-page-subtitle">Lengkapi dan perbarui data sekolah sesuai ketentuan</p>
+            </div>
+        </div>
+        <div class="school-page-header-info">
+            <i data-lucide="info"></i>
+            <span>Pastikan data sekolah sudah sesuai dengan dokumen resmi dari sekolah.</span>
+        </div>
+    </div>
+
+    <form method="post" id="school-form">
+        <?= csrf_field() ?><input type="hidden" name="action" value="save_school">
+
+        <!-- Section 1: Informasi Umum -->
+        <div class="school-section-card">
+            <div class="school-section-header">
+                <div class="school-section-icon">
+                    <i data-lucide="school"></i>
+                </div>
+                <h2 class="school-section-title">Informasi Umum</h2>
+            </div>
+            <div class="school-section-body">
+                <div class="school-form-grid two-col">
+                    <div class="school-form-group">
+                        <label class="school-label">Nama Sekolah <span class="required">*</span></label>
+                        <input type="text" class="school-input" name="name" required value="<?= e($school['name'] ?? '') ?>" placeholder="Masukkan nama sekolah">
+                    </div>
+                    <div class="school-form-group">
+                        <label class="school-label">NPSN <span class="required">*</span></label>
+                        <input type="text" class="school-input" name="npsn" value="<?= e($school['npsn'] ?? '') ?>" placeholder="Masukkan NPSN Sekolah">
+                    </div>
+                </div>
+                <div class="school-form-group">
+                    <label class="school-label">Alamat <span class="required">*</span></label>
+                    <textarea class="school-input school-textarea" name="address" rows="3" placeholder="Masukkan alamat lengkap sekolah"><?= e($school['address'] ?? '') ?></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 2: Informasi Kepala Sekolah & Legalitas -->
+        <div class="school-section-card">
+            <div class="school-section-header">
+                <div class="school-section-icon">
+                    <i data-lucide="user-check"></i>
+                </div>
+                <h2 class="school-section-title">Informasi Kepala Sekolah &amp; Legalitas</h2>
+            </div>
+            <div class="school-section-body">
+                <div class="school-form-grid two-col">
+                    <div class="school-form-group">
+                        <label class="school-label">Nama Kepala Sekolah <span class="required">*</span></label>
+                        <input type="text" class="school-input" name="principal_name" value="<?= e($school['principal_name'] ?? '') ?>" placeholder="Masukkan nama kepala sekolah">
+                    </div>
+                    <div class="school-form-group">
+                        <label class="school-label">NIP Kepala Sekolah</label>
+                        <input type="text" class="school-input" name="principal_nip" value="<?= e($school['principal_nip'] ?? '') ?>" placeholder="Masukkan NIP Kepala Sekolah">
+                    </div>
+                </div>
+                <div class="school-form-grid two-col">
+                    <div class="school-form-group">
+                        <label class="school-label">Tahun Ajaran <span class="required">*</span></label>
+                        <input type="text" class="school-input" name="academic_year" required value="<?= e($school['academic_year'] ?? '') ?>" placeholder="Contoh: 2026/2027">
+                    </div>
+                    <div class="school-form-group">
+                        <label class="school-label">Semester <span class="required">*</span></label>
+                        <select class="school-input school-select" name="semester" required>
+                            <option value="Ganjil" <?= ($school['semester'] ?? '') === 'Ganjil' ? 'selected' : '' ?>>Ganjil</option>
+                            <option value="Genap" <?= ($school['semester'] ?? '') === 'Genap' ? 'selected' : '' ?>>Genap</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 3: Data Teknis Sekolah -->
+        <div class="school-section-card">
+            <div class="school-section-header">
+                <div class="school-section-icon">
+                    <i data-lucide="settings-2"></i>
+                </div>
+                <h2 class="school-section-title">Data Teknis Sekolah</h2>
+            </div>
+            <div class="school-section-body">
+                <div class="school-form-grid two-col">
+                    <div class="school-form-group">
+                        <label class="school-label">Latitude Sekolah <span class="required">*</span></label>
+                        <div class="school-input-with-icon">
+                            <i data-lucide="map-pin"></i>
+                            <input type="number" step="any" class="school-input" name="location_lat" id="school_lat" value="<?= e($school['location_lat'] ?? '') ?>" placeholder="-6.2088">
+                        </div>
+                    </div>
+                    <div class="school-form-group">
+                        <label class="school-label">Longitude Sekolah <span class="required">*</span></label>
+                        <div class="school-input-with-icon">
+                            <i data-lucide="map-pin"></i>
+                            <input type="number" step="any" class="school-input" name="location_lng" id="school_lng" value="<?= e($school['location_lng'] ?? '') ?>" placeholder="106.8456">
+                        </div>
+                    </div>
+                </div>
+                <div class="school-form-grid three-col">
+                    <div class="school-form-group">
+                        <label class="school-label">Radius Absensi (meter)</label>
+                        <input type="number" min="0" class="school-input" name="attendance_radius_meters" value="<?= e($school['attendance_radius_meters'] ?? '500') ?>" placeholder="500">
+                    </div>
+                    <div class="school-form-group">
+                        <label class="school-label">Jam Pelajaran Normal (menit)</label>
+                        <input type="number" min="10" max="60" class="school-input" name="regular_period_minutes" value="<?= e($school['regular_period_minutes'] ?? '35') ?>" placeholder="35">
+                    </div>
+                    <div class="school-form-group">
+                        <label class="school-label">Jam Pelajaran Pendek (menit)</label>
+                        <input type="number" min="10" max="60" class="school-input" name="short_period_minutes" value="<?= e($school['short_period_minutes'] ?? '25') ?>" placeholder="25">
+                    </div>
+                </div>
+                <div class="school-form-grid two-col">
+                    <div class="school-form-group">
+                        <label class="school-label">Hari Pendek</label>
+                        <input type="text" class="school-input" name="short_days" value="<?= e($school['short_days'] ?? '') ?>" placeholder="Contoh: 5 atau 5,6 (Jumat, Sabtu)">
+                    </div>
+                    <div class="school-form-group">
+                        <label class="school-label">Jam Mulai Pelajaran</label>
+                        <input type="time" class="school-input" name="start_time" value="<?= e($school['start_time'] ?? '07:00') ?>">
+                    </div>
+                </div>
+
+                <!-- Jam & Istirahat -->
+                <div class="school-subsection-divider">
+                    <span>Pengaturan Jam &amp; Istirahat</span>
+                </div>
+                <div class="school-form-grid three-col">
+                    <div class="school-form-group">
+                        <label class="school-label">Istirahat 1 Setelah Jam</label>
+                        <select class="school-input school-select" name="break1_after">
+                            <?php for ($i = 1; $i <= 9; $i++): ?>
+                            <option value="<?= $i ?>" <?= ($school['break1_after'] ?? 3) == $i ? 'selected' : '' ?>>Jam <?= $i ?></option>
+                            <?php endfor; ?>
+                        </select>
+                    </div>
+                    <div class="school-form-group">
+                        <label class="school-label">Durasi Istirahat 1 (menit)</label>
+                        <input type="number" min="5" max="60" class="school-input" name="break1_minutes" value="<?= e($school['break1_minutes'] ?? '15') ?>" placeholder="15">
+                    </div>
+                    <div class="school-form-group">
+                        <label class="school-label">Istirahat 2 Setelah Jam</label>
+                        <select class="school-input school-select" name="break2_after">
+                            <?php for ($i = 1; $i <= 9; $i++): ?>
+                            <option value="<?= $i ?>" <?= ($school['break2_after'] ?? 6) == $i ? 'selected' : '' ?>>Jam <?= $i ?></option>
+                            <?php endfor; ?>
+                        </select>
+                    </div>
+                </div>
+                <div class="school-form-grid two-col">
+                    <div class="school-form-group">
+                        <label class="school-label">Durasi Istirahat 2 (menit)</label>
+                        <input type="number" min="5" max="60" class="school-input" name="break2_minutes" value="<?= e($school['break2_minutes'] ?? '15') ?>" placeholder="15">
+                    </div>
+                    <div class="school-form-group">
+                        <label class="school-label">Jam Maksimal</label>
+                        <input type="number" min="1" max="12" class="school-input" name="max_periods" value="<?= e($school['max_periods'] ?? '10') ?>" placeholder="10">
+                    </div>
+                </div>
+
+                <!-- Map -->
+                <div class="school-subsection-divider">
+                    <span>Peta Lokasi Sekolah</span>
+                    <small>(klik peta untuk set lokasi)</small>
+                </div>
+                <div class="school-map-wrap">
+                    <div id="school-map"></div>
+                </div>
+
+                <!-- Checkbox -->
+                <div class="school-check-group">
+                    <label class="school-check">
+                        <input type="checkbox" name="promotion_enabled" value="1" <?= checked(get_app_setting('promotion.enabled', '1') === '1') ?>>
+                        <span class="school-check-mark"></span>
+                        <span>Aktifkan Keterangan Naik Kelas (semester genap)</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="school-form-actions">
+            <a href="<?= e(route_url('dashboard')) ?>" class="school-btn school-btn-secondary">
+                <i data-lucide="x"></i>
+                <span>Batal</span>
+            </a>
+            <button type="submit" class="school-btn school-btn-primary">
+                <i data-lucide="save"></i>
+                <span>Simpan Data</span>
+            </button>
+        </div>
+    </form>
+
     <script>
     (function(){
         var lat = parseFloat(document.getElementById('school_lat').value) || -2.5;
@@ -46,7 +218,7 @@ function page_school(): void
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
-        var icon = L.divIcon({html:'<svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 0C5.6 0 0 5.6 0 12.5S12.5 41 12.5 41 25 19.4 25 12.5 19.4 0 12.5 0z" fill="#e74c3c"/><circle cx="12.5" cy="12.5" r="5" fill="#fff"/></svg>', className:'', iconSize:[25,41], iconAnchor:[12,41]});
+        var icon = L.divIcon({html:'<svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 0C5.6 0 0 5.6 0 12.5S12.5 41 12.5 41 25 19.4 25 12.5 19.4 0 12.5 0z" fill="#2563EB"/><circle cx="12.5" cy="12.5" r="5" fill="#fff"/></svg>', className:'', iconSize:[25,41], iconAnchor:[12,41]});
         var marker = (document.getElementById('school_lat').value && document.getElementById('school_lng').value)
             ? L.marker([lat, lng], {icon:icon}).addTo(map) : null;
         map.on('click', function(e){
