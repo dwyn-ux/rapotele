@@ -222,10 +222,10 @@ function page_telegram_register(): void
         <?= csrf_field() ?>
         <input type="hidden" name="token" value="<?= e($token) ?>">
         <label>Nama Lengkap
-            <input name="name" required autofocus value="<?= e($values['name'] ?? '') ?>">
+            <input type="text" name="name" required autofocus value="<?= e($values['name'] ?? '') ?>">
         </label>
         <label>Username Web
-            <input name="username" required pattern="[A-Za-z0-9_.-]{3,64}" value="<?= e($values['username'] ?? '') ?>">
+            <input type="text" name="username" required pattern="[A-Za-z0-9_.-]{3,64}" value="<?= e($values['username'] ?? '') ?>">
         </label>
         <label>Password
             <input type="password" name="password" required minlength="8">
@@ -237,10 +237,10 @@ function page_telegram_register(): void
             <input type="email" name="email" value="<?= e($values['email'] ?? '') ?>">
         </label>
         <label>NIP
-            <input name="nip" value="<?= e($values['nip'] ?? '') ?>">
+            <input type="text" name="nip" value="<?= e($values['nip'] ?? '') ?>">
         </label>
         <label>NUPTK
-            <input name="nuptk" value="<?= e($values['nuptk'] ?? '') ?>">
+            <input type="text" name="nuptk" value="<?= e($values['nuptk'] ?? '') ?>">
         </label>
         <label>JK
             <select name="gender">
@@ -249,10 +249,10 @@ function page_telegram_register(): void
             </select>
         </label>
         <label>Telepon
-            <input name="phone" value="<?= e($values['phone'] ?? '') ?>">
+            <input type="text" name="phone" value="<?= e($values['phone'] ?? '') ?>">
         </label>
         <label>Jabatan
-            <input name="position" value="<?= e($values['position'] ?? 'Guru Mapel') ?>">
+            <input type="text" name="position" value="<?= e($values['position'] ?? 'Guru Mapel') ?>">
         </label>
         <label>Mapel Utama
             <select name="subject_id">

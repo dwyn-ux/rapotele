@@ -839,13 +839,13 @@ function page_whatsapp(): void
             <?= csrf_field() ?><input type="hidden" name="action" value="save_whatsapp_settings">
             <label>Mode <select name="mode"><?= options(whatsapp_modes(), whatsapp_setting('mode', 'simulate')) ?></select></label>
             <label>Jenis Kirim Cloud <select name="cloud_delivery"><?= options(whatsapp_delivery_modes(), whatsapp_setting('cloud_delivery', 'text')) ?></select></label>
-            <label>Graph Version <input name="graph_version" value="<?= e(whatsapp_setting('graph_version', 'v23.0')) ?>"></label>
-            <label>Phone Number ID <input name="phone_number_id" value="<?= e(whatsapp_setting('phone_number_id', '')) ?>"></label>
-            <label>WABA ID <input name="waba_id" value="<?= e(whatsapp_setting('waba_id', '')) ?>"></label>
+            <label>Graph Version <input type="text" name="graph_version" value="<?= e(whatsapp_setting('graph_version', 'v23.0')) ?>"></label>
+            <label>Phone Number ID <input type="text" name="phone_number_id" value="<?= e(whatsapp_setting('phone_number_id', '')) ?>"></label>
+            <label>WABA ID <input type="text" name="waba_id" value="<?= e(whatsapp_setting('waba_id', '')) ?>"></label>
             <label>Access Token <input type="password" name="access_token" placeholder="<?= e($hasToken ? 'Sudah terisi, kosongkan jika tidak diganti' : 'Isi token Cloud API') ?>"></label>
             <label>Token Fonnte <input type="password" name="fonnte_token" placeholder="<?= e($hasFonnteToken ? 'Sudah terisi, kosongkan jika tidak diganti' : 'Isi token device Fonnte') ?>"></label>
-            <label>Country Code Fonnte <input name="fonnte_country_code" value="<?= e(whatsapp_setting('fonnte_country_code', '62')) ?>"></label>
-            <label>Cron Secret <input name="cron_secret" value="<?= e(whatsapp_cron_secret()) ?>"></label>
+            <label>Country Code Fonnte <input type="text" name="fonnte_country_code" value="<?= e(whatsapp_setting('fonnte_country_code', '62')) ?>"></label>
+            <label>Cron Secret <input type="text" name="cron_secret" value="<?= e(whatsapp_cron_secret()) ?>"></label>
             <label class="checkbox"><input type="checkbox" name="clear_access_token" value="1"> Hapus token tersimpan</label>
             <label class="checkbox"><input type="checkbox" name="clear_fonnte_token" value="1"> Hapus token Fonnte</label>
             <div class="wide actions"><button class="button primary">Simpan Pengaturan</button></div>
@@ -892,9 +892,9 @@ function page_whatsapp(): void
         <form method="post" class="grid four">
             <?= csrf_field() ?><input type="hidden" name="action" value="save_whatsapp_guardian"><input type="hidden" name="id" value="<?= e($guardianEdit['id'] ?? 0) ?>">
             <label>Siswa <select name="student_id" required><?= options($students, $guardianEdit['student_id'] ?? '') ?></select></label>
-            <label>Nama Wali <input name="name" required value="<?= e($guardianEdit['name'] ?? '') ?>"></label>
-            <label>Relasi <input name="relationship" value="<?= e($guardianEdit['relationship'] ?? 'Orang Tua') ?>"></label>
-            <label>No WhatsApp <input name="phone" required placeholder="62812..." value="<?= e($guardianEdit['phone'] ?? '') ?>"></label>
+            <label>Nama Wali <input type="text" name="name" required value="<?= e($guardianEdit['name'] ?? '') ?>"></label>
+            <label>Relasi <input type="text" name="relationship" value="<?= e($guardianEdit['relationship'] ?? 'Orang Tua') ?>"></label>
+            <label>No WhatsApp <input type="text" name="phone" required placeholder="62812..." value="<?= e($guardianEdit['phone'] ?? '') ?>"></label>
             <label class="checkbox"><input type="checkbox" name="whatsapp_enabled" value="1" <?= checked($guardianEdit['whatsapp_enabled'] ?? 1) ?>> WA Aktif</label>
             <label class="checkbox"><input type="checkbox" name="active" value="1" <?= checked($guardianEdit['active'] ?? 1) ?>> Data Aktif</label>
             <label class="wide">Catatan <textarea name="notes"><?= e($guardianEdit['notes'] ?? '') ?></textarea></label>
@@ -915,12 +915,12 @@ function page_whatsapp(): void
     <?php input_panel_start($templateEdit ? 'Edit Template WhatsApp' : 'Template WhatsApp', 'Tambah Template', (bool)$templateEdit || isset($_GET['add_template'])); ?>
         <form method="post" class="grid two">
             <?= csrf_field() ?><input type="hidden" name="action" value="save_whatsapp_template"><input type="hidden" name="id" value="<?= e($templateEdit['id'] ?? 0) ?>">
-            <label>Kode <input name="code" required value="<?= e($templateEdit['code'] ?? '') ?>"></label>
-            <label>Nama <input name="name" required value="<?= e($templateEdit['name'] ?? '') ?>"></label>
-            <label>Kategori <input name="category" value="<?= e($templateEdit['category'] ?? 'utility') ?>"></label>
-            <label>Nama Template Cloud <input name="cloud_template_name" value="<?= e($templateEdit['cloud_template_name'] ?? '') ?>"></label>
-            <label>Language Code <input name="language_code" value="<?= e($templateEdit['language_code'] ?? 'id') ?>"></label>
-            <label>Urutan Parameter <input name="parameter_keys" value="<?= e($templateEdit['parameter_keys'] ?? '') ?>"></label>
+            <label>Kode <input type="text" name="code" required value="<?= e($templateEdit['code'] ?? '') ?>"></label>
+            <label>Nama <input type="text" name="name" required value="<?= e($templateEdit['name'] ?? '') ?>"></label>
+            <label>Kategori <input type="text" name="category" value="<?= e($templateEdit['category'] ?? 'utility') ?>"></label>
+            <label>Nama Template Cloud <input type="text" name="cloud_template_name" value="<?= e($templateEdit['cloud_template_name'] ?? '') ?>"></label>
+            <label>Language Code <input type="text" name="language_code" value="<?= e($templateEdit['language_code'] ?? 'id') ?>"></label>
+            <label>Urutan Parameter <input type="text" name="parameter_keys" value="<?= e($templateEdit['parameter_keys'] ?? '') ?>"></label>
             <label class="wide">Isi Pesan <textarea name="body" rows="7" required><?= e($templateEdit['body'] ?? '') ?></textarea></label>
             <label class="checkbox"><input type="checkbox" name="active" value="1" <?= checked($templateEdit['active'] ?? 1) ?>> Aktif</label>
             <div class="wide actions"><button class="button primary">Simpan Template</button><a class="button" href="<?= e(route_url('whatsapp')) ?>">Reset</a></div>

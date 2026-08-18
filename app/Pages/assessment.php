@@ -224,7 +224,7 @@ function page_grades(): void
                         <tr>
                             <td><?= e($student['name']) ?></td><td><?= e($student['nis']) ?></td>
                             <td><input class="small-input" type="number" min="0" max="100" step="0.01" name="score[<?= e($student['id']) ?>]" value="<?= e($student['score']) ?>"></td>
-                            <td><input name="description[<?= e($student['id']) ?>]" value="<?= e($student['description']) ?>"></td>
+                            <td><input type="text" name="description[<?= e($student['id']) ?>]" value="<?= e($student['description']) ?>"></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody></table>
@@ -278,7 +278,7 @@ function page_student_attendance(): void
             <input type="hidden" name="assignment_id" value="<?= e($assignment['id']) ?>">
             <input type="hidden" name="date" value="<?= e($date) ?>">
             <input type="hidden" name="meeting_no" value="<?= e($meetingNo) ?>">
-            <label>Topik Pertemuan <input name="topic" value="<?= e($session['topic'] ?? '') ?>" placeholder="Misal: Pecahan sederhana"></label>
+            <label>Topik Pertemuan <input type="text" name="topic" value="<?= e($session['topic'] ?? '') ?>" placeholder="Misal: Pecahan sederhana"></label>
             <label class="checkbox"><input type="checkbox" name="queue_whatsapp_absence" value="1"> Tambahkan WA untuk siswa selain hadir</label>
             <div class="table-wrap">
                 <table><thead><tr><th>Nama Siswa</th><th>NIS</th><th>Status</th><th>Catatan</th></tr></thead><tbody>
@@ -286,7 +286,7 @@ function page_student_attendance(): void
                         <tr>
                             <td><?= e($student['name']) ?></td><td><?= e($student['nis']) ?></td>
                             <td><select name="status[<?= e($student['id']) ?>]"><?= options(allowed_statuses(), $student['status'] ?? 'hadir') ?></select></td>
-                            <td><input name="notes[<?= e($student['id']) ?>]" value="<?= e($student['notes']) ?>"></td>
+                            <td><input type="text" name="notes[<?= e($student['id']) ?>]" value="<?= e($student['notes']) ?>"></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody></table>
@@ -337,7 +337,7 @@ function page_teacher_attendance(): void
                                 <td><select name="status[<?= e($scheduleId) ?>]"><?= options(teacher_attendance_statuses(), $row['status'] ?? 'hadir') ?></select></td>
                                 <td><input type="time" name="time_in[<?= e($scheduleId) ?>]" value="<?= e(substr($start, 0, 5)) ?>"></td>
                                 <td><input type="time" name="time_out[<?= e($scheduleId) ?>]" value="<?= e(substr($end, 0, 5)) ?>"></td>
-                                <td><input name="notes[<?= e($scheduleId) ?>]" value="<?= e($row['notes']) ?>" placeholder="Materi/kelas pengganti/catatan"></td>
+                                <td><input type="text" name="notes[<?= e($scheduleId) ?>]" value="<?= e($row['notes']) ?>" placeholder="Materi/kelas pengganti/catatan"></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody></table>
@@ -464,7 +464,7 @@ function page_journals(): void
             <?php render_cascading_assignment_selects($assignments, (int)($edit['assignment_id'] ?? 0), 'journal-picker'); ?>
             <label>Tanggal <input type="date" name="date" required value="<?= e($edit['date'] ?? date('Y-m-d')) ?>"></label>
             <label>Pertemuan <input type="number" min="1" name="meeting_no" value="<?= e($edit['meeting_no'] ?? 1) ?>"></label>
-            <label>Topik <input name="topic" required value="<?= e($edit['topic'] ?? '') ?>"></label>
+            <label>Topik <input type="text" name="topic" required value="<?= e($edit['topic'] ?? '') ?>"></label>
             <label class="wide">Kegiatan Pembelajaran <textarea name="activities" required><?= e($edit['activities'] ?? '') ?></textarea></label>
             <label class="wide">Materi/Media <textarea name="materials"><?= e($edit['materials'] ?? '') ?></textarea></label>
             <label class="wide">Kendala <textarea name="obstacles"><?= e($edit['obstacles'] ?? '') ?></textarea></label>
@@ -497,7 +497,7 @@ function page_violations(): void
             <?= csrf_field() ?><input type="hidden" name="action" value="save_violation"><input type="hidden" name="id" value="<?= e($edit['id'] ?? 0) ?>">
             <label>Siswa <select name="student_id" required><?= options($students, $edit['student_id'] ?? '') ?></select></label>
             <label>Tanggal <input type="date" name="date" required value="<?= e($edit['date'] ?? date('Y-m-d')) ?>"></label>
-            <label>Jenis <input name="type" required value="<?= e($edit['type'] ?? '') ?>"></label>
+            <label>Jenis <input type="text" name="type" required value="<?= e($edit['type'] ?? '') ?>"></label>
             <label>Poin <input type="number" name="points" value="<?= e($edit['points'] ?? 0) ?>"></label>
             <label class="wide">Deskripsi <textarea name="description"><?= e($edit['description'] ?? '') ?></textarea></label>
             <label class="wide">Tindak Lanjut <textarea name="action_taken"><?= e($edit['action_taken'] ?? '') ?></textarea></label>

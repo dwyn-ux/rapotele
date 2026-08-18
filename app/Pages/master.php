@@ -256,20 +256,20 @@ function page_teachers(): void
     ?>
         <form method="post" class="grid four">
             <?= csrf_field() ?><input type="hidden" name="action" value="save_teacher"><input type="hidden" name="id" value="<?= e($edit['id'] ?? 0) ?>">
-            <label class="span-2">Nama <input name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
-            <label>NIP <input name="nip" value="<?= e($edit['nip'] ?? '') ?>"></label>
-            <label>NUPTK <input name="nuptk" value="<?= e($edit['nuptk'] ?? '') ?>"></label>
+            <label class="span-2">Nama <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
+            <label>NIP <input type="text" name="nip" value="<?= e($edit['nip'] ?? '') ?>"></label>
+            <label>NUPTK <input type="text" name="nuptk" value="<?= e($edit['nuptk'] ?? '') ?>"></label>
             <label>JK <select name="gender"><?= options(['L' => 'Laki-laki', 'P' => 'Perempuan'], $edit['gender'] ?? '') ?></select></label>
-            <label>Telepon <input name="phone" value="<?= e($edit['phone'] ?? '') ?>"></label>
+            <label>Telepon <input type="text" name="phone" value="<?= e($edit['phone'] ?? '') ?>"></label>
             <label>Email <input type="email" name="email" value="<?= e($edit['email'] ?? '') ?>"></label>
-            <label>Jabatan <input name="position" value="<?= e($edit['position'] ?? '') ?>"></label>
-            <label>Telegram Chat ID <input name="telegram_chat_id" value="<?= e($edit['telegram_chat_id'] ?? '') ?>"></label>
+            <label>Jabatan <input type="text" name="position" value="<?= e($edit['position'] ?? '') ?>"></label>
+            <label>Telegram Chat ID <input type="text" name="telegram_chat_id" value="<?= e($edit['telegram_chat_id'] ?? '') ?>"></label>
             <?php if ($existingUser): ?>
-                <label>Username Login <input name="username" value="<?= e($existingUser['username'] ?? '') ?>" readonly></label>
+                <label>Username Login <input type="text" name="username" value="<?= e($existingUser['username'] ?? '') ?>" readonly></label>
                 <label>Password Baru <input type="password" name="password" placeholder="Kosongkan jika tidak diganti"></label>
             <?php else: ?>
                 <?php $autoUsername = $edit['name'] ? generate_username_from_name($edit['name']) : ''; ?>
-                <label>Username Login <input name="username" data-autofill-username value="<?= e($edit['username'] ?? '') ?>" placeholder="otomatis: <?= e($autoUsername) ?>"></label>
+                <label>Username Login <input type="text" name="username" data-autofill-username value="<?= e($edit['username'] ?? '') ?>" placeholder="otomatis: <?= e($autoUsername) ?>"></label>
                 <label>Password Login <input type="password" name="password" value="<?= e(config('default_teacher_password', 'guru123')) ?>" placeholder="default: <?= e(config('default_teacher_password', 'guru123')) ?>"></label>
             <?php endif; ?>
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
@@ -338,26 +338,26 @@ function page_students(): void
     ?>
         <form method="post" class="grid four">
             <?= csrf_field() ?><input type="hidden" name="action" value="save_student"><input type="hidden" name="id" value="<?= e($edit['id'] ?? 0) ?>">
-            <label>NIS <input name="nis" value="<?= e($edit['nis'] ?? '') ?>"></label>
-            <label>NISN <input name="nisn" value="<?= e($edit['nisn'] ?? '') ?>"></label>
-            <label class="span-2">Nama <input name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
+            <label>NIS <input type="text" name="nis" value="<?= e($edit['nis'] ?? '') ?>"></label>
+            <label>NISN <input type="text" name="nisn" value="<?= e($edit['nisn'] ?? '') ?>"></label>
+            <label class="span-2">Nama <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
             <label>JK <select name="gender"><?= options(['L' => 'Laki-laki', 'P' => 'Perempuan'], $edit['gender'] ?? '') ?></select></label>
-            <label>Tempat Lahir <input name="birth_place" value="<?= e($edit['birth_place'] ?? '') ?>"></label>
+            <label>Tempat Lahir <input type="text" name="birth_place" value="<?= e($edit['birth_place'] ?? '') ?>"></label>
             <label>Tanggal Lahir <input type="date" name="birth_date" value="<?= e($edit['birth_date'] ?? '') ?>"></label>
-            <label>Agama <input name="religion" value="<?= e($edit['religion'] ?? '') ?>"></label>
-            <label>Alamat <input name="address" value="<?= e($edit['address'] ?? '') ?>"></label>
-            <label>No. HP <input name="phone" value="<?= e($edit['phone'] ?? '') ?>"></label>
-            <label>Nama Ayah <input name="father_name" value="<?= e($edit['father_name'] ?? '') ?>"></label>
-            <label>Pekerjaan Ayah <input name="father_occupation" value="<?= e($edit['father_occupation'] ?? '') ?>"></label>
-            <label>Nama Ibu <input name="mother_name" value="<?= e($edit['mother_name'] ?? '') ?>"></label>
-            <label>Pekerjaan Ibu <input name="mother_occupation" value="<?= e($edit['mother_occupation'] ?? '') ?>"></label>
-            <label>Nama Wali <input name="guardian_name" value="<?= e($edit['guardian_name'] ?? '') ?>"></label>
+            <label>Agama <input type="text" name="religion" value="<?= e($edit['religion'] ?? '') ?>"></label>
+            <label>Alamat <input type="text" name="address" value="<?= e($edit['address'] ?? '') ?>"></label>
+            <label>No. HP <input type="text" name="phone" value="<?= e($edit['phone'] ?? '') ?>"></label>
+            <label>Nama Ayah <input type="text" name="father_name" value="<?= e($edit['father_name'] ?? '') ?>"></label>
+            <label>Pekerjaan Ayah <input type="text" name="father_occupation" value="<?= e($edit['father_occupation'] ?? '') ?>"></label>
+            <label>Nama Ibu <input type="text" name="mother_name" value="<?= e($edit['mother_name'] ?? '') ?>"></label>
+            <label>Pekerjaan Ibu <input type="text" name="mother_occupation" value="<?= e($edit['mother_occupation'] ?? '') ?>"></label>
+            <label>Nama Wali <input type="text" name="guardian_name" value="<?= e($edit['guardian_name'] ?? '') ?>"></label>
             <label>Kelas <select name="class_id"><option value="">-</option><?= options($classes, $edit['class_id'] ?? '') ?></select></label>
             <?php if ($existingUser): ?>
-                <label>Username Login <input name="username" value="<?= e($existingUser['username'] ?? '') ?>" readonly></label>
+                <label>Username Login <input type="text" name="username" value="<?= e($existingUser['username'] ?? '') ?>" readonly></label>
                 <label>Password Baru <input type="password" name="password" placeholder="Kosongkan jika tidak diganti"></label>
             <?php else: ?>
-                <label>Username Login <input name="username" value="<?= e($edit['nisn'] ?? '') ?>" placeholder="default: NISN siswa"></label>
+                <label>Username Login <input type="text" name="username" value="<?= e($edit['nisn'] ?? '') ?>" placeholder="default: NISN siswa"></label>
                 <label>Password Login <input type="password" name="password" value="<?= e(config('default_student_password', 'siswa123')) ?>" placeholder="default: <?= e(config('default_student_password', 'siswa123')) ?>"></label>
             <?php endif; ?>
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
@@ -380,9 +380,9 @@ function page_subjects(): void
     ?>
         <form method="post" class="grid four">
             <?= csrf_field() ?><input type="hidden" name="action" value="save_subject"><input type="hidden" name="id" value="<?= e($edit['id'] ?? 0) ?>">
-            <label class="span-2">Nama Mapel <input name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
-            <label>Nama Singkat <input name="short_name" value="<?= e($edit['short_name'] ?? '') ?>"></label>
-            <label>Kelompok <input name="group_name" value="<?= e($edit['group_name'] ?? '') ?>"></label>
+            <label class="span-2">Nama Mapel <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
+            <label>Nama Singkat <input type="text" name="short_name" value="<?= e($edit['short_name'] ?? '') ?>"></label>
+            <label>Kelompok <input type="text" name="group_name" value="<?= e($edit['group_name'] ?? '') ?>"></label>
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
             <div class="actions span-2"><button class="button primary">Simpan</button><a class="button" href="<?= e(route_url('subjects')) ?>">Reset</a></div>
         </form>
@@ -409,8 +409,8 @@ function page_assignments(): void
             <label>Guru <select name="teacher_id" required><?= options($teachers, $edit['teacher_id'] ?? '') ?></select></label>
             <label>Kelas <select name="class_id" required><?= options($classes, $edit['class_id'] ?? '') ?></select></label>
             <label>Mapel <select name="subject_id" required><?= options($subjects, $edit['subject_id'] ?? '') ?></select></label>
-            <label>Tahun Ajaran <input name="academic_year" required value="<?= e($edit['academic_year'] ?? config('school.academic_year')) ?>"></label>
-            <label>Semester <input name="semester" required value="<?= e($edit['semester'] ?? config('school.semester')) ?>"></label>
+            <label>Tahun Ajaran <input type="text" name="academic_year" required value="<?= e($edit['academic_year'] ?? config('school.academic_year')) ?>"></label>
+            <label>Semester <input type="text" name="semester" required value="<?= e($edit['semester'] ?? config('school.semester')) ?>"></label>
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
             <div class="actions span-2"><button class="button primary">Simpan</button><a class="button" href="<?= e(route_url('assignments')) ?>">Reset</a></div>
         </form>
@@ -433,14 +433,14 @@ function page_users(): void
     ?>
         <form method="post" class="grid four">
             <?= csrf_field() ?><input type="hidden" name="action" value="save_user"><input type="hidden" name="id" value="<?= e($edit['id'] ?? 0) ?>">
-            <label>Username <input name="username" required value="<?= e($edit['username'] ?? '') ?>"></label>
+            <label>Username <input type="text" name="username" required value="<?= e($edit['username'] ?? '') ?>"></label>
             <label>Password <input type="password" name="password" placeholder="<?= $edit ? 'Kosongkan jika tidak diganti' : '' ?>"></label>
-            <label class="span-2">Nama <input name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
+            <label class="span-2">Nama <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
             <label>Email <input type="email" name="email" value="<?= e($edit['email'] ?? '') ?>"></label>
             <label>Role <select name="role"><?= options(['admin' => 'Admin', 'guru' => 'Guru', 'operator' => 'Operator', 'siswa' => 'Siswa'], $edit['role'] ?? 'guru') ?></select></label>
             <label>Guru Terkait <select name="teacher_id"><option value="">-</option><?= options($teachers, $edit['teacher_id'] ?? '') ?></select></label>
             <label>Siswa Terkait <select name="student_id"><option value="">-</option><?= options($students, $edit['student_id'] ?? '') ?></select></label>
-            <label>Telegram Chat ID <input name="telegram_chat_id" value="<?= e($edit['telegram_chat_id'] ?? '') ?>" placeholder="Kosong untuk role siswa"></label>
+            <label>Telegram Chat ID <input type="text" name="telegram_chat_id" value="<?= e($edit['telegram_chat_id'] ?? '') ?>" placeholder="Kosong untuk role siswa"></label>
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
             <div class="actions span-2"><button class="button primary">Simpan</button><a class="button" href="<?= e(route_url('users')) ?>">Reset</a></div>
         </form>
@@ -459,7 +459,7 @@ function page_profile(): void
     <section class="panel">
         <form method="post" class="grid two">
             <?= csrf_field() ?><input type="hidden" name="action" value="save_profile">
-            <label>Nama <input name="name" required value="<?= e($user['name']) ?>"></label>
+            <label>Nama <input type="text" name="name" required value="<?= e($user['name']) ?>"></label>
             <label>Email <input type="email" name="email" value="<?= e($user['email']) ?>"></label>
             <label>Password Baru <input type="password" name="password" placeholder="Kosongkan jika tidak diganti"></label>
             <?php if (($user['role'] ?? '') !== 'siswa'): ?>

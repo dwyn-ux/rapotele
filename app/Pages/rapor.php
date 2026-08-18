@@ -157,7 +157,7 @@ function page_input_kelulusan(): void
     render_header('Input Kelulusan');
     table_panel('Data Kelulusan Siswa', ['Nama', 'Kelas', 'Status', 'No Ijazah', 'No Transkrip', 'Tanggal', 'Simpan'], $rows, function ($row) { ?>
         <form method="post" class="inline-form"><?= csrf_field() ?><input type="hidden" name="action" value="save_graduation"><input type="hidden" name="student_id" value="<?= e($row['id']) ?>">
-        <td><?= e($row['name']) ?></td><td><?= e($row['class_name']) ?></td><td><select name="status"><?= options(['lulus' => 'Lulus', 'tidak_lulus' => 'Tidak Lulus', 'naik' => 'Naik Kelas', 'tinggal' => 'Tinggal Kelas'], $row['status'] ?? 'lulus') ?></select></td><td><input name="certificate_no" value="<?= e($row['certificate_no']) ?>"></td><td><input name="transcript_no" value="<?= e($row['transcript_no']) ?>"></td><td><input type="date" name="graduation_date" value="<?= e($row['graduation_date']) ?>"></td><td><button class="button small primary">Simpan</button></td></form>
+        <td><?= e($row['name']) ?></td><td><?= e($row['class_name']) ?></td><td><select name="status"><?= options(['lulus' => 'Lulus', 'tidak_lulus' => 'Tidak Lulus', 'naik' => 'Naik Kelas', 'tinggal' => 'Tinggal Kelas'], $row['status'] ?? 'lulus') ?></select></td><td><input type="text" name="certificate_no" value="<?= e($row['certificate_no']) ?>"></td><td><input type="text" name="transcript_no" value="<?= e($row['transcript_no']) ?>"></td><td><input type="date" name="graduation_date" value="<?= e($row['graduation_date']) ?>"></td><td><button class="button small primary">Simpan</button></td></form>
     <?php }); render_footer();
 }
 
@@ -365,7 +365,7 @@ function page_naik_kelas(): void
                                     <?= options(['naik' => 'Naik Kelas', 'tinggal' => 'Tinggal Kelas'], $student['status'] ?? 'naik') ?>
                                 </select>
                             </td>
-                            <td><input name="notes[<?= e($student['id']) ?>]" value="<?= e($student['notes']) ?>" placeholder="Catatan (opsional)"></td>
+                            <td><input type="text" name="notes[<?= e($student['id']) ?>]" value="<?= e($student['notes']) ?>" placeholder="Catatan (opsional)"></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody></table>

@@ -788,13 +788,13 @@ $defaults = [
     <?php if ($result): ?><div class="result"><?= h($result) ?></div><?php endif; ?>
     <form method="post">
         <label>URL Dapodik Lokal
-            <input name="dapodik_url" value="<?= h($defaults['dapodik_url']) ?>" placeholder="http://127.0.0.1:5774">
+            <input type="text" name="dapodik_url" value="<?= h($defaults['dapodik_url']) ?>" placeholder="http://127.0.0.1:5774">
         </label>
         <label>Token Web Service Dapodik / Token Sinkron
-            <input name="dapodik_token" value="<?= h($defaults['dapodik_token']) ?>">
+            <input type="text" name="dapodik_token" value="<?= h($defaults['dapodik_token']) ?>">
         </label>
         <label>NPSN
-            <input name="npsn" value="<?= h($defaults['npsn']) ?>">
+            <input type="text" name="npsn" value="<?= h($defaults['npsn']) ?>">
         </label>
         <label>Jenis Data
             <select name="type">
@@ -804,7 +804,7 @@ $defaults = [
             </select>
         </label>
         <label>Link Web Raport
-            <input name="bridge_url" value="<?= h($defaults['bridge_url']) ?>" placeholder="https://domain-erapor">
+            <input type="text" name="bridge_url" value="<?= h($defaults['bridge_url']) ?>" placeholder="https://domain-erapor">
         </label>
         <div class="actions wide">
             <button name="mode" value="sync">Sinkron Jenis Ini</button>

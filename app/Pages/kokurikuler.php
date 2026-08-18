@@ -10,9 +10,9 @@ function page_data_ekskul(): void
     render_header('Data Ekskul');
     ext_simple_form_start('save_extracurricular', $edit, 'Data Ekskul');
     ?>
-        <label>Nama Rombel Ekskul <input name="class_name" required value="<?= e($edit['class_name'] ?? '') ?>"></label>
-        <label>Jenis Ekskul <input name="type" value="<?= e($edit['type'] ?? '') ?>"></label>
-        <label>Nama Ekskul <input name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
+        <label>Nama Rombel Ekskul <input type="text" name="class_name" required value="<?= e($edit['class_name'] ?? '') ?>"></label>
+        <label>Jenis Ekskul <input type="text" name="type" value="<?= e($edit['type'] ?? '') ?>"></label>
+        <label>Nama Ekskul <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
         <label>Pembina <select name="teacher_id"><option value="">-</option><?= options($teachers, $edit['teacher_id'] ?? '') ?></select></label>
         <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
     <?php ext_simple_form_end('data-ekskul'); ?>
@@ -44,8 +44,8 @@ function page_data_kelompok(): void
     render_header('Data Kelompok Mapel');
     ext_simple_form_start('save_subject_group', $edit, 'Kelompok Mapel');
     ?>
-        <label>Kode <input name="code" required value="<?= e($edit['code'] ?? '') ?>"></label>
-        <label>Nama Kelompok <input name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
+        <label>Kode <input type="text" name="code" required value="<?= e($edit['code'] ?? '') ?>"></label>
+        <label>Nama Kelompok <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
         <label>Status <select name="status"><?= options(['aktif' => 'Aktif', 'nonaktif' => 'Nonaktif'], $edit['status'] ?? 'aktif') ?></select></label>
         <label>Urutan <input type="number" name="display_order" value="<?= e($edit['display_order'] ?? 0) ?>"></label>
     <?php ext_simple_form_end('data-kelompok'); ?>
@@ -63,7 +63,7 @@ function page_gabung_mapel(): void
     render_header('Gabung Mapel');
     ext_simple_form_start('save_merged_subject', $edit, 'Gabung Mapel');
     ?>
-        <label>Tingkat <input name="grade" required value="<?= e($edit['grade'] ?? '') ?>"></label>
+        <label>Tingkat <input type="text" name="grade" required value="<?= e($edit['grade'] ?? '') ?>"></label>
         <label>Mapel Asal <select name="source_subject_id"><?= options($subjects, $edit['source_subject_id'] ?? '') ?></select></label>
         <label>Digabung ke Mapel <select name="target_subject_id"><?= options($subjects, $edit['target_subject_id'] ?? '') ?></select></label>
     <?php ext_simple_form_end('gabung-mapel'); ?>
@@ -82,8 +82,8 @@ function page_data_mapping(string $title = 'Data Mapping Rapor', string $page = 
     render_header($title);
     ext_simple_form_start($page === 'mapping-mapel-skl' ? 'save_skl_mapping' : 'save_report_mapping', $edit, $title);
     ?>
-        <label>Kurikulum <input name="curriculum" required value="<?= e($edit['curriculum'] ?? 'Kurikulum Merdeka') ?>"></label>
-        <label>Tingkat <input name="grade" required value="<?= e($edit['grade'] ?? '') ?>"></label>
+        <label>Kurikulum <input type="text" name="curriculum" required value="<?= e($edit['curriculum'] ?? 'Kurikulum Merdeka') ?>"></label>
+        <label>Tingkat <input type="text" name="grade" required value="<?= e($edit['grade'] ?? '') ?>"></label>
         <label>Mapel <select name="subject_id"><?= options($subjects, $edit['subject_id'] ?? '') ?></select></label>
         <label>Kelompok <select name="group_id"><option value="">-</option><?= options($groups, $edit['group_id'] ?? '') ?></select></label>
         <label>Urutan <input type="number" name="display_order" value="<?= e($edit['display_order'] ?? 0) ?>"></label>
@@ -112,9 +112,9 @@ function page_data_logo_ttd(): void
     ?>
         <label>Tipe <select name="type"><?= options($types, $edit['type'] ?? 'logo') ?></select></label>
         <label>User/Guru <select name="user_id"><option value="">-</option><?= options($users, $edit['user_id'] ?? '') ?></select></label>
-        <label>Jabatan <input name="title" value="<?= e($edit['title'] ?? '') ?>"></label>
-        <label>Nama <input name="person_name" value="<?= e($edit['person_name'] ?? '') ?>"></label>
-        <label>NIP <input name="nip" value="<?= e($edit['nip'] ?? '') ?>"></label>
+        <label>Jabatan <input type="text" name="title" value="<?= e($edit['title'] ?? '') ?>"></label>
+        <label>Nama <input type="text" name="person_name" value="<?= e($edit['person_name'] ?? '') ?>"></label>
+        <label>NIP <input type="text" name="nip" value="<?= e($edit['nip'] ?? '') ?>"></label>
         <label>File <input type="file" name="userfile" accept="image/*"></label>
     <?php ext_simple_form_end('data-logo-ttd'); ?>
     <?php table_panel('Daftar Logo/TTD', ['Tipe', 'Preview', 'User', 'Nama', 'NIP', 'File', 'Aksi'], $rows, function ($row) use ($types) { ?>
@@ -135,11 +135,11 @@ function page_tanggal_rapor(): void
     render_header('Data Tanggal Rapor');
     ext_simple_form_start('save_report_date', $edit, 'Tanggal Rapor');
     ?>
-        <label>Tingkat <input name="grade" required value="<?= e($edit['grade'] ?? '') ?>"></label>
+        <label>Tingkat <input type="text" name="grade" required value="<?= e($edit['grade'] ?? '') ?>"></label>
         <label>Tanggal Rapor <input type="date" name="report_date" required value="<?= e($edit['report_date'] ?? date('Y-m-d')) ?>"></label>
-        <label>Tempat TTD Wali <input name="homeroom_place" value="<?= e($edit['homeroom_place'] ?? '') ?>"></label>
-        <label>Tempat TTD Kepsek <input name="principal_place" value="<?= e($edit['principal_place'] ?? '') ?>"></label>
-        <label class="span-2">Catatan <input name="note" value="<?= e($edit['note'] ?? '') ?>"></label>
+        <label>Tempat TTD Wali <input type="text" name="homeroom_place" value="<?= e($edit['homeroom_place'] ?? '') ?>"></label>
+        <label>Tempat TTD Kepsek <input type="text" name="principal_place" value="<?= e($edit['principal_place'] ?? '') ?>"></label>
+        <label class="span-2">Catatan <input type="text" name="note" value="<?= e($edit['note'] ?? '') ?>"></label>
     <?php ext_simple_form_end('tanggal-rapor'); ?>
     <?php table_panel('Tanggal Rapor', ['Tingkat', 'Tanggal', 'TTD Wali', 'TTD Kepsek', 'Catatan', 'Aksi'], $rows, function ($row) { ?>
         <td><?= e($row['grade']) ?></td><td><?= e($row['report_date']) ?></td><td><?= e($row['homeroom_place']) ?></td><td><?= e($row['principal_place']) ?></td><td><?= e($row['note']) ?></td><td><?= ext_delete_button('report_dates', 'tanggal-rapor', (int)$row['id']) ?></td>
@@ -171,7 +171,7 @@ function page_tema_kokurikuler(): void
     render_header('Daftar Tema Kokurikuler');
     ext_simple_form_start('save_cocurricular_theme', $edit, 'Tema');
     ?>
-        <label class="span-2">Nama Tema <input name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
+        <label class="span-2">Nama Tema <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
         <label>Status <select name="status"><?= options(['aktif' => 'Aktif', 'nonaktif' => 'Nonaktif'], $edit['status'] ?? 'aktif') ?></select></label>
     <?php ext_simple_form_end('tema-kokurikuler'); ?>
     <?php table_panel('Tema Kokurikuler', ['Tema', 'Status', 'Aksi'], $rows, function ($row) { ?>
@@ -189,8 +189,8 @@ function page_kegiatan_kokurikuler(): void
     ext_simple_form_start('save_cocurricular_activity', $edit, 'Kegiatan Kokurikuler', 'grid two');
     ?>
         <label>Tema <select name="theme_id"><?= options($themes, $edit['theme_id'] ?? '') ?></select></label>
-        <label>Fase <input name="phase" required value="<?= e($edit['phase'] ?? '') ?>"></label>
-        <label class="wide">Judul Kegiatan <input name="title" required value="<?= e($edit['title'] ?? '') ?>"></label>
+        <label>Fase <input type="text" name="phase" required value="<?= e($edit['phase'] ?? '') ?>"></label>
+        <label class="wide">Judul Kegiatan <input type="text" name="title" required value="<?= e($edit['title'] ?? '') ?>"></label>
         <label class="wide">Deskripsi <textarea name="description"><?= e($edit['description'] ?? '') ?></textarea></label>
         <label class="wide">Tujuan <textarea name="objective"><?= e($edit['objective'] ?? '') ?></textarea></label>
         <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
@@ -212,9 +212,9 @@ function page_kelompok_kokurikuler(): void
     render_header('Kelompok Kokurikuler');
     ext_simple_form_start('save_cocurricular_group', $edit, 'Kelompok Kokurikuler', 'grid two');
     ?>
-        <label>Nama Kelompok <input name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
-        <label>Tingkat <input name="grade" required value="<?= e($edit['grade'] ?? '') ?>"></label>
-        <label>Fase <input name="phase" required value="<?= e($edit['phase'] ?? '') ?>"></label>
+        <label>Nama Kelompok <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
+        <label>Tingkat <input type="text" name="grade" required value="<?= e($edit['grade'] ?? '') ?>"></label>
+        <label>Fase <input type="text" name="phase" required value="<?= e($edit['phase'] ?? '') ?>"></label>
         <label>Tema <select name="theme_id"><option value="">-</option><?= options($themes, $edit['theme_id'] ?? '') ?></select></label>
         <label>Koordinator <select name="coordinator_teacher_id"><option value="">-</option><?= options($teachers, $edit['coordinator_teacher_id'] ?? '') ?></select></label>
         <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
