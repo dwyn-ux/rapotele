@@ -260,6 +260,142 @@ function action_save_student_photo(): void
     redirect_to('foto-siswa');
 }
 
+function action_bulk_student_photo(): void
+{
+    require_role(['admin']);
+
+    // Validate ZIP upload
+    $zipData = uploaded_file('zip_file', false);
+    if (!$zipData) {
+        throw new RuntimeException('Pilih file ZIP foto siswa.');
+    }
+
+    $ext = strtolower(pathinfo((string)$zipData['name'], PATHINFO_EXTENSION));
+    if ($ext !== 'zip') {
+        throw new RuntimeException('File harus berformat .zip');
+    }
+
+    $tmpPath = (string)$zipData['tmp_name'];
+    $zip = new \ZipArchive();
+    if ($zip->open($tmpPath) !== \ZipArchive::OK) {
+        throw new RuntimeException('File ZIP tidak valid atau rusak.');
+    }
+
+    // Get all students with NISN for matching
+    $allStudents = fetch_all('SELECT id, name, nisn FROM students WHERE active = 1 AND nisn != \'\' AND nisn IS NOT NULL');
+    $nisnMap = [];
+    foreach ($allStudents as $s) {
+        $nisnMap[trim((string)$s['nisn'])] = $s;
+    }
+
+    $allowedImageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    $success = 0;
+    $failed = 0;
+    $errors = [];
+    $matched = [];
+
+    $photoDir = storage_path('uploads/student-photos');
+    ensure_directory($photoDir);
+
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $name = $zip->getNameIndex($i);
+        if ($name === false || $name === '') continue;
+
+        // Skip directories
+        if (substr($name, -1) === '/') continue;
+
+        $fileBase = pathinfo($name, PATHINFO_FILENAME);
+        $fileExt = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+
+        // Only process image files
+        if (!in_array($fileExt, $allowedImageExts, true)) {
+            $failed++;
+            $errors[] = ['filename' => basename($name), 'reason' => 'Bukan file gambar (ekstensi: ' . $fileExt . ')'];
+            continue;
+        }
+
+        // Match NISN from filename
+        $nisn = trim($fileBase);
+        if (!isset($nisnMap[$nisn])) {
+            $failed++;
+            $errors[] = ['filename' => basename($name), 'reason' => 'NISN \'' . $nisn . '\' tidak ditemukan di database'];
+            continue;
+        }
+
+        $student = $nisnMap[$nisn];
+        $studentId = (int)$student['id'];
+
+        // Extract the image to a temp location to validate it
+        $extractedPath = tempnam(sys_get_temp_dir(), 'bulk_photo_');
+        $fp = @fopen($extractedPath, 'wb');
+        if (!$fp) {
+            $failed++;
+            $errors[] = ['filename' => basename($name), 'reason' => 'Gagal mengekstrak file dari ZIP'];
+            continue;
+        }
+        fwrite($fp, $zip->getFromIndex($i));
+        fclose($fp);
+
+        // Validate image
+        if (@getimagesize($extractedPath) === false) {
+            $failed++;
+            $errors[] = ['filename' => basename($name), 'reason' => 'File gambar tidak valid'];
+            @unlink($extractedPath);
+            continue;
+        }
+
+        // Check file size (max 5MB)
+        $fileSize = filesize($extractedPath);
+        if ($fileSize > (int)config('security.max_image_upload_bytes', 2 * 1024 * 1024)) {
+            $failed++;
+            $errors[] = ['filename' => basename($name), 'reason' => 'Ukuran file melebihi batas'];
+            @unlink($extractedPath);
+            continue;
+        }
+
+        // Save the file
+        $saveName = date('YmdHis') . '-' . bin2hex(random_bytes(5)) . '.' . $fileExt;
+        $target = $photoDir . '/' . $saveName;
+        if (!copy($extractedPath, $target)) {
+            $failed++;
+            $errors[] = ['filename' => basename($name), 'reason' => 'Gagal menyimpan file'];
+            @unlink($extractedPath);
+            continue;
+        }
+        @unlink($extractedPath);
+
+        $relativePath = 'storage/uploads/student-photos/' . $saveName;
+
+        // Upsert student photo
+        $existing = fetch_one('SELECT id FROM student_photos WHERE student_id = ?', [$studentId]);
+        if ($existing) {
+            // Delete old photo file if it exists and is not a default
+            $oldPath = fetch_one('SELECT file_path FROM student_photos WHERE student_id = ?', [$studentId]);
+            if ($oldPath && !str_contains((string)$oldPath['file_path'], 'dummy')) {
+                $oldFile = __DIR__ . '/../../' . $oldPath['file_path'];
+                if (file_exists($oldFile)) @unlink($oldFile);
+            }
+            execute_sql('UPDATE student_photos SET file_path = ?, updated_at = ? WHERE student_id = ?', [$relativePath, now_string(), $studentId]);
+        } else {
+            execute_sql('INSERT INTO student_photos (student_id, file_path, updated_at) VALUES (?, ?, ?)', [$studentId, $relativePath, now_string()]);
+        }
+
+        $success++;
+        $matched[] = ['nisn' => $nisn, 'name' => $student['name'], 'file' => basename($name)];
+    }
+
+    $zip->close();
+
+    $_SESSION['bulk_photo_result'] = [
+        'success' => $success,
+        'failed' => $failed,
+        'errors' => $errors,
+        'matched' => $matched,
+    ];
+
+    redirect_to('foto-siswa');
+}
+
 function action_save_cocurricular_theme(): void
 {
     require_role(['admin']);

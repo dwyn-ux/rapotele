@@ -40,6 +40,7 @@ return [
     'save_signature' => 'action_save_signature',
     'save_report_date' => 'action_save_report_date',
     'save_student_photo' => 'action_save_student_photo',
+    'bulk_student_photo' => 'action_bulk_student_photo',
     'save_cocurricular_theme' => 'action_save_cocurricular_theme',
     'save_cocurricular_activity' => 'action_save_cocurricular_activity',
     'save_cocurricular_group' => 'action_save_cocurricular_group',

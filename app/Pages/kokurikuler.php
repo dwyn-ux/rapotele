@@ -149,15 +149,75 @@ function page_tanggal_rapor(): void
 function page_foto_siswa(): void
 {
     require_role(['admin']);
+
+    // Handle bulk upload result from session
+    $bulkResult = $_SESSION['bulk_photo_result'] ?? null;
+    unset($_SESSION['bulk_photo_result']);
+
     $students = array_column_map(fetch_all('SELECT id, name FROM students WHERE active = 1 ORDER BY name'), 'id', 'name');
     $rows = fetch_all('SELECT p.*, s.name AS student_name, s.nisn FROM student_photos p JOIN students s ON s.id = p.student_id ORDER BY s.name');
     render_header('Foto Siswa');
-    echo '<section class="panel"><h3>Upload Foto Siswa</h3><form method="post" enctype="multipart/form-data" class="grid four">' . csrf_field() . '<input type="hidden" name="action" value="save_student_photo">';
-    ?>
-        <label>Siswa <select name="student_id"><?= options($students, '') ?></select></label>
-        <label>Foto <input type="file" name="userfile" accept="image/*" required></label>
-        <div class="actions"><button class="button primary">Upload</button></div>
-    </form></section>
+
+    // Bulk upload result notification
+    if ($bulkResult): ?>
+        <section class="panel">
+            <h3>📦 Hasil Upload Bulk Foto</h3>
+            <p><strong><?= $bulkResult['success'] ?></strong> foto berhasil diupload, <strong><?= $bulkResult['failed'] ?> foto gagal.</strong></p>
+            <?php if (!empty($bulkResult['errors'])): ?>
+                <div style="margin-top:10px;">
+                    <strong>Detail:</strong>
+                    <ul style="margin:5px 0; padding-left:20px;">
+                    <?php foreach ($bulkResult['errors'] as $err): ?>
+                        <li style="color:var(--color-danger,#dc2626);">
+                            <strong><?= e($err['filename']) ?></strong> — <?= e($err['reason']) ?>
+                        </li>
+                    <?php endforeach; ?>
+                    </ul>
+                </div>
+            <?php endif; ?>
+            <?php if (!empty($bulkResult['matched'])): ?>
+                <div style="margin-top:10px;">
+                    <strong>Berhasil:</strong>
+                    <ul style="margin:5px 0; padding-left:20px;">
+                    <?php foreach ($bulkResult['matched'] as $m): ?>
+                        <li style="color:var(--color-success,#16a34a);">NISN <strong><?= e($m['nisn']) ?></strong> → <?= e($m['name']) ?> (<?= e($m['file']) ?>)</li>
+                    <?php endforeach; ?>
+                    </ul>
+                </div>
+            <?php endif; ?>
+        </section>
+    <?php endif; ?>
+
+    <!-- Single upload -->
+    <section class="panel">
+        <h3>Upload Satu Foto</h3>
+        <form method="post" enctype="multipart/form-data" class="grid four">
+            <?= csrf_field() ?><input type="hidden" name="action" value="save_student_photo">
+            <label>Siswa <select name="student_id"><?= options($students, '') ?></select></label>
+            <label>Foto <input type="file" name="userfile" accept="image/*" required></label>
+            <div class="actions"><button class="button primary">Upload</button></div>
+        </form>
+    </section>
+
+    <!-- Bulk upload via ZIP -->
+    <section class="panel">
+        <h3>📦 Upload Bulk Foto (ZIP)</h3>
+        <p style="color:var(--text-muted,#6b7280); margin-bottom:12px;">
+            Upload file <strong>.zip</strong> yang berisi foto siswa.<br>
+            <strong>Nama file gambar harus sesuai dengan NISN siswa</strong> (tanpa ekstensi).<br>
+            Contoh: <code>0081234001.jpg</code>, <code>0081234002.png</code>, <code>0081234003.jpeg</code>, <code>0081234004.webp</code>
+        </p>
+        <form method="post" enctype="multipart/form-data">
+            <?= csrf_field() ?><input type="hidden" name="action" value="bulk_student_photo">
+            <label>File ZIP Foto <input type="file" name="zip_file" accept=".zip,application/zip" required></label>
+            <div class="actions" style="margin-top:10px;">
+                <button class="button primary" onclick="return confirm('Upload foto bulk dari file ZIP ini? Nama file gambar akan dicocokkan dengan NISN siswa.')">
+                    📦 Upload Bulk Foto
+                </button>
+            </div>
+        </form>
+    </section>
+
     <?php table_panel('Foto Siswa', ['Nama', 'NISN', 'File', 'Aksi'], $rows, function ($row) { ?>
         <td><?= e($row['student_name']) ?></td><td><?= e($row['nisn']) ?></td><td><?= e($row['file_path']) ?></td><td><?= ext_delete_button('student_photos', 'foto-siswa', (int)$row['id']) ?></td>
     <?php }); render_footer();
