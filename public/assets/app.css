@@ -2119,13 +2119,80 @@ code.block {
    PANDUAN (HELP/GUIDE) PAGE
    ================================================================ */
 
+/* Page Header */
+.panduan-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.panduan-page-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.panduan-page-header-icon {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-xl);
+  background: linear-gradient(135deg, var(--primary-lighter), #E0E7FF);
+  color: var(--primary);
+}
+
+.panduan-page-header-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.panduan-page-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.panduan-page-subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  margin: 4px 0 0;
+  font-weight: 500;
+}
+
+.panduan-page-header-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+}
+
+.panduan-page-header-badge svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Layout */
 .panduan-layout {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 250px 1fr;
   gap: var(--space-6);
   align-items: start;
 }
 
+/* TOC Sidebar */
 .panduan-toc {
   position: sticky;
   top: calc(var(--topbar-height) + var(--space-4));
@@ -2135,6 +2202,8 @@ code.block {
   padding: var(--space-4);
   max-height: calc(100vh - var(--topbar-height) - var(--space-8));
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .panduan-toc-title {
@@ -2158,14 +2227,18 @@ code.block {
 .panduan-toc-nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
+  flex: 1;
+  overflow-y: auto;
 }
 
-.panduan-toc-nav a {
-  display: block;
-  padding: 6px 10px;
+.panduan-toc-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
   border-radius: var(--radius-md);
-  font-size: var(--font-size-xs);
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--text-secondary);
   text-decoration: none;
@@ -2173,61 +2246,129 @@ code.block {
   line-height: 1.4;
 }
 
-.panduan-toc-nav a:hover {
+.panduan-toc-link:hover {
   background: var(--primary-lighter);
   color: var(--primary);
 }
 
+.panduan-toc-link.active {
+  background: var(--primary-lighter);
+  color: var(--primary);
+  font-weight: 650;
+}
+
+.panduan-toc-sub {
+  padding-left: 28px !important;
+  font-size: 12px !important;
+}
+
+.panduan-toc-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-secondary);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.panduan-toc-link.active .panduan-toc-num {
+  background: var(--primary);
+  color: #fff;
+}
+
+.panduan-toc-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.panduan-toc-footer svg {
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  opacity: 0.6;
+}
+
+/* Content */
 .panduan-content {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   padding: var(--space-8);
+  min-width: 0;
 }
 
-.panduan-content h1 {
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--text);
+/* Headings */
+.panduan-h1 {
+  font-size: 30px !important;
+  font-weight: 800 !important;
+  color: var(--text) !important;
   letter-spacing: -0.5px;
-  margin: 0 0 var(--space-4);
-  padding-bottom: var(--space-4);
-  border-bottom: 2px solid var(--primary-lighter);
+  margin: 0 0 var(--space-5) !important;
+  padding-bottom: var(--space-4) !important;
+  border-bottom: 2px solid var(--primary-lighter) !important;
+  line-height: 1.2;
 }
 
-.panduan-content h2 {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text);
+.panduan-h2 {
+  font-size: 21px !important;
+  font-weight: 700 !important;
+  color: var(--text) !important;
   letter-spacing: -0.3px;
-  margin: var(--space-8) 0 var(--space-4);
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--border);
+  margin: var(--space-8) 0 var(--space-4) !important;
+  padding: var(--space-3) 0 var(--space-3) !important;
+  border-bottom: 1px solid var(--border) !important;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
-.panduan-content h2:first-child {
-  margin-top: 0;
+.panduan-h2:first-child {
+  margin-top: 0 !important;
 }
 
-.panduan-content h3 {
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--text);
-  margin: var(--space-6) 0 var(--space-3);
+.panduan-h2-anchor {
+  color: var(--primary);
+  font-weight: 400;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
 }
 
-.panduan-content h4 {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin: var(--space-5) 0 var(--space-2);
+.panduan-h2:hover .panduan-h2-anchor {
+  opacity: 0.5;
 }
 
-.panduan-content p {
+.panduan-h3 {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: var(--text) !important;
+  margin: var(--space-6) 0 var(--space-3) !important;
+}
+
+.panduan-h4 {
+  font-size: 14px !important;
+  font-weight: 650 !important;
+  color: var(--text-secondary) !important;
+  margin: var(--space-5) 0 var(--space-2) !important;
+}
+
+/* Paragraphs */
+.panduan-p {
   font-size: var(--font-size-base);
   color: var(--text-secondary);
-  line-height: 1.7;
-  margin: 0 0 var(--space-4);
+  line-height: 1.75;
+  margin: 0 0 var(--space-4) !important;
 }
 
 .panduan-content strong {
@@ -2235,76 +2376,139 @@ code.block {
   font-weight: 650;
 }
 
-.panduan-content a {
+.panduan-link {
   color: var(--primary);
   text-decoration: underline;
   text-underline-offset: 2px;
+  text-decoration-color: rgba(37, 99, 235, 0.3);
+  transition: text-decoration-color var(--transition-fast);
 }
 
-.panduan-content a:hover {
+.panduan-link:hover {
   color: var(--primary-dark);
+  text-decoration-color: var(--primary);
 }
 
+/* HR */
 .panduan-hr {
   border: 0;
-  border-top: 1px solid var(--border);
-  margin: var(--space-6) 0;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--border), transparent);
+  margin: var(--space-8) 0;
 }
 
+/* Blockquote */
 .panduan-quote {
-  border-left: 3px solid var(--primary);
-  background: var(--primary-lighter);
+  display: flex;
+  gap: var(--space-3);
+  background: linear-gradient(135deg, #EEF2FF, var(--primary-lighter));
+  border: 1px solid rgba(37, 99, 235, 0.12);
   padding: var(--space-4) var(--space-5);
-  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
-  margin: var(--space-4) 0;
+  border-radius: var(--radius-lg);
+  margin: var(--space-5) 0;
+}
+
+.panduan-quote-icon {
+  color: var(--primary);
+  opacity: 0.6;
+  margin-top: 1px;
+}
+
+.panduan-quote-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.panduan-quote p {
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
   font-style: italic;
+  line-height: 1.6;
+  margin: 0 !important;
 }
 
+/* Lists */
 .panduan-list {
   padding-left: var(--space-5);
   margin: 0 0 var(--space-4);
 }
 
 .panduan-list li {
-  padding: 4px 0;
+  padding: 5px 0;
   font-size: var(--font-size-base);
   color: var(--text-secondary);
-  line-height: 1.6;
+  line-height: 1.65;
+}
+
+.panduan-list li::marker {
+  color: var(--primary);
+  font-weight: 600;
 }
 
 .panduan-list li strong {
   color: var(--text);
 }
 
+.panduan-ol {
+  counter-reset: panduan-ol;
+}
+
+.panduan-ol li {
+  counter-increment: panduan-ol;
+}
+
+/* Code */
+.panduan-code-wrap {
+  position: relative;
+  margin: 0 0 var(--space-5);
+}
+
+.panduan-code-lang {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.08);
+  color: #94A3B8;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-family);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
 .panduan-code {
   background: #0F172A;
   color: #E2E8F0;
-  padding: var(--space-4) var(--space-5);
-  border-radius: var(--radius-lg);
+  padding: var(--space-5) var(--space-5);
+  padding-top: var(--space-4);
+  border-radius: var(--radius-xl);
   font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.65;
   overflow-x: auto;
-  margin: 0 0 var(--space-4);
+  margin: 0;
+  border: 1px solid rgba(255,255,255,0.06);
 }
 
 .panduan-inline-code {
-  background: var(--surface-secondary);
-  color: var(--primary-dark);
-  padding: 2px 6px;
+  background: #F1F5F9;
+  color: #7C3AED;
+  padding: 2px 7px;
   border-radius: var(--radius-sm);
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 13px;
+  font-size: 12.5px;
   border: 1px solid var(--border);
+  font-weight: 500;
 }
 
+/* Tables */
 .panduan-table-wrap {
   overflow-x: auto;
-  margin: 0 0 var(--space-4);
+  margin: 0 0 var(--space-5);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
 }
 
 .panduan-table {
@@ -2318,15 +2522,19 @@ code.block {
   padding: var(--space-3) var(--space-4);
   text-align: left;
   font-weight: 700;
-  color: var(--text);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .panduan-table td {
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border-light);
   color: var(--text-secondary);
+  line-height: 1.5;
 }
 
 .panduan-table tbody tr:last-child td {
@@ -2334,7 +2542,7 @@ code.block {
 }
 
 .panduan-table tbody tr:hover td {
-  background: var(--surface-secondary);
+  background: rgba(37, 99, 235, 0.02);
 }
 
 /* ================================================================
