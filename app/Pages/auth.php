@@ -106,7 +106,7 @@ function page_login(): void
             <input type="hidden" name="next" value="<?= e($nextPage) ?>">
         <?php endif; ?>
         <label>Username
-            <input name="username" required autofocus>
+            <input type="text" name="username" required autofocus>
         </label>
         <label>Password
             <input type="password" name="password" required>
