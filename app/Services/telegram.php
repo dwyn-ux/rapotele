@@ -336,8 +336,9 @@ function telegram_home_response(string $chatId, ?string $fromUsername): array
 
     return telegram_card_response(
         implode("\n", [
-            '<b>Menu Guru</b>',
-            'Login sebagai ' . e($user['name']) . ' (' . e($user['role']) . ').',
+            '🏠 <b>Menu Guru</b>',
+            '',
+            '👤 Login sebagai <b>' . e($user['name']) . '</b> <i>(' . e($user['role']) . ')</i>.',
             'Pilih menu di bawah untuk membuka miniweb di Telegram.',
         ]),
         telegram_guru_menu_buttons($user),
@@ -371,15 +372,16 @@ function telegram_registration_reply(string $chatId, ?string $fromUsername): mix
     $token = telegram_registration_create_token($chatId, $fromUsername);
     $url = telegram_registration_url($token);
     if ($url === '') {
-        return 'Link daftar belum bisa dibuat. Isi APP_URL/base_url di config terlebih dulu.';
+        return '⚠️ <b>Link daftar belum bisa dibuat.</b> Isi APP_URL/base_url di config terlebih dulu.';
     }
 
     return telegram_card_response(
         implode("\n", [
-            '<b>Daftar Guru</b>',
+            '📋 <b>Daftar Guru</b>',
+            '',
             'Buka miniweb pendaftaran guru dari tombol di bawah.',
-            'Link berlaku ' . (int)(telegram_registration_token_ttl() / 60) . ' menit dan hanya bisa dipakai sekali.',
-            'Setelah form selesai, login bot dengan format: <code>login password</code>',
+            '⏰ Link berlaku <b>' . (int)(telegram_registration_token_ttl() / 60) . ' menit</b> dan hanya bisa dipakai sekali.',
+            '✅ Setelah form selesai, login bot dengan format: <code>/login password</code>',
         ]),
         [
             [telegram_web_app_button('Buka Form Daftar Guru', $url)],
@@ -396,9 +398,10 @@ function telegram_login_card_response(string $chatId, ?string $fromUsername): ar
 {
     return telegram_card_response(
         implode("\n", [
-            '<b>Pilih cara masuk</b>',
-            'Kalau sudah daftar lewat Telegram, pilih Login Password.',
-            'Tombol Daftar Guru dan Login Web terbuka sebagai miniweb di Telegram.',
+            '🔐 <b>Pilih cara masuk</b>',
+            '',
+            'Kalau sudah daftar lewat Telegram, pilih <b>Login Password</b>.',
+            'Tombol <b>Daftar Guru</b> dan <b>Login Web</b> terbuka sebagai miniweb di Telegram.',
         ]),
         telegram_login_menu_buttons($chatId, $fromUsername),
         true
@@ -409,17 +412,28 @@ function telegram_login_callback_response(string $data): string
 {
     return match ($data) {
         'login:password' => implode("\n", [
-            '<b>Login Password</b>',
-            'Ketik: <code>login password-anda</code>',
-            'Contoh: <code>login rahasia123</code>',
+            '🔐 <b>Login Password</b>',
+            '',
+            'Ketik perintah berikut:',
+            '<code>login password-anda</code>',
+            '',
+            '💡 <i>Contoh: <code>login rahasia123</code></i>',
         ]),
         'login:username' => implode("\n", [
-            '<b>Login Username</b>',
-            'Ketik: <code>login username password</code>',
-            'Pakai ini untuk akun lama atau akun yang belum terhubung Telegram.',
+            '🔑 <b>Login Username</b>',
+            '',
+            'Ketik perintah berikut:',
+            '<code>login username password</code>',
+            '',
+            '📌 <i>Pakai cara ini untuk akun lama atau akun yang belum terhubung Telegram.</i>',
         ]),
-        'login:register' => 'Ketik <code>daftar</code> untuk meminta link miniweb pendaftaran guru. Isi APP_URL/base_url agar tombol daftar bisa langsung berupa link.',
-        default => 'Pilihan tidak dikenal.',
+        'login:register' => implode("\n", [
+            '📋 <b>Daftar Guru</b>',
+            '',
+            'Ketik <code>daftar</code> untuk meminta link miniweb pendaftaran guru.',
+            'Isi <code>APP_URL/base_url</code> agar tombol daftar bisa langsung berupa link.',
+        ]),
+        default => '⚠️ Pilihan tidak dikenal.',
     };
 }
 
@@ -456,9 +470,10 @@ function telegram_web_menu(array $user): array
 
     return telegram_card_response(
         implode("\n", [
-            '<b>Menu ' . ($role === 'admin' ? 'Admin' : 'Guru') . '</b>',
+            ($role === 'admin' ? '👑' : '🏠') . ' <b>Menu ' . ($role === 'admin' ? 'Admin' : 'Guru') . '</b>',
+            '',
             'Pilih tombol untuk membuka miniweb di Telegram.',
-            telegram_app_base_url() === '' ? 'Catatan: isi APP_URL/base_url agar miniweb bisa dibuka.' : 'Kalau diminta login web, pakai akun yang sama.',
+            telegram_app_base_url() === '' ? '⚠️ Catatan: isi APP_URL/base_url agar miniweb bisa dibuka.' : 'Kalau diminta login web, pakai akun yang sama.',
         ]),
         $rows,
         true
@@ -467,9 +482,17 @@ function telegram_web_menu(array $user): array
 
 function telegram_web_page_hint(string $title, string $page, string $hint, ?array $user = null): array
 {
+    $icon = match($page) {
+        'lesson-schedule' => '📅',
+        'student-attendance' => '✅',
+        'teacher-attendance' => '📝',
+        'teacher-attendance-self' => '📍',
+        default => '📌',
+    };
     return telegram_card_response(
         implode("\n", [
-            '<b>' . e($title) . '</b>',
+            $icon . ' <b>' . e($title) . '</b>',
+            '',
             e($hint),
         ]),
         [
@@ -481,30 +504,33 @@ function telegram_web_page_hint(string $title, string $page, string $hint, ?arra
 function telegram_help(): string
 {
     return implode("\n", [
-        'Perintah E-Raport KumerBot:',
-        '/daftar',
-        '/daftar Nama Guru Mapel',
-        '/daftar Nama Guru | Mapel | Kelas',
-        '/login password',
-        '/login username password',
-        '/profil',
-        '/menu',
-        '/web',
-        '/jadwal',
-        '/requestjadwal',
-        '/kelas',
-        '/absensi',
-        '/absensiguru',
-        '/absensikehadiran',
-        '/hadir ID_PEMBELAJARAN YYYY-MM-DD [PERTEMUAN] [topik]',
-        '/absen ID_PEMBELAJARAN YYYY-MM-DD NIS status [catatan]',
-        '/jurnal ID_PEMBELAJARAN YYYY-MM-DD | topik | kegiatan | materi | kendala | tindak_lanjut',
-        '/logout',
+        '📖 <b>Perintah E-Raport KumerBot</b>',
         '',
-        'Ketik /daftar tanpa isian untuk membuka miniweb pendaftaran.',
-        'Contoh daftar cepat: /daftar Fahmi Dwi Payana, S.H Fiqih',
-        'Jika mapel lebih dari satu kata: /daftar Fahmi Dwi Payana, S.H | Bahasa Indonesia | 1A',
-        'Status absensi: hadir, sakit, izin, alpa, terlambat.',
+        '🔐 <b>Akun</b>',
+        '  /daftar — Daftar guru via miniweb',
+        '  /login password — Login dengan password',
+        '  /login username password — Login dengan username',
+        '  /profil — Lihat profil akun',
+        '  /logout — Keluar dari bot',
+        '',
+        '📋 <b>Menu</b>',
+        '  /menu — Buka menu utama',
+        '  /web — Buka miniweb',
+        '  /jadwal — Lihat jadwal pelajaran',
+        '  /kelas — Lihat daftar pembelajaran',
+        '',
+        '✅ <b>Absensi</b>',
+        '  /absensi — Absensi siswa via miniweb',
+        '  /absensiguru — Absensi mengajar',
+        '  /absensikehadiran — Kehadiran guru',
+        '  /hadir ID YYYY-MM-DD [PERTEMUAN] [topik]',
+        '  /absen ID YYYY-MM-DD NIS status [catatan]',
+        '',
+        '📝 <b>Jurnal</b>',
+        '  /jurnal ID YYYY-MM-DD | topik | kegiatan | materi | kendala | tindak_lanjut',
+        '',
+        '💡 <i>Contoh: /daftar Fahmi Dwi Payana, S.H | Bahasa Indonesia | 1A</i>',
+        '📌 <i>Status absensi: hadir, sakit, izin, alpa, terlambat.</i>',
     ]);
 }
 
@@ -879,23 +905,27 @@ function telegram_register_teacher(string $chatId, ?string $fromUsername, string
 
         $user = $userResult['user'] ?? [];
         $lines = [
-            'Pendaftaran guru berhasil.',
-            'Nama: ' . $name,
-            'Mapel: ' . $subjectName,
-            'Telegram ID: ' . $chatId,
-            'Username web: ' . ($user['username'] ?? '-'),
+            '🎉 <b>Pendaftaran guru berhasil!</b>',
+            '',
+            '👤 <b>Nama:</b> ' . $name,
+            '📚 <b>Mapel:</b> ' . $subjectName,
+            '🆔 <b>Telegram ID:</b> <code>' . $chatId . '</code>',
+            '🌐 <b>Username web:</b> <code>' . ($user['username'] ?? '-') . '</code>',
         ];
         if (!empty($userResult['password'])) {
-            $lines[] = 'Password web: ' . $userResult['password'];
+            $lines[] = '🔑 <b>Password web:</b> <code>' . $userResult['password'] . '</code>';
         } else {
-            $lines[] = 'Password web: tetap memakai password akun yang sudah ada.';
+            $lines[] = '🔑 <b>Password web:</b> tetap memakai password akun yang sudah ada.';
         }
         if ($assignmentResult) {
-            $lines[] = $assignmentResult['message'];
+            $lines[] = '';
+            $lines[] = '📝 ' . $assignmentResult['message'];
         } else {
-            $lines[] = 'Pembelajaran kelas belum dibuat. Admin bisa mapping di Data Pembelajaran, atau daftar dengan format: /daftar Nama | Mapel | Kelas';
+            $lines[] = '';
+            $lines[] = '📝 Pembelajaran kelas belum dibuat. Admin bisa mapping di Data Pembelajaran, atau daftar dengan format: <code>/daftar Nama | Mapel | Kelas</code>';
         }
-        $lines[] = 'Ketik /profil untuk cek akun atau /kelas untuk melihat pembelajaran.';
+        $lines[] = '';
+        $lines[] = '💡 Ketik <code>/profil</code> untuk cek akun atau <code>/kelas</code> untuk melihat pembelajaran.';
         return implode("\n", $lines);
     } catch (Throwable $exception) {
         log_exception($exception);
@@ -966,7 +996,9 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
             $password = (string)$parts[1];
             $linkedUsers = fetch_all('SELECT * FROM users WHERE telegram_chat_id = ? AND active = 1 ORDER BY id', [$chatId]);
             if (!$linkedUsers) {
-                return 'Akun Telegram ini belum terhubung. Ketik /daftar untuk daftar lewat miniweb, atau pakai /login username password untuk akun lama.';
+                return '⚠️ <b>Akun Telegram ini belum terhubung.</b>'
+                    . "\n\n📋 Ketik <code>/daftar</code> untuk daftar lewat miniweb."
+                    . "\n🔑 Atau pakai <code>/login username password</code> untuk akun lama.';
             }
 
             $user = null;
@@ -977,10 +1009,10 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
                 }
             }
             if (!$user) {
-                return 'Login gagal. Password salah.';
+                return '❌ <b>Login gagal.</b> Password salah.';
             }
             if (!in_array($user['role'], ['admin', 'guru'], true)) {
-                return 'Akun ini belum diizinkan memakai bot.';
+                return '⛔ <b>Akun ini belum diizinkan memakai bot.</b>';
             }
 
             telegram_user_set_login_state((int)$user['id'], true);
@@ -991,18 +1023,20 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
                 execute_sql('UPDATE teachers SET telegram_chat_id = ?, updated_at = ? WHERE id = ?', [$chatId, now_string(), (int)$user['teacher_id']]);
             }
 
-            return 'Login berhasil sebagai ' . $user['name'] . '. Ketik /kelas untuk melihat pembelajaran.';
+            return '✅ <b>Login berhasil!</b>'
+                . "\n" . '👤 Masuk sebagai <b>' . e($user['name']) . '</b>'
+                . "\n" . "\n💡 Ketik <code>/menu</code> untuk membuka menu atau <code>/kelas</code> untuk melihat pembelajaran.';
         }
 
         if (count($parts) < 3) {
-            return 'Format: /login password atau /login username password';
+            return '📌 Format: <code>/login password</code> atau <code>/login username password</code>';
         }
         $user = fetch_one('SELECT * FROM users WHERE username = ? AND active = 1', [$parts[1]]);
         if (!$user || !password_verify($parts[2], (string)$user['password_hash'])) {
-            return 'Login gagal. Periksa username dan password.';
+            return '❌ <b>Login gagal.</b> Periksa username dan password.';
         }
         if (!in_array($user['role'], ['admin', 'guru'], true)) {
-            return 'Akun ini belum diizinkan memakai bot.';
+            return '⛔ <b>Akun ini belum diizinkan memakai bot.</b>';
         }
 
         execute_sql('UPDATE users SET telegram_chat_id = ?, updated_at = ? WHERE id = ?', [$chatId, now_string(), (int)$user['id']]);
@@ -1011,12 +1045,16 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
             execute_sql('UPDATE teachers SET telegram_chat_id = ?, updated_at = ? WHERE id = ?', [$chatId, now_string(), (int)$user['teacher_id']]);
         }
 
-        return 'Login berhasil sebagai ' . $user['name'] . '. Ketik /kelas untuk melihat pembelajaran.';
+        return '✅ <b>Login berhasil!</b>'
+            . "\n" . '👤 Masuk sebagai <b>' . e($user['name']) . '</b>'
+            . "\n\n💡 Ketik <code>/menu</code> untuk membuka menu atau <code>/kelas</code> untuk melihat pembelajaran.';
     }
 
     $user = telegram_user_by_chat($chatId);
     if (!$user) {
-        return 'Silakan login dulu: /login password. Jika akun belum terhubung Telegram, pakai /login username password atau ketik /daftar.';
+        return '🔒 <b>Anda belum login.</b>'
+        . "\n\n🔐 Ketik <code>/login password</code> untuk masuk."
+        . "\n📋 Ketik <code>/daftar</code> untuk membuat akun baru.";
     }
 
     if ($command === '/logout') {
@@ -1028,11 +1066,16 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
                 execute_sql('UPDATE teachers SET telegram_chat_id = NULL, updated_at = ? WHERE id = ?', [now_string(), (int)$user['teacher_id']]);
             }
         }
-        return 'Logout bot berhasil. Ketik /login password untuk masuk lagi.';
+        return '👋 <b>Logout berhasil!</b>'
+            . "\n\n🔐 Ketik <code>/login password</code> untuk masuk lagi.';
     }
 
     if ($command === '/profil') {
-        return 'Login sebagai ' . $user['name'] . ' (' . $user['role'] . '). Chat ID: ' . $chatId;
+        $roleIcon = $user['role'] === 'admin' ? '👑' : '👤';
+        return '📋 <b>Profil Akun</b>'
+            . "\n\n" . $roleIcon . ' <b>' . e($user['name']) . '</b>'
+            . "\n" . '🏷️ Role: <b>' . e($user['role']) . '</b>'
+            . "\n" . '🆔 Chat ID: <code>' . e($chatId) . '</code>';
     }
 
     if (in_array($command, ['/menu', '/web'], true)) {
@@ -1105,22 +1148,22 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
             $params
         );
         if (!$rows) {
-            return 'Belum ada pembelajaran untuk akun ini.';
+            return '📭 <b>Belum ada pembelajaran</b> untuk akun ini.';
         }
-        $lines = ['Daftar pembelajaran:'];
+        $lines = ['📋 <b>Daftar Pembelajaran</b>', ''];
         foreach ($rows as $row) {
-            $lines[] = $row['id'] . '. ' . $row['class_name'] . ' - ' . $row['subject_name'] . ' (' . $row['teacher_name'] . ')';
+            $lines[] = '📚 <b>' . e($row['class_name']) . '</b> — ' . e($row['subject_name']) . '\n    👨‍🏫 ' . e($row['teacher_name']) . '  │  🆔 <code>' . $row['id'] . '</code>';
         }
         return implode("\n", $lines);
     }
 
     if ($command === '/hadir') {
         if (count($parts) < 3) {
-            return 'Format: /hadir ID_PEMBELAJARAN YYYY-MM-DD [PERTEMUAN] [topik]';
+            return '📌 Format: <code>/hadir ID_PEMBELAJARAN YYYY-MM-DD [PERTEMUAN] [topik]</code>';
         }
         $assignment = telegram_assignment_for_user((int)$parts[1], $user);
         if (!$assignment) {
-            return 'Pembelajaran tidak ditemukan atau bukan milik akun ini.';
+            return '❌ <b>Pembelajaran tidak ditemukan</b> atau bukan milik akun ini.';
         }
         $date = date_ymd($parts[2]);
         $meetingNo = isset($parts[3]) && ctype_digit($parts[3]) ? (int)$parts[3] : 1;
@@ -1144,7 +1187,7 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
 
     if ($command === '/absen') {
         if (count($parts) < 5) {
-            return 'Format: /absen ID_PEMBELAJARAN YYYY-MM-DD NIS status [catatan]';
+            return '📌 Format: <code>/absen ID_PEMBELAJARAN YYYY-MM-DD NIS status [catatan]</code>';
         }
         $assignment = telegram_assignment_for_user((int)$parts[1], $user);
         if (!$assignment) {
@@ -1152,14 +1195,14 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
         }
         $status = strtolower($parts[4]);
         if (!array_key_exists($status, allowed_statuses())) {
-            return '❌ Status tidak valid. Pakai: ' . implode(', ', array_keys(allowed_statuses()));
+            return '⚠️ <b>Status tidak valid.</b> Pakai: ' . implode(', ', array_keys(allowed_statuses()));
         }
         $student = fetch_one(
             'SELECT * FROM students WHERE class_id = ? AND active = 1 AND (nis = ? OR nisn = ?)',
             [(int)$assignment['class_id'], $parts[3], $parts[3]]
         );
         if (!$student) {
-            return '❌ Siswa dengan NIS/NISN ' . $parts[3] . ' tidak ditemukan di kelas pembelajaran.';
+            return '❌ <b>Siswa dengan NIS/NISN ' . e($parts[3]) . ' tidak ditemukan</b> di kelas pembelajaran.';
         }
 
         $date = date_ymd($parts[2]);
@@ -1176,11 +1219,11 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
         $segments = array_map('trim', explode('|', $payload));
         $first = preg_split('/\s+/', (string)($segments[0] ?? ''));
         if (count($first) < 2 || count($segments) < 3) {
-            return 'Format: /jurnal ID_PEMBELAJARAN YYYY-MM-DD | topik | kegiatan | materi | kendala | tindak_lanjut';
+            return '📌 Format: <code>/jurnal ID YYYY-MM-DD | topik | kegiatan | materi | kendala | tindak_lanjut</code>';
         }
         $assignment = telegram_assignment_for_user((int)$first[0], $user);
         if (!$assignment) {
-            return 'Pembelajaran tidak ditemukan atau bukan milik akun ini.';
+            return '❌ <b>Pembelajaran tidak ditemukan</b> atau bukan milik akun ini.';
         }
         $date = date_ymd($first[1]);
         $topic = $segments[1] ?? 'Jurnal harian';
@@ -1216,7 +1259,7 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
             . "\n" . '💡 Topik: ' . e($topic);
     }
 
-    return 'Perintah belum dikenal.' . "\n\n" . telegram_help();
+    return '❓ <b>Perintah belum dikenal.</b>' . "\n\n" . telegram_help();
 }
 
 function telegram_handle_callback(string $chatId, ?string $fromUsername, string $data): mixed
@@ -1242,10 +1285,10 @@ function telegram_handle_callback(string $chatId, ?string $fromUsername, string 
     }
 
     if ($data === 'home:missing-url') {
-        return 'Miniweb belum bisa dibuka. Isi APP_URL/base_url di config agar tombol Telegram punya alamat web lengkap.';
+        return '⚠️ <b>Miniweb belum bisa dibuka.</b> Isi APP_URL/base_url di config agar tombol Telegram punya alamat web lengkap.';
     }
 
-    return 'Pilihan tidak dikenal.';
+    return '⚠️ <b>Pilihan tidak dikenal.</b>';
 }
 
 function handle_telegram_webhook(): void
@@ -1294,8 +1337,8 @@ function handle_telegram_webhook(): void
         } catch (Throwable $exception) {
             log_exception($exception);
             $response = app_debug()
-                ? 'Maaf, tombol gagal diproses: ' . $exception->getMessage()
-                : 'Maaf, tombol gagal diproses. Coba ulangi atau hubungi admin.';
+            ? '⚠️ Maaf, tombol gagal diproses: ' . $exception->getMessage()
+            : '⚠️ <b>Maaf, tombol gagal diproses.</b> Coba ulangi atau hubungi admin.';
         }
 
         $response = telegram_attach_home_menu($response, $chatId, $username);
@@ -1325,8 +1368,8 @@ function handle_telegram_webhook(): void
     } catch (Throwable $exception) {
         log_exception($exception);
         $response = app_debug()
-            ? 'Maaf, perintah gagal diproses: ' . $exception->getMessage()
-            : 'Maaf, perintah gagal diproses. Coba ulangi atau hubungi admin.';
+            ? '⚠️ Maaf, perintah gagal diproses: ' . $exception->getMessage()
+            : '⚠️ <b>Maaf, perintah gagal diproses.</b> Coba ulangi atau hubungi admin.';
     }
 
     $response = telegram_attach_home_menu($response, $chatId, $username);
