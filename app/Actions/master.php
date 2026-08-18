@@ -397,6 +397,116 @@ function action_import_bulk(): void
         ? (string)config('default_teacher_password', 'guru123')
         : (string)config('default_student_password', 'siswa123');
 
+    // ── Jadwal pelajaran: handle separately ──
+    if ($type === 'jadwal') {
+        $dayMap = ['senin' => 1, 'selasa' => 2, 'rabu' => 3, 'kamis' => 4, 'jumat' => 5, 'jum\'at' => 5, 'sabtu' => 6];
+        // Pre-load lookups
+        $allClasses = [];
+        foreach (fetch_all('SELECT id, name FROM classes WHERE active = 1') as $c) {
+            $allClasses[strtolower(trim($c['name']))] = (int)$c['id'];
+        }
+        $allSubjects = [];
+        foreach (fetch_all('SELECT id, name, short_name FROM subjects WHERE active = 1') as $s) {
+            $allSubjects[strtolower(trim($s['name']))] = (int)$s['id'];
+            if (!empty($s['short_name'])) {
+                $allSubjects[strtolower(trim($s['short_name']))] = (int)$s['id'];
+            }
+        }
+        $allTeachers = [];
+        foreach (fetch_all('SELECT id, name FROM teachers WHERE active = 1') as $t) {
+            $norm = strtolower(preg_replace('/[^a-z0-9\s]/', '', (string)preg_replace('/\s*,\s*/', ' ', $t['name'])));
+            $allTeachers[$norm] = (int)$t['id'];
+        }
+        $academicYear = (string)config('school.academic_year', '2025/2026');
+        $semester = (string)config('school.semester', 'Genap');
+
+        $rowNum = 1;
+        while (($row = fgetcsv($handle)) !== false) {
+            $rowNum++;
+            $data = array_combine($header, $row);
+            if (!$data) { $skipped++; continue; }
+
+            $hari = strtolower(trim((string)($data['hari'] ?? '')));
+            $day = $dayMap[$hari] ?? 0;
+            if ($day === 0) {
+                $errors[] = "Baris $rowNum: hari '$hari' tidak valid, dilewati.";
+                $skipped++; continue;
+            }
+            $periodNo = (int)($data['jam_ke'] ?? 0);
+            if ($periodNo < 1 || $periodNo > 12) {
+                $errors[] = "Baris $rowNum: jam_ke '$periodNo' tidak valid, dilewati.";
+                $skipped++; continue;
+            }
+            $className = strtolower(trim((string)($data['kelas'] ?? '')));
+            $subjectName = strtolower(trim((string)($data['mapel'] ?? '')));
+            $teacherName = strtolower(trim((string)($data['guru'] ?? '')));
+            $startTime = trim((string)($data['jam_mulai'] ?? '')) ?: null;
+            $endTime = trim((string)($data['jam_selesai'] ?? '')) ?: null;
+
+            // Resolve class
+            $classId = $allClasses[$className] ?? null;
+            if ($classId === null) {
+                $errors[] = "Baris $rowNum: kelas '$className' tidak ditemukan, dilewati.";
+                $skipped++; continue;
+            }
+            // Resolve subject
+            $subjectId = $allSubjects[$subjectName] ?? null;
+            if ($subjectId === null) {
+                $errors[] = "Baris $rowNum: mapel '$subjectName' tidak ditemukan, dilewati.";
+                $skipped++; continue;
+            }
+            // Resolve teacher
+            $teacherId = null;
+            foreach ($allTeachers as $normName => $tid) {
+                $tokens = preg_split('/\s+/', $normName) ?: [];
+                $searchTokens = preg_split('/\s+/', $teacherName) ?: [];
+                if ($tokens && $searchTokens && count(array_intersect($searchTokens, $tokens)) >= min(count($tokens), count($searchTokens))) {
+                    $teacherId = $tid;
+                    break;
+                }
+            }
+            if ($teacherId === null) {
+                $errors[] = "Baris $rowNum: guru '$teacherName' tidak ditemukan, dilewati.";
+                $skipped++; continue;
+            }
+
+            // Find or create teaching assignment
+            $assignment = fetch_one(
+                'SELECT id FROM teaching_assignments WHERE teacher_id = ? AND class_id = ? AND subject_id = ? AND academic_year = ? AND semester = ? ORDER BY id LIMIT 1',
+                [$teacherId, $classId, $subjectId, $academicYear, $semester]
+            );
+            if ($assignment) {
+                $assignmentId = (int)$assignment['id'];
+            } else {
+                execute_sql(
+                    'INSERT INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?)',
+                    [$teacherId, $classId, $subjectId, $academicYear, $semester, now_string()]
+                );
+                $assignmentId = (int)db()->lastInsertId();
+            }
+
+            // Insert schedule
+            try {
+                execute_sql(
+                    'INSERT INTO lesson_schedules (assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked, generated_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)',
+                    [$assignmentId, $teacherId, $classId, $subjectId, $day, $periodNo, $startTime, $endTime, now_string(), now_string()]
+                );
+                $imported++;
+            } catch (Throwable $e) {
+                $skipped++;
+                $errors[] = "Baris $rowNum: kelas '$className' jam $periodNo sudah terisi ($hari).";
+            }
+        }
+        fclose($handle);
+        $msg = "Import jadwal selesai: $imported berhasil, $skipped dilewati.";
+        if ($errors) {
+            $msg .= ' Detail: ' . implode(' ', array_slice($errors, 0, 5));
+            if (count($errors) > 5) { $msg .= ' ... dan ' . (count($errors) - 5) . ' error lainnya.'; }
+        }
+        flash($imported > 0 ? 'success' : 'warning', $msg);
+        redirect_to('import-bulk');
+    }
+
     $rowNum = 1;
     while (($row = fgetcsv($handle)) !== false) {
         $rowNum++;

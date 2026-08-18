@@ -17,6 +17,7 @@ function page_import_bulk(): void
         <div class="quick-links">
             <a href="<?= e(route_url('import-bulk', ['download' => 'guru'])) ?>">Template Guru (CSV)</a>
             <a href="<?= e(route_url('import-bulk', ['download' => 'siswa'])) ?>">Template Siswa (CSV)</a>
+            <a href="<?= e(route_url('import-bulk', ['download' => 'jadwal'])) ?>">Template Jadwal (CSV)</a>
         </div>
     </section>
     <section class="panel">
@@ -26,6 +27,7 @@ function page_import_bulk(): void
             <label>Jenis Data <select name="data_type">
                 <option value="guru">Guru</option>
                 <option value="siswa">Siswa</option>
+                <option value="jadwal">Jadwal Pelajaran</option>
             </select></label>
             <label>File CSV <input type="file" name="csv_file" accept=".csv,text/csv" required></label>
             <div class="wide actions">
@@ -40,7 +42,7 @@ function page_import_bulk(): void
 function action_import_bulk_download(): void
 {
     $type = (string)($_GET['download'] ?? '');
-    if (!in_array($type, ['guru', 'siswa'], true)) {
+    if (!in_array($type, ['guru', 'siswa', 'jadwal'], true)) {
         return;
     }
     header('Content-Type: text/csv; charset=utf-8');
@@ -51,6 +53,12 @@ function action_import_bulk_download(): void
         fputcsv($output, ['username', 'password', 'name', 'nip', 'nuptk', 'gender', 'phone', 'email', 'position', 'telegram_chat_id']);
         fputcsv($output, ['guru_budi', 'guru123', 'Budi Santoso, S.Pd', '198410102009011002', '', 'L', '70010002', 'budi@sekolah.local', 'Guru Mapel', '']);
         fputcsv($output, ['guru_rina', 'guru123', 'Rina Lestari, S.Pd', '199003032015022003', '', 'P', '70010003', 'rina@sekolah.local', 'Guru Mapel', '']);
+    } elseif ($type === 'jadwal') {
+        fputcsv($output, ['hari', 'jam_ke', 'kelas', 'mapel', 'guru', 'jam_mulai', 'jam_selesai']);
+        fputcsv($output, ['Senin', '1', '7A', 'PJOK', 'Kasfaril Ramadani', '07:00', '07:35']);
+        fputcsv($output, ['Senin', '1', '8A', 'PJOK', 'Kasfaril Ramadani', '07:00', '07:35']);
+        fputcsv($output, ['Senin', '2', '7A', 'Matematika', 'Kodir', '07:35', '08:10']);
+        fputcsv($output, ['Senin', '3', '7A', 'Bahasa Indonesia', 'Mekha Eka Sari', '08:25', '09:00']);
     } else {
         fputcsv($output, ['username', 'password', 'name', 'nis', 'nisn', 'gender', 'birth_place', 'birth_date', 'religion', 'address', 'phone', 'father_name', 'father_occupation', 'mother_name', 'mother_occupation', 'guardian_name', 'class_name']);
         fputcsv($output, ['0081234001', 'siswa123', 'Ahmad Rizki', '0081234001', '0081234001', 'L', 'Jakarta', '2010-05-15', 'Islam', 'Jl. Merdeka No. 10, Kel. Sukamaju, Bandung 40123', '081234567890', 'H. Rizki Pratama', 'Wiraswasta', 'Siti Aminah', 'Guru', '', '7A']);
