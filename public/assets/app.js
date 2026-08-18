@@ -1,4 +1,36 @@
 document.addEventListener('DOMContentLoaded', () => {
+    /* ── Sidebar Scroll Position ────────────────────────── */
+    const sidebarNav = document.querySelector('.sidebar-nav');
+    const STORAGE_KEY = 'sidebar_scroll_pos';
+    if (sidebarNav) {
+        const saved = sessionStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            sidebarNav.scrollTop = parseInt(saved, 10) || 0;
+        }
+        sidebarNav.addEventListener('scroll', () => {
+            sessionStorage.setItem(STORAGE_KEY, sidebarNav.scrollTop);
+        });
+        /* Also save before navigating away */
+        document.querySelectorAll('.sidebar .menu a').forEach((link) => {
+            link.addEventListener('mousedown', () => {
+                sessionStorage.setItem(STORAGE_KEY, sidebarNav.scrollTop);
+            });
+        });
+    }
+
+    /* ── Smooth Filter Auto-Submit ───────────────────────── */
+    document.querySelectorAll('form[method="get"] select').forEach((select) => {
+        select.addEventListener('change', () => {
+            const form = select.closest('form');
+            if (!form) return;
+            /* Save sidebar scroll before submitting */
+            if (sidebarNav) {
+                sessionStorage.setItem(STORAGE_KEY, sidebarNav.scrollTop);
+            }
+            form.submit();
+        });
+    });
+
     /* ── Sidebar Toggle ──────────────────────────────────── */
     const sidebarButtons = Array.from(document.querySelectorAll('[data-sidebar-open]'));
     const setSidebarState = (open) => {
