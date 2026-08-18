@@ -604,3 +604,162 @@ function action_import_bulk(): void
     flash($imported > 0 ? 'success' : 'warning', $msg);
     redirect_to('import-bulk');
 }
+
+function action_import_bulk_validate(): void
+{
+    require_role(['admin']);
+    if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
+        flash('danger', 'File CSV tidak berhasil diupload.');
+        redirect_to('import-bulk');
+    }
+
+    $handle = fopen($_FILES['csv_file']['tmp_name'], 'r');
+    if (!$handle) {
+        flash('danger', 'Gagal membaca file CSV.');
+        redirect_to('import-bulk');
+    }
+
+    $header = fgetcsv($handle);
+    if (!$header) {
+        flash('danger', 'File CSV kosong atau format tidak valid.');
+        redirect_to('import-bulk');
+    }
+    $header = array_map('strtolower', array_map('trim', $header));
+
+    // Pre-load lookups
+    $allClasses = [];
+    foreach (fetch_all('SELECT id, name FROM classes WHERE active = 1') as $c) {
+        $allClasses[strtolower(trim($c['name']))] = (int)$c['id'];
+    }
+    $allSubjects = [];
+    foreach (fetch_all('SELECT id, name, short_name FROM subjects WHERE active = 1') as $s) {
+        $allSubjects[strtolower(trim($s['name']))] = (int)$s['id'];
+        if (!empty($s['short_name'])) {
+            $allSubjects[strtolower(trim($s['short_name']))] = (int)$s['id'];
+        }
+    }
+    $allTeachers = [];
+    foreach (fetch_all('SELECT id, name FROM teachers WHERE active = 1') as $t) {
+        $norm = strtolower(preg_replace('/[^a-z0-9\s]/', '', (string)preg_replace('/\s*,\s*/', ' ', $t['name'])));
+        $allTeachers[$norm] = (int)$t['id'];
+    }
+    $dayMap = ['senin' => 1, 'selasa' => 2, 'rabu' => 3, 'kamis' => 4, 'jumat' => 5, 'jum\'at' => 5, 'sabtu' => 6];
+
+    $rows = [];
+    $rowNum = 1;
+    while (($row = fgetcsv($handle)) !== false) {
+        $rowNum++;
+        $data = array_combine($header, $row);
+        if (!$data) { continue; }
+
+        $hari = strtolower(trim((string)($data['hari'] ?? '')));
+        $day = $dayMap[$hari] ?? 0;
+        $periodNo = (int)($data['jam_ke'] ?? 0);
+        $className = strtolower(trim((string)($data['kelas'] ?? '')));
+        $subjectName = strtolower(trim((string)($data['mapel'] ?? '')));
+        $teacherName = strtolower(trim((string)($data['guru'] ?? '')));
+        $startTime = trim((string)($data['jam_mulai'] ?? '')) ?: null;
+        $endTime = trim((string)($data['jam_selesai'] ?? '')) ?: null;
+
+        $r = [
+            'hari' => $hari, 'jam_ke' => $periodNo, 'kelas' => $className,
+            'mapel' => $subjectName, 'guru' => $teacherName,
+            'jam_mulai' => $startTime, 'jam_selesai' => $endTime,
+            'class_id' => null, 'subject_id' => null, 'teacher_id' => null,
+            'valid' => false, 'error' => '',
+        ];
+
+        if ($day === 0) { $r['error'] = 'Hari tidak valid'; $rows[] = $r; continue; }
+        if ($periodNo < 1 || $periodNo > 12) { $r['error'] = 'Jam ke tidak valid'; $rows[] = $r; continue; }
+
+        $classId = $allClasses[$className] ?? null;
+        if ($classId === null) { $r['error'] = 'Kelas tidak ditemukan'; $rows[] = $r; continue; }
+        $r['class_id'] = $classId;
+
+        $subjectId = $allSubjects[$subjectName] ?? null;
+        if ($subjectId === null) { $r['error'] = 'Mapel tidak ditemukan'; $rows[] = $r; continue; }
+        $r['subject_id'] = $subjectId;
+
+        $teacherId = null;
+        foreach ($allTeachers as $normName => $tid) {
+            $tokens = preg_split('/\s+/', $normName) ?: [];
+            $searchTokens = preg_split('/\s+/', $teacherName) ?: [];
+            if ($tokens && $searchTokens && count(array_intersect($searchTokens, $tokens)) >= min(count($tokens), count($searchTokens))) {
+                $teacherId = $tid;
+                break;
+            }
+        }
+        if ($teacherId === null) { $r['error'] = 'Guru tidak ditemukan'; $rows[] = $r; continue; }
+        $r['teacher_id'] = $teacherId;
+
+        $r['valid'] = true;
+        $rows[] = $r;
+    }
+    fclose($handle);
+
+    $_SESSION['import_bulk_pending'] = ['type' => 'jadwal', 'rows' => $rows];
+    redirect_to('import-bulk');
+}
+
+function action_import_bulk_confirm(): void
+{
+    require_role(['admin']);
+    $pending = $_SESSION['import_bulk_pending'] ?? null;
+    if (!$pending || $pending['type'] !== 'jadwal') {
+        flash('danger', 'Tidak ada data jadwal yang pending.');
+        redirect_to('import-bulk');
+    }
+
+    $rows = $pending['rows'];
+    unset($_SESSION['import_bulk_pending']);
+
+    $dayMap = ['senin' => 1, 'selasa' => 2, 'rabu' => 3, 'kamis' => 4, 'jumat' => 5, 'jum\'at' => 5, 'sabtu' => 6];
+    $academicYear = (string)config('school.academic_year', '2025/2026');
+    $semester = (string)config('school.semester', 'Genap');
+    $imported = 0;
+    $skipped = 0;
+    $errors = [];
+
+    foreach ($rows as $i => $r) {
+        if (!$r['valid']) { $skipped++; continue; }
+        $classId = (int)$r['class_id'];
+        $subjectId = (int)$r['subject_id'];
+        $teacherId = (int)$r['teacher_id'];
+        $day = $dayMap[strtolower($r['hari'])] ?? 0;
+        $periodNo = (int)$r['jam_ke'];
+
+        // Find or create assignment
+        $assignment = fetch_one(
+            'SELECT id FROM teaching_assignments WHERE teacher_id = ? AND class_id = ? AND subject_id = ? AND academic_year = ? AND semester = ? ORDER BY id LIMIT 1',
+            [$teacherId, $classId, $subjectId, $academicYear, $semester]
+        );
+        if ($assignment) {
+            $assignmentId = (int)$assignment['id'];
+        } else {
+            execute_sql(
+                'INSERT INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?)',
+                [$teacherId, $classId, $subjectId, $academicYear, $semester, now_string()]
+            );
+            $assignmentId = (int)db()->lastInsertId();
+        }
+
+        try {
+            execute_sql(
+                'INSERT INTO lesson_schedules (assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked, generated_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)',
+                [$assignmentId, $teacherId, $classId, $subjectId, $day, $periodNo, $r['jam_mulai'], $r['jam_selesai'], now_string(), now_string()]
+            );
+            $imported++;
+        } catch (Throwable $e) {
+            $skipped++;
+            $errors[] = "Baris " . ($i + 2) . ": " . $r['kelas'] . " jam " . $periodNo . " sudah terisi (" . $r['hari'] . ").";
+        }
+    }
+
+    $msg = "Import jadwal selesai: $imported berhasil, $skipped dilewati.";
+    if ($errors) {
+        $msg .= ' Detail: ' . implode(' ', array_slice($errors, 0, 5));
+        if (count($errors) > 5) { $msg .= ' ... dan ' . (count($errors) - 5) . ' error lainnya.'; }
+    }
+    flash($imported > 0 ? 'success' : 'warning', $msg);
+    redirect_to('import-bulk');
+}

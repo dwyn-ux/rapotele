@@ -9,6 +9,61 @@ function page_import_bulk(): void
         return;
     }
 
+    // ── Show validation table if pending ──
+    $pending = $_SESSION['import_bulk_pending'] ?? null;
+    if ($pending && $pending['type'] === 'jadwal') {
+        render_header('Import Jadwal — Validasi');
+        $rows = $pending['rows'];
+        $validCount = 0;
+        $invalidCount = 0;
+        foreach ($rows as $r) {
+            if ($r['valid']) { $validCount++; } else { $invalidCount++; }
+        }
+        ?>
+        <section class="panel">
+            <h3>📋 Hasil Validasi CSV Jadwal</h3>
+            <p><strong><?= $validCount ?></strong> baris valid, <strong><?= $invalidCount ?></strong> baris bermasalah.</p>
+            <?php if ($validCount > 0): ?>
+            <form method="post" style="display:inline;">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="import_bulk_confirm">
+                <button class="button primary" onclick="return confirm('Import <?= $validCount ?> jadwal valid ini?')">✅ Import <?= $validCount ?> Jadwal</button>
+            </form>
+            <?php endif; ?>
+            <a href="<?= e(route_url('import-bulk')) ?>" class="button">⬅ Kembali</a>
+        </section>
+        <section class="panel">
+            <h3>Preview Data</h3>
+            <div style="overflow-x:auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th><th>Hari</th><th>Jam Ke</th><th>Kelas</th><th>Mapel</th><th>Guru</th><th>Mulai</th><th>Selesai</th><th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($rows as $i => $r): ?>
+                    <tr style="<?= $r['valid'] ? '' : 'background:var(--bg-danger,#fff0f0);' ?>">
+                        <td><?= $i + 1 ?></td>
+                        <td><?= e($r['hari']) ?></td>
+                        <td><?= e($r['jam_ke']) ?></td>
+                        <td><?= e($r['kelas']) ?> <?= $r['class_id'] ? '<span style="color:var(--text-muted)">(id:' . $r['class_id'] . ')</span>' : '' ?></td>
+                        <td><?= e($r['mapel']) ?> <?= $r['subject_id'] ? '<span style="color:var(--text-muted)">(id:' . $r['subject_id'] . ')</span>' : '' ?></td>
+                        <td><?= e($r['guru']) ?> <?= $r['teacher_id'] ? '<span style="color:var(--text-muted)">(id:' . $r['teacher_id'] . ')</span>' : '' ?></td>
+                        <td><?= e($r['jam_mulai'] ?? '-') ?></td>
+                        <td><?= e($r['jam_selesai'] ?? '-') ?></td>
+                        <td><?= $r['valid'] ? '<span style="color:var(--color-success,#16a34a)">✅ OK</span>' : '<span style="color:var(--color-danger,#dc2626)">❌ ' . e($r['error']) . '</span>' ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            </div>
+        </section>
+        <?php
+        render_footer();
+        return;
+    }
+
     render_header('Import Data Bulk');
     ?>
     <section class="panel">
@@ -22,18 +77,35 @@ function page_import_bulk(): void
     </section>
     <section class="panel">
         <h3>Upload CSV</h3>
-        <form method="post" enctype="multipart/form-data" class="grid two">
-            <?= csrf_field() ?><input type="hidden" name="action" value="import_bulk">
-            <label>Jenis Data <select name="data_type">
+        <form method="post" enctype="multipart/form-data" class="grid two" id="importForm">
+            <?= csrf_field() ?><input type="hidden" name="action" value="import_bulk" id="importAction">
+            <label>Jenis Data <select name="data_type" id="dataType" onchange="document.getElementById('importAction').value = this.value === 'jadwal' ? 'import_bulk_validate' : 'import_bulk';">
                 <option value="guru">Guru</option>
                 <option value="siswa">Siswa</option>
                 <option value="jadwal">Jadwal Pelajaran</option>
             </select></label>
             <label>File CSV <input type="file" name="csv_file" accept=".csv,text/csv" required></label>
             <div class="wide actions">
-                <button class="button primary" onclick="return confirm('Import data ini?')">Import Sekarang</button>
+                <button class="button primary" id="importBtn" onclick="return confirm(this.dataset.msg)">Import Sekarang</button>
             </div>
         </form>
+        <script>
+        (function(){
+            var sel = document.getElementById('dataType');
+            var btn = document.getElementById('importBtn');
+            function updateBtn(){
+                if(sel.value === 'jadwal'){
+                    btn.textContent = '📋 Validasi Jadwal';
+                    btn.dataset.msg = 'Validasi data jadwal ini?';
+                } else {
+                    btn.textContent = 'Import Sekarang';
+                    btn.dataset.msg = 'Import data ini?';
+                }
+            }
+            sel.addEventListener('change', updateBtn);
+            updateBtn();
+        })();
+        </script>
     </section>
     <?php
     render_footer();

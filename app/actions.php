@@ -68,4 +68,6 @@ return [
     'send_dapodik' => 'action_send_dapodik',
     'delete_extended' => 'action_delete_extended',
     'import_bulk' => 'action_import_bulk',
+    'import_bulk_validate' => 'action_import_bulk_validate',
+    'import_bulk_confirm' => 'action_import_bulk_confirm',
 ];
