@@ -24,6 +24,7 @@ require_once $base . '/Pages/student.php';
 require_once $base . '/Pages/reports.php';
 require_once $base . '/Pages/telegram.php';
 require_once $base . '/Pages/rapor.php';
+require_once $base . '/Pages/panduan.php';
 require_once $base . '/Pages/kokurikuler.php';
 require_once $base . '/Pages/dapodik.php';
 require_once $base . '/Pages/export.php';

@@ -61,6 +61,7 @@ return [
         'whatsapp' => 'page_whatsapp',
         'users' => 'page_users',
         'profile' => 'page_profile',
+        'panduan' => 'page_panduan',
         'import-bulk' => 'page_import_bulk',
         'grades' => 'page_grades',
         'student-attendance' => 'page_student_attendance',
