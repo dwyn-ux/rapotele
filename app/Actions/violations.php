@@ -150,8 +150,75 @@ function action_save_reward(): void
 
 function action_delete_reward(): void
 {
-    require_bk();
+    require_role(['admin']);
     execute_sql('DELETE FROM student_rewards WHERE id = ?', [(int)($_POST['id'] ?? 0)]);
     flash('success', 'Reward dihapus.');
     redirect_to('violations');
+}
+
+function action_import_violation_rules(): void
+{
+    require_role(['admin']);
+    if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
+        flash('danger', 'File CSV tidak berhasil diupload.');
+        redirect_to('violation-rules');
+    }
+
+    $handle = fopen($_FILES['csv_file']['tmp_name'], 'r');
+    if (!$handle) {
+        flash('danger', 'Gagal membaca file CSV.');
+        redirect_to('violation-rules');
+    }
+
+    $header = fgetcsv($handle);
+    if (!$header) {
+        flash('danger', 'File CSV kosong.');
+        redirect_to('violation-rules');
+    }
+
+    $header = array_map('strtolower', array_map('trim', $header));
+    $hasHeader = in_array('kode', $header, true) || in_array('code', $header, true);
+
+    if (!$hasHeader) {
+        rewind($handle);
+    }
+
+    $imported = 0;
+    $skipped = 0;
+    $rowNum = 0;
+
+    while (($row = fgetcsv($handle)) !== false) {
+        $rowNum++;
+        if (count($row) < 3) {
+            $skipped++;
+            continue;
+        }
+
+        if ($hasHeader && $rowNum === 1) {
+            continue;
+        }
+
+        $code = trim((string)($row[0] ?? ''));
+        $category = trim((string)($row[1] ?? 'Umum'));
+        $description = trim((string)($row[2] ?? ''));
+        $points = (int)($row[3] ?? 0);
+        $active = (int)($row[4] ?? 1);
+
+        if ($code === '' || $description === '') {
+            $skipped++;
+            continue;
+        }
+
+        $existing = fetch_one('SELECT id FROM violation_rules WHERE code = ?', [$code]);
+        if ($existing) {
+            execute_sql('UPDATE violation_rules SET category = ?, description = ?, points = ?, active = ?, updated_at = ? WHERE id = ?', [$category, $description, $points, $active, now_string(), (int)$existing['id']]);
+        } else {
+            execute_sql('INSERT INTO violation_rules (code, category, description, points, active, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [$code, $category, $description, $points, $active, now_string()]);
+        }
+        $imported++;
+    }
+    fclose($handle);
+
+    flash($imported > 0 ? 'success' : 'warning', "Import selesai: $imported pasal diimpor, $skipped dilewati.");
+    redirect_to('violation-rules');
 }

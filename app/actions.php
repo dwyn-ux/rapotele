@@ -37,6 +37,7 @@ return [
     'save_sp_threshold' => 'action_save_sp_threshold',
     'save_reward' => 'action_save_reward',
     'delete_reward' => 'action_delete_reward',
+    'import_violation_rules' => 'action_import_violation_rules',
 
     'save_extracurricular' => 'action_save_extracurricular',
     'save_subject_group' => 'action_save_subject_group',

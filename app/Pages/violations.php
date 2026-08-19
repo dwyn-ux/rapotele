@@ -22,6 +22,19 @@ function page_violation_rules(): void
     </form>
     <?php input_panel_end(); ?>
 
+    <section class="panel">
+        <?php panel_title('Import Bulk CSV', ''); ?>
+        <p style="color:var(--muted,#64748b);font-size:.875rem;margin-bottom:1rem;">
+            Format CSV: <code>kode, kategori, deskripsi, poin, aktif(1/0)</code> — Baris pertama header akan dilewati otomatis jika ada tulisan <code>kode</code>.
+        </p>
+        <form method="post" enctype="multipart/form-data" style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;">
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="import_violation_rules">
+            <input type="file" name="csv_file" accept=".csv" required style="font-size:.875rem;">
+            <button type="submit" class="button primary">Import CSV</button>
+        </form>
+    </section>
+
     <?php table_panel('Daftar Pasal Pelanggaran', ['Kode', 'Kategori', 'Deskripsi', 'Poin', 'Status', 'Aksi'], $rows, function ($row) { ?>
         <td><?= e($row['code']) ?></td>
         <td><?= e($row['category']) ?></td>
