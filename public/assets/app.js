@@ -391,6 +391,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         trigger.addEventListener('click', function(e) {
+            e.preventDefault();
             e.stopPropagation();
             if (isOpen()) {
                 closeDropdown();
