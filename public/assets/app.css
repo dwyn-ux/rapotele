@@ -3300,7 +3300,6 @@ code.block {
   max-height: 280px;
   display: none;
   overflow: hidden;
-  display: flex;
   flex-direction: column;
 }
 .search-select-trigger.open + .search-select-dropdown { display: flex; }
