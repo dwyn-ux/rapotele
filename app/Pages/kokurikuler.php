@@ -20,7 +20,7 @@ function page_data_ekskul(): void
         <label class="wide">Anggota Siswa
             <div style="position:relative;">
                 <input type="text" id="ekskul-member-search" placeholder="🔍 Cari nama atau NISN..." style="width:100%;margin-bottom:6px;padding:8px 10px;border:1px solid var(--border-color,#d1d5db);border-radius:6px;font-size:0.9rem;">
-                <select name="members[]" id="ekskul-member-select" multiple size="15" style="width:100%;">
+                <select name="members[]" id="ekskul-member-select" multiple size="25" style="width:100%;">
                     <?php foreach ($students as $student): ?>
                         <option value="<?= e($student['id']) ?>" <?= in_array((int)$student['id'], $members, true) ? 'selected' : '' ?>><?= e($student['name']) ?> (<?= e($student['nisn'] ?? '') ?>)</option>
                     <?php endforeach; ?>
