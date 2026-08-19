@@ -132,6 +132,7 @@ function render_header(string $title): void
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="color-scheme" content="light only">
         <title><?= e($title) ?> — <?= e(config('app_name')) ?></title>
         <?php if ($appLogoUrl !== ''): ?>
             <link rel="icon" href="<?= e($appLogoUrl) ?>">
@@ -358,6 +359,7 @@ function render_public_header(string $title): void
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="color-scheme" content="light only">
         <title><?= e($title) ?> — <?= e(config('app_name')) ?></title>
         <?php if ($appLogoUrl !== ''): ?>
             <link rel="icon" href="<?= e($appLogoUrl) ?>">
