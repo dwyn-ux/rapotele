@@ -2818,7 +2818,6 @@ code.block {
     pointer-events: none;
     opacity: 0;
     background: var(--sidebar-bg);
-    opacity: 0.5;
     backdrop-filter: blur(4px);
     transition: opacity 0.2s ease;
   }
