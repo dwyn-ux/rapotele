@@ -3303,6 +3303,7 @@ code.block {
 }
 .search-select-dropdown.open {
   display: flex !important;
+  flex-direction: column;
 }
 
 .search-select-search {
