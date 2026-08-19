@@ -301,6 +301,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var dd = document.createElement('div');
         dd.className = 'search-select-dropdown';
+        dd.style.display = 'none';
         wrap.appendChild(dd);
 
         var searchBox = document.createElement('div');
@@ -313,37 +314,30 @@ document.addEventListener('DOMContentLoaded', function() {
         dd.appendChild(optList);
 
         var items = [];
-        function buildItems() {
-            optList.innerHTML = '';
-            items = [];
-            for (var i = 0; i < sel.options.length; i++) {
-                var opt = sel.options[i];
-                if (opt.disabled && opt.value === '') continue;
-                var div = document.createElement('div');
-                div.className = 'search-select-option';
-                div.dataset.value = opt.value;
-                div.innerHTML = checkSvg + '<span>' + opt.textContent + '</span>';
-                if (opt.selected) { div.classList.add('selected'); trigger.querySelector('span').textContent = opt.textContent; }
-                div.addEventListener('click', function() {
-                    var val = this.dataset.value;
-                    sel.value = val;
-                    optList.querySelectorAll('.search-select-option').forEach(function(o) { o.classList.remove('selected'); });
-                    this.classList.add('selected');
-                    trigger.querySelector('span').textContent = this.querySelector('span').textContent;
-                    trigger.classList.remove('open');
-                    sel.dispatchEvent(new Event('change', {bubbles: true}));
-                });
-                optList.appendChild(div);
-                items.push({el: div, text: opt.textContent.toLowerCase(), group: ''});
-            }
-        }
-        buildItems();
 
-        searchBox.querySelector('input').addEventListener('input', function() {
-            var q = this.value.toLowerCase();
+        function openDropdown() {
+            dd.style.display = 'flex';
+            trigger.classList.add('open');
+            var input = searchBox.querySelector('input');
+            input.value = '';
+            filterItems('');
+            setTimeout(function() { input.focus(); }, 30);
+        }
+
+        function closeDropdown() {
+            dd.style.display = 'none';
+            trigger.classList.remove('open');
+        }
+
+        function isOpen() {
+            return dd.style.display === 'flex';
+        }
+
+        function filterItems(q) {
+            var lc = q.toLowerCase();
             var anyVisible = false;
             items.forEach(function(item) {
-                var match = item.text.indexOf(q) !== -1;
+                var match = lc === '' || item.text.indexOf(lc) !== -1;
                 item.el.style.display = match ? '' : 'none';
                 if (match) anyVisible = true;
             });
@@ -356,24 +350,63 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (anyVisible && empty) {
                 empty.remove();
             }
+        }
+
+        function buildItems() {
+            optList.innerHTML = '';
+            items = [];
+            for (var i = 0; i < sel.options.length; i++) {
+                var opt = sel.options[i];
+                if (opt.disabled && opt.value === '') continue;
+                var div = document.createElement('div');
+                div.className = 'search-select-option';
+                div.dataset.value = opt.value;
+                div.innerHTML = checkSvg + '<span>' + opt.textContent + '</span>';
+                if (opt.selected) {
+                    div.classList.add('selected');
+                    trigger.querySelector('span').textContent = opt.textContent;
+                }
+                (function(optionEl) {
+                    optionEl.addEventListener('click', function() {
+                        sel.value = this.dataset.value;
+                        optList.querySelectorAll('.search-select-option').forEach(function(o) { o.classList.remove('selected'); });
+                        this.classList.add('selected');
+                        trigger.querySelector('span').textContent = this.querySelector('span').textContent;
+                        closeDropdown();
+                        sel.dispatchEvent(new Event('change', {bubbles: true}));
+                    });
+                })(div);
+                optList.appendChild(div);
+                items.push({el: div, text: opt.textContent.toLowerCase()});
+            }
+        }
+        buildItems();
+
+        searchBox.querySelector('input').addEventListener('input', function() {
+            filterItems(this.value);
+        });
+        searchBox.querySelector('input').addEventListener('click', function(e) {
+            e.stopPropagation();
         });
 
         trigger.addEventListener('click', function(e) {
             e.stopPropagation();
-            document.querySelectorAll('.search-select-trigger.open').forEach(function(t) {
-                if (t !== trigger) t.classList.remove('open');
-            });
-            trigger.classList.toggle('open');
-            if (trigger.classList.contains('open')) {
-                var input = searchBox.querySelector('input');
-                input.value = '';
-                input.dispatchEvent(new Event('input'));
-                setTimeout(function() { input.focus(); }, 50);
+            if (isOpen()) {
+                closeDropdown();
+            } else {
+                document.querySelectorAll('.search-select-dropdown').forEach(function(d) { d.style.display = 'none'; });
+                document.querySelectorAll('.search-select-trigger.open').forEach(function(t) { t.classList.remove('open'); });
+                openDropdown();
             }
+        });
+
+        dd.addEventListener('click', function(e) {
+            e.stopPropagation();
         });
     });
 
     document.addEventListener('click', function() {
+        document.querySelectorAll('.search-select-dropdown').forEach(function(d) { d.style.display = 'none'; });
         document.querySelectorAll('.search-select-trigger.open').forEach(function(t) { t.classList.remove('open'); });
     });
 });
