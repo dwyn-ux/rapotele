@@ -227,8 +227,8 @@ final class SimplePdf
 
     public function stringWidth(string $text, float $fontSize = 10, bool $bold = false): float
     {
-        $factor = $bold ? 0.56 : 0.52;
-        return mb_strlen($text) * $fontSize * $factor;
+    $factor = $bold ? 0.56 : 0.52;
+    return mb_strlen($text) * $fontSize * $factor;
     }
 
     private function escape(string $text): string
@@ -739,8 +739,13 @@ function draw_report_identity(SimplePdf $pdf, array $payload, int $pageNo): void
 
     $pdf->text(59.53, 746.76, 'Sekolah');
     $pdf->text(161.58, 746.76, ':');
-    $schoolNameWidth = 391.18 - 170.08 - 10.0; // mentok sebelum label Tahun Ajaran
-    $schoolNameLines = array_slice($pdf->wrapText((string)$school['name'], $schoolNameWidth, 10), 0, 2);
+    $schoolNameWidth = 391.18 - 170.08 - 10.0; // ruang sebelum label "Tahun Ajaran"
+
+// stringWidth() meremehkan lebar huruf KAPITAL (~0.52/char vs realita ~0.70/char
+// untuk Helvetica all-caps). Nama sekolah selalu huruf besar, jadi pakai font
+// size "fiktif" 14pt khusus untuk HITUNG titik wrap-nya saja (bukan buat render) —
+// ini bikin estimasi lebar (14 * 0.52 ≈ 7.28/char) mendekati lebar asli huruf kapital.
+    $schoolNameLines = array_slice($pdf->wrapText((string)$school['name'], $schoolNameWidth, 14), 0, 2);
     $pdf->text(170.08, 746.76, $schoolNameLines[0] ?? '', 10);
     if (isset($schoolNameLines[1])) {
     $pdf->text(170.08, 746.76 - 11.34, $schoolNameLines[1], 10);
@@ -797,7 +802,7 @@ function report_learning_table_columns(): array
         'nilai'    => ['x' => 199.37, 'w' => 55.00,  'label' => 'Nilai Akhir', 'fill' => false],
         'capaian'  => ['x' => 254.37, 'w' => 284.21, 'label' => 'Capaian Kompetensi', 'fill' => false],
     ];
-}
+
 
 function draw_report_learning_table_header(SimplePdf $pdf): float
 {
