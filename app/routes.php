@@ -75,6 +75,7 @@ return [
         'violation-rules' => 'page_violation_rules',
         'download-template-violation-rules' => 'page_download_template_violation_rules',
         'cetak-sp' => 'page_cetak_sp',
+        'laporan-belajar' => 'page_laporan_belajar',
         'reports' => 'page_reports',
         'student-progress' => 'page_student_progress',
         'student-attendance-view' => 'page_student_attendance_view',

@@ -1836,3 +1836,328 @@ function page_cetak_sp(): void
     echo $pdfContent;
     exit;
 }
+
+function page_laporan_belajar(): void
+{
+    require_role(['admin', 'guru']);
+    $studentId = (int)($_GET['student_id'] ?? 0);
+    $classId = (int)($_GET['class_id'] ?? 0);
+
+    if ($studentId > 0) {
+        $student = fetch_one('SELECT s.*, c.name AS class_name, c.grade, c.homeroom_teacher_id, t.name AS homeroom_name, t.nip AS homeroom_nip FROM students s LEFT JOIN classes c ON c.id = s.class_id LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id WHERE s.id = ?', [$studentId]);
+        if (!$student) {
+            http_response_code(404);
+            exit('Siswa tidak ditemukan.');
+        }
+        $pdfContent = generate_laporan_belajar_pdf($student);
+        $filename = 'Laporan_Belajar_' . preg_replace('/[^A-Za-z0-9_]/', '_', (string)$student['name']) . '.pdf';
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="' . $filename . '"');
+        header('Content-Length: ' . strlen($pdfContent));
+        echo $pdfContent;
+        exit;
+    }
+
+    $classes = assignments_for_current_user();
+    $classId = $classId ?: ((int)($classes[0]['class_id'] ?? 0));
+    $students = $classId ? fetch_all('SELECT s.id, s.name, s.nis FROM students s WHERE s.class_id = ? AND s.active = 1 ORDER BY s.name', [$classId]) : [];
+    render_header('Cetak Laporan Hasil Belajar');
+    ?>
+    <section class="panel">
+        <form method="get" class="grid four">
+            <input type="hidden" name="page" value="laporan-belajar">
+            <label>Kelas
+                <select name="class_id" onchange="this.form.submit()">
+                    <option value="">Pilih Kelas</option>
+                    <?php foreach (fetch_all('SELECT DISTINCT c.id, c.name FROM teaching_assignments ta JOIN classes c ON c.id = ta.class_id WHERE ta.active = 1 ORDER BY c.name') as $c): ?>
+                        <option value="<?= e($c['id']) ?>" <?= $classId == $c['id'] ? 'selected' : '' ?>><?= e($c['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+        </form>
+    </section>
+    <?php if ($students): ?>
+        <section class="panel">
+            <?php panel_title('Daftar Siswa', '', ''); ?>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>No</th><th>Nama Siswa</th><th>NIS</th><th>Aksi</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($students as $i => $s): ?>
+                            <tr>
+                                <td><?= $i + 1 ?></td>
+                                <td><?= e($s['name']) ?></td>
+                                <td><?= e($s['nis']) ?></td>
+                                <td><a class="button small primary" href="<?= e(route_url('laporan-belajar', ['student_id' => (int)$s['id']])) ?>" target="_blank">Cetak PDF</a></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    <?php endif; ?>
+    <?php render_footer();
+}
+
+function generate_laporan_belajar_pdf(array $student): string
+{
+    $pdf = new SimplePdf();
+    $pdf->addPage();
+
+    $school = report_get_school_profile();
+    $studentId = (int)$student['id'];
+    $attendance = report_attendance_summary_for_student($studentId);
+    $extracurriculars = report_extracurriculars_for_student($student);
+    $signatures = report_signatures_for_student($student);
+    $principalSig = $signatures['principal'] ?? null;
+    $homeroomSig = $signatures['homeroom'] ?? null;
+    $principalName = trim((string)($principalSig['person_name'] ?? '')) ?: (string)($school['principal_name'] ?? '');
+    $principalNip = trim((string)($principalSig['nip'] ?? '')) ?: (string)($school['principal_nip'] ?? '');
+    $homeroomName = trim((string)($homeroomSig['person_name'] ?? '')) ?: (string)($student['homeroom_name'] ?? '');
+    $homeroomNip = trim((string)($homeroomSig['nip'] ?? '')) ?: (string)($student['homeroom_nip'] ?? '');
+    $reportDate = fetch_one('SELECT * FROM report_dates WHERE grade = ? ORDER BY report_date DESC LIMIT 1', [(string)($student['grade'] ?? '')]);
+    $place = (string)($reportDate['principal_place'] ?? 'Jakarta');
+    $dateStr = $reportDate['report_date'] ?? date('Y-m-d');
+    $dateText = $place . ', ' . format_indonesian_date($dateStr);
+    $graduation = fetch_one('SELECT status FROM graduations WHERE student_id = ?', [$studentId]);
+    $gradeNum = (int)preg_replace('/\D+/', '', (string)($student['grade'] ?? '0'));
+    $isFinalGrade = in_array($gradeNum, [6], true);
+
+    $subjects = report_subjects_for_student($student, $studentId);
+    $lm = 56.69;
+    $rm = 538.58;
+    $contentW = $rm - $lm;
+
+    // === HEADER IDENTITAS ===
+    $y = 775.0;
+    $pdf->setFont('Helvetica', 10);
+    $colLeft = $lm;
+    $colRight = 330.0;
+    $labelW = 105.0;
+    $valLeft = $colLeft + $labelW;
+    $valRight = $colRight + $labelW;
+
+    $identityLeft = [
+        ['Nama Murid', (string)$student['name']],
+        ['NIS/NISN', trim((string)($student['nis'] ?? '-')) . ' / ' . trim((string)($student['nisn'] ?? '-'))],
+        ['Sekolah', (string)$school['name']],
+        ['Alamat', (string)($school['address'] ?? '...........')],
+    ];
+    $identityRight = [
+        ['Kelas', (string)($student['class_name'] ?? '-')],
+        ['Fase', class_phase((string)($student['grade'] ?? ''))],
+        ['Semester', current_semester()],
+        ['Tahun Ajaran', current_academic_year()],
+    ];
+    foreach ($identityLeft as $i => $row) {
+        $pdf->text($colLeft, $y, $row[0], 10);
+        $pdf->text($valLeft, $y, ': ' . $row[1], 10);
+        $pdf->text($colRight, $y, $identityRight[$i][0], 10);
+        $pdf->text($valRight, $y, ': ' . ($identityRight[$i][1] ?: '...........'), 10);
+        $y -= 16.0;
+    }
+
+    // Garis pemisah
+    $y -= 4.0;
+    $pdf->line($lm, $y, $rm, $y);
+    $y -= 6.0;
+
+    // === JUDUL ===
+    $pdf->setFont('Helvetica', 13, true);
+    $pdf->centerText($lm, $y, $contentW, 'LAPORAN HASIL BELAJAR', 13, true);
+    $y -= 24.0;
+
+    // === TABEL NILAI AKADEMIK ===
+    $colNo = ['x' => $lm, 'w' => 28.0];
+    $colMapel = ['x' => $colNo['x'] + $colNo['w'], 'w' => 160.0];
+    $colNilai = ['x' => $colMapel['x'] + $colMapel['w'], 'w' => 50.0];
+    $colCapaian = ['x' => $colNilai['x'] + $colNilai['w'], 'w' => $rm - ($colNilai['x'] + $colNilai['w'])];
+
+    // Header tabel
+    $headerH = 18.0;
+    $pdf->setFont('Helvetica', 9, true);
+    $pdf->rect($colNo['x'], $y, $colNo['w'], -$headerH, 'S');
+    $pdf->centerText($colNo['x'], $y - 12.0, $colNo['w'], 'No', 9, true);
+    $pdf->rect($colMapel['x'], $y, $colMapel['w'], -$headerH, 'S');
+    $pdf->centerText($colMapel['x'], $y - 12.0, $colMapel['w'], 'Mata Pelajaran', 9, true);
+    $pdf->rect($colNilai['x'], $y, $colNilai['w'], -$headerH, 'S');
+    $pdf->centerText($colNilai['x'], $y - 12.0, $colNilai['w'], 'Nilai Akhir', 9, true);
+    $pdf->rect($colCapaian['x'], $y, $colCapaian['w'], -$headerH, 'S');
+    $pdf->centerText($colCapaian['x'], $y - 12.0, $colCapaian['w'], 'Capaian Kompetensi', 9, true);
+    $y -= $headerH;
+
+    $pdf->setFont('Helvetica', 9);
+    $no = 1;
+    $pageBottom = 200.0;
+    foreach ($subjects as $subject) {
+        $description = trim((string)($subject['description'] ?? ''));
+        if ($description === '') {
+            $description = 'Menunjukkan perkembangan belajar yang baik pada mata pelajaran ' . (string)$subject['name'] . '.';
+        }
+        $capaianWidth = $colCapaian['w'] - 11.0;
+        $capaianLines = $pdf->wrapText($description, $capaianWidth, 9);
+        $rowH = max(20.0, 10.0 + count($capaianLines) * 11.0);
+
+        if ($y - $rowH < $pageBottom) {
+            $pdf->addPage();
+            draw_laporan_footer($pdf, $student, 1);
+            $y = 775.0;
+        }
+
+        $pdf->rect($colNo['x'], $y, $colNo['w'], -$rowH, 'S');
+        $pdf->centerText($colNo['x'], $y - ($rowH / 2) - 3, $colNo['w'], (string)$no, 9);
+
+        $pdf->rect($colMapel['x'], $y, $colMapel['w'], -$rowH, 'S');
+        $mapelText = $pdf->wrapText((string)$subject['name'], $colMapel['w'] - 11.0, 9);
+        foreach (array_slice($mapelText, 0, 2) as $mi => $ml) {
+            $pdf->text($colMapel['x'] + 5.5, $y - 10.0 - ($mi * 11.0), $ml, 9);
+        }
+
+        $pdf->rect($colNilai['x'], $y, $colNilai['w'], -$rowH, 'S');
+        $score = $subject['score'] !== null ? (string)$subject['score'] : '...........';
+        $pdf->centerText($colNilai['x'], $y - ($rowH / 2) - 3, $colNilai['w'], $score, 9);
+
+        $pdf->rect($colCapaian['x'], $y, $colCapaian['w'], -$rowH, 'S');
+        $pdf->justifyText($colCapaian['x'] + 5.5, $y - 10.0, $capaianWidth, $description, 9);
+
+        $y -= $rowH;
+        $no++;
+    }
+
+    // === KOKURIKULER ===
+    $y -= 14.0;
+    if ($y < $pageBottom) { $pdf->addPage(); draw_laporan_footer($pdf, $student, 1); $y = 775.0; }
+    $pdf->setFont('Helvetica', 10, true);
+    $pdf->text($lm, $y, 'Kokurikuler', 10, true);
+    $y -= 14.0;
+
+    $kokHeaderH = 18.0;
+    $pdf->setFont('Helvetica', 9, true);
+    $pdf->rect($colNo['x'], $y, $colNo['w'], -$kokHeaderH, 'S');
+    $pdf->centerText($colNo['x'], $y - 12.0, $colNo['w'], 'No', 9, true);
+    $pdf->rect($colMapel['x'], $y, $colMapel['w'] + $colNilai['w'], -$kokHeaderH, 'S');
+    $pdf->centerText($colMapel['x'], $y - 12.0, $colMapel['w'] + $colNilai['w'], 'Kokurikuler', 9, true);
+    $pdf->rect($colCapaian['x'], $y, $colCapaian['w'], -$kokHeaderH, 'S');
+    $pdf->centerText($colCapaian['x'], $y - 12.0, $colCapaian['w'], 'Keterangan', 9, true);
+    $y -= $kokHeaderH;
+
+    $pdf->setFont('Helvetica', 9);
+    $kokRows = [];
+    if (!empty($student['class_name'])) {
+        $kokurikuler = report_cocurricular_for_student($student);
+        if ($kokurikuler) {
+            $kokRows[] = [$kokurikuler['group_name'] ?? $kokurikuler['theme_name'] ?? '-', $kokurikuler['activity_title'] ?? $kokurikuler['description'] ?? '-'];
+        }
+    }
+    if (!$kokRows) {
+        $kokRows[] = ['...........', '...........'];
+    }
+    foreach ($kokRows as $ki => $kr) {
+        $rowH = 16.0;
+        $pdf->rect($colNo['x'], $y, $colNo['w'], -$rowH, 'S');
+        $pdf->centerText($colNo['x'], $y - 11.0, $colNo['w'], (string)($ki + 1), 9);
+        $pdf->rect($colMapel['x'], $y, $colMapel['w'] + $colNilai['w'], -$rowH, 'S');
+        $pdf->text($colMapel['x'] + 5.5, $y - 11.0, (string)$kr[0], 9);
+        $pdf->rect($colCapaian['x'], $y, $colCapaian['w'], -$rowH, 'S');
+        $pdf->text($colCapaian['x'] + 5.5, $y - 11.0, (string)$kr[1], 9);
+        $y -= $rowH;
+    }
+
+    // === KETIDAKHADIRAN & CATATAN WALI KELAS ===
+    $y -= 14.0;
+    if ($y < $pageBottom) { $pdf->addPage(); draw_laporan_footer($pdf, $student, 1); $y = 775.0; }
+    $pdf->setFont('Helvetica', 10, true);
+    $pdf->text($lm, $y, 'Ketidakhadiran', 10, true);
+    $pdf->text($colRight, $y, 'Catatan Wali Kelas', 10, true);
+    $y -= 16.0;
+
+    $pdf->setFont('Helvetica', 10);
+    $absenLabels = [
+        ['Sakit', $attendance['sakit'] ?? 0],
+        ['Izin', $attendance['izin'] ?? 0],
+        ['Tanpa Keterangan', $attendance['alpa'] ?? 0],
+    ];
+    foreach ($absenLabels as $al) {
+        $pdf->text($lm + 10, $y, $al[0] . ' : ' . $al[1] . ' hari', 10);
+        $y -= 14.0;
+    }
+
+    $catatan = trim((string)($reportDate['note'] ?? '')) ?: 'Menunjukkan sikap baik dan perlu terus dibiasakan belajar mandiri di rumah.';
+    $catatanY = $y + (count($absenLabels) * 14.0);
+    $catatanLines = $pdf->wrapText($catatan, $contentW / 2 - 10, 9);
+    foreach ($catatanLines as $ci => $cl) {
+        $pdf->text($colRight, $catatanY - ($ci * 11.0), $cl, 9);
+    }
+    $y = min($y, $catatanY - count($catatanLines) * 11.0);
+
+    // === TANGGAPAN ORANG TUA ===
+    $y -= 14.0;
+    if ($y < $pageBottom) { $pdf->addPage(); draw_laporan_footer($pdf, $student, 1); $y = 775.0; }
+    $pdf->setFont('Helvetica', 10, true);
+    $pdf->text($lm, $y, 'Tanggapan Orang Tua/Wali Murid', 10, true);
+    $y -= 16.0;
+    $pdf->setFont('Helvetica', 10);
+    for ($line = 0; $line < 4; $line++) {
+        $pdf->line($lm, $y, $rm, $y);
+        $y -= 16.0;
+    }
+
+    // === KETERANGAN KELULUSAN ===
+    if ($isFinalGrade && $graduation) {
+        $y -= 6.0;
+        if ($y < $pageBottom) { $pdf->addPage(); draw_laporan_footer($pdf, $student, 1); $y = 775.0; }
+        $pdf->setFont('Helvetica', 10, true);
+        $statusLabel = match ((string)($graduation['status'] ?? '')) {
+            'lulus' => 'Lulus',
+            'tidak_lulus' => 'Tidak Lulus',
+            'naik' => 'Naik Kelas',
+            'tinggal' => 'Tinggal Kelas',
+            default => '...........',
+        };
+        $pdf->text($lm, $y, 'Keterangan Kelulusan : ' . $statusLabel, 10, true);
+        $y -= 16.0;
+    }
+
+    // === FOOTER TANDA TANGAN ===
+    $y -= 6.0;
+    if ($y < 140.0) { $pdf->addPage(); draw_laporan_footer($pdf, $student, 1); $y = 775.0; }
+    $pdf->setFont('Helvetica', 10);
+    $pdf->text($rm - 160, $y, $dateText, 10);
+    $y -= 20.0;
+
+    $sigGap = 56.0;
+    $col1X = $lm + 20.0;
+    $col2X = $lm + $contentW / 2 - 40.0;
+    $col3X = $rm - 100.0;
+
+    $pdf->setFont('Helvetica', 10);
+    $pdf->text($col1X, $y, 'Orang Tua Murid,', 10);
+    $pdf->text($col2X, $y, 'Kepala Sekolah,', 10);
+    $pdf->text($col3X, $y, 'Wali Kelas,', 10);
+    $y -= $sigGap;
+
+    $pdf->text($col1X, $y, '............................', 10);
+    $pdf->setFont('Helvetica', 10, true);
+    $pdf->text($col2X, $y, $principalName ?: '............................', 10, true);
+    $pdf->text($col3X, $y, $homeroomName ?: '............................', 10, true);
+    $y -= 12.0;
+
+    $pdf->setFont('Helvetica', 10);
+    if ($principalNip) {
+        $pdf->text($col2X - 6, $y, 'NIP. ' . $principalNip, 10);
+    }
+    if ($homeroomNip) {
+        $pdf->text($col3X - 6, $y, 'NIP. ' . $homeroomNip, 10);
+    }
+
+    return $pdf->output();
+}
+
+function draw_laporan_footer(SimplePdf $pdf, array $student, int $pageNo): void
+{
+    $pdf->line(56.69, 36.85, 538.58, 36.85);
+    $pdf->setFont('Helvetica', 7.5);
+    $footer = (string)($student['class_name'] ?? '') . '  |  ' . (string)$student['name'] . '  |  ' . (string)($student['nis'] ?? '');
+    $pdf->italicText(59.53, 20.43, $footer, 7.5);
+    $pdf->italicText(489.08, 20.43, 'Halaman : ' . $pageNo, 7.5);
+}

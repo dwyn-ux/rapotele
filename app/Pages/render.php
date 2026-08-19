@@ -46,6 +46,7 @@ function render_header(string $title): void
         ],
         'Cetak Rapor' => [
             'cetak-pelengkap-rapor' => ['Cetak Biodata', 'cetak-pelengkap-rapor', 'file-text'],
+            'laporan-belajar' => ['Laporan Hasil Belajar', 'laporan-belajar', 'file-check'],
             'cetak-nilai-rapor' => ['Cetak Rapor', 'cetak-nilai-rapor', 'printer'],
             'cetak-leger-rapor' => ['Leger Rapor', 'cetak-leger-rapor', 'list'],
             'cetak-leger-pts' => ['Leger PTS', 'cetak-leger-pts', 'list'],
