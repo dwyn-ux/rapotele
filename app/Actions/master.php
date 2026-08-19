@@ -76,18 +76,19 @@ function action_save_teacher(): void
         trim((string)($_POST['email'] ?? '')),
         trim((string)($_POST['position'] ?? '')),
         trim((string)($_POST['telegram_chat_id'] ?? '')),
+        isset($_POST['is_bk']) ? 1 : 0,
         isset($_POST['active']) ? 1 : 0,
         now_string(),
     ];
     if ($id > 0) {
         execute_sql(
-            'UPDATE teachers SET name = ?, nip = ?, nuptk = ?, gender = ?, phone = ?, email = ?, position = ?, telegram_chat_id = ?, active = ?, updated_at = ? WHERE id = ?',
+            'UPDATE teachers SET name = ?, nip = ?, nuptk = ?, gender = ?, phone = ?, email = ?, position = ?, telegram_chat_id = ?, is_bk = ?, active = ?, updated_at = ? WHERE id = ?',
             array_merge($data, [$id])
         );
         $teacherId = $id;
     } else {
         execute_sql(
-            'INSERT INTO teachers (name, nip, nuptk, gender, phone, email, position, telegram_chat_id, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO teachers (name, nip, nuptk, gender, phone, email, position, telegram_chat_id, is_bk, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             $data
         );
         $teacherId = (int)db()->lastInsertId();
@@ -318,14 +319,27 @@ function action_save_user(): void
 
 function action_save_violation(): void
 {
-    require_role(['admin']);
+    require_bk();
     $id = (int)($_POST['id'] ?? 0);
+    $ruleId = (int)($_POST['rule_id'] ?? 0) ?: null;
+
+    $type = trim((string)($_POST['type'] ?? ''));
+    $points = (int)($_POST['points'] ?? 0);
+
+    if ($ruleId) {
+        $rule = fetch_one('SELECT * FROM violation_rules WHERE id = ?', [$ruleId]);
+        if ($rule) {
+            $type = $type ?: (string)$rule['description'];
+            $points = $points ?: (int)$rule['points'];
+        }
+    }
+
     $data = [
         (int)$_POST['student_id'],
         date_ymd((string)($_POST['date'] ?? date('Y-m-d'))),
-        trim((string)$_POST['type']),
+        $type,
         trim((string)($_POST['description'] ?? '')),
-        (int)($_POST['points'] ?? 0),
+        $points,
         trim((string)($_POST['action_taken'] ?? '')),
         (int)current_user()['id'],
         now_string(),

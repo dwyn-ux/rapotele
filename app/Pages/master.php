@@ -272,12 +272,13 @@ function page_teachers(): void
                 <label>Username Login <input type="text" name="username" data-autofill-username value="<?= e($edit['username'] ?? '') ?>" placeholder="otomatis: <?= e($autoUsername) ?>"></label>
                 <label>Password Login <input type="password" name="password" value="<?= e(config('default_teacher_password', 'guru123')) ?>" placeholder="default: <?= e(config('default_teacher_password', 'guru123')) ?>"></label>
             <?php endif; ?>
+            <label class="check"><input type="checkbox" name="is_bk" <?= checked((int)($edit['is_bk'] ?? 0)) ?>> Guru BK (Bimbingan Konseling)</label>
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
             <div class="actions span-2"><button class="button primary">Simpan</button><a class="button" href="<?= e(route_url('teachers')) ?>">Reset</a></div>
         </form>
     <?php input_panel_end(); ?>
-    <?php table_panel('Daftar Guru', ['Nama', 'NIP', 'JK', 'Jabatan', 'Telegram', 'Status', 'Aksi'], $rows, function ($row) { ?>
-        <td><?= e($row['name']) ?></td><td><?= e($row['nip']) ?></td><td><?= e($row['gender']) ?></td><td><?= e($row['position']) ?></td><td><?= e($row['telegram_chat_id']) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('teachers', (int)$row['id'], 'delete_teacher') ?></td>
+    <?php table_panel('Daftar Guru', ['Nama', 'NIP', 'JK', 'Jabatan', 'BK', 'Status', 'Aksi'], $rows, function ($row) { ?>
+        <td><?= e($row['name']) ?></td><td><?= e($row['nip']) ?></td><td><?= e($row['gender']) ?></td><td><?= e($row['position']) ?></td><td><?= (int)($row['is_bk'] ?? 0) ? '<span class="badge ok">BK</span>' : '—' ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('teachers', (int)$row['id'], 'delete_teacher') ?></td>
     <?php }, '', true); ?>
     <?php render_footer();
 }

@@ -59,16 +59,36 @@ function page_student_violations(): void
     require_role(['siswa']);
     $student = current_student();
     $rows = student_violations((int)$student['id']);
-    $total = array_sum(array_map(fn ($row) => (int)$row['points'], $rows));
-    render_header('Pelanggaran Siswa');
-    echo '<div class="metric-grid"><div class="metric"><span>Total Catatan</span><strong>' . e(count($rows)) . '</strong></div><div class="metric"><span>Total Poin</span><strong>' . e($total) . '</strong></div></div>';
+    $net = function_exists('violation_net_points') ? violation_net_points((int)$student['id']) : ['gross_points' => array_sum(array_column($rows, 'points')), 'net_points' => array_sum(array_column($rows, 'points')), 'discount_pct' => 0, 'deduction' => 0];
+    $spLevel = function_exists('violation_sp_level') ? violation_sp_level($net['net_points']) : null;
+    $rewards = table_exists('student_rewards') ? fetch_all('SELECT * FROM student_rewards WHERE student_id = ? ORDER BY date DESC', [(int)$student['id']]) : [];
+    render_header('Pelanggaran & Poin Siswa');
+    echo '<div class="metric-grid">'
+        . '<div class="metric"><span>Total Catatan</span><strong>' . e(count($rows)) . '</strong></div>'
+        . '<div class="metric"><span>Poin Pelanggaran</span><strong>' . e($net['gross_points']) . '</strong></div>';
+    if ($net['discount_pct'] > 0) {
+        echo '<div class="metric"><span>Diskon Reward</span><strong>-' . e($net['discount_pct']) . '%</strong></div>'
+            . '<div class="metric"><span>Poin Bersih</span><strong>' . e($net['net_points']) . '</strong></div>';
+    }
+    if ($spLevel) {
+        echo '<div class="metric"><span>Status</span><strong style="color:#dc2626;">' . e($spLevel['label']) . '</strong></div>';
+    }
+    echo '</div>';
     table_panel('Riwayat Pelanggaran', ['Tanggal', 'Jenis', 'Deskripsi', 'Poin', 'Tindak Lanjut'], $rows, function ($row) { ?>
         <td><?= e($row['date']) ?></td>
         <td><?= e($row['type']) ?></td>
         <td><?= e($row['description']) ?></td>
         <td><?= e($row['points']) ?></td>
         <td><?= e($row['action_taken']) ?></td>
-    <?php }); render_footer();
+    <?php });
+    if ($rewards) {
+        table_panel('Reward & Prestasi', ['Tanggal', 'Prestasi', 'Potongan Poin'], $rewards, function ($row) { ?>
+            <td><?= e($row['date']) ?></td>
+            <td><?= e($row['title']) ?></td>
+            <td><?= e($row['discount_percent']) ?>%</td>
+        <?php });
+    }
+    render_footer();
 }
 
 function page_student_documents(): void

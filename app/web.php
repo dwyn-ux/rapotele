@@ -14,6 +14,7 @@ require_once $base . '/Actions/settings.php';
 require_once $base . '/Actions/backup.php';
 require_once $base . '/Actions/dapodik.php';
 require_once $base . '/Actions/admin.php';
+require_once $base . '/Actions/violations.php';
 
 require_once $base . '/Pages/render.php';
 require_once $base . '/Pages/helpers.php';
@@ -31,3 +32,4 @@ require_once $base . '/Pages/dapodik.php';
 require_once $base . '/Pages/export.php';
 require_once $base . '/Pages/import_bulk.php';
 require_once $base . '/Pages/admin.php';
+require_once $base . '/Pages/violations.php';

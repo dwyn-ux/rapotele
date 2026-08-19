@@ -40,6 +40,7 @@ function render_header(string $title): void
             'lesson-schedule' => ['Jadwal Pelajaran', 'lesson-schedule', 'calendar-days'],
             'journals' => ['Jurnal Harian', 'journals', 'book'],
             'violations' => ['Pelanggaran Siswa', 'violations', 'alert-triangle'],
+            'violation-rules' => ['Pasal & SP', 'violation-rules', 'book-open'],
             'input-nilai-ekskul' => ['Input Nilai Ekskul', 'input-nilai-ekskul', 'award'],
             'naik-kelas' => ['Keterangan Naik Kelas', 'naik-kelas', 'arrow-up-circle'],
         ],
@@ -96,8 +97,8 @@ function render_header(string $title): void
             'gabung-mapel', 'data-mapping', 'data-logo-ttd', 'tanggal-rapor', 'foto-siswa',
             'tema-kokurikuler', 'kegiatan-kokurikuler', 'kelompok-kokurikuler', 'input-kelulusan',
             'import-nomor-ijazah', 'setting-transkrip', 'setting-skl', 'mapping-mapel-skl',
-            'input-nilai-skl', 'kirim-data-dapodik', 'backup-restore', 'whatsapp', 'users', 'violations',
-            'import-bulk', 'bulk-delete',
+            'input-nilai-skl', 'kirim-data-dapodik', 'backup-restore', 'whatsapp', 'users',
+            'import-bulk', 'bulk-delete', 'violation-rules',
         ] as $adminPage) {
             foreach ($menuGroups as &$groupItems) {
                 unset($groupItems[$adminPage]);
@@ -106,6 +107,12 @@ function render_header(string $title): void
         }
     } else {
         $menuGroups['Pengaturan']['users'] = ['Data Pengguna', 'users', 'shield'];
+        if (!function_exists('is_bk') || !is_bk()) {
+            foreach ($menuGroups as &$groupItems) {
+                unset($groupItems['violations']);
+            }
+            unset($groupItems);
+        }
     }
     $menuGroups['Pengaturan']['profile'] = ['Profil Pengguna', 'profile', 'user'];
 

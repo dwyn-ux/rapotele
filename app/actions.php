@@ -32,6 +32,11 @@ return [
     'delete_journal' => fn (): mixed => action_delete('daily_journals', 'journals'),
     'save_violation' => 'action_save_violation',
     'delete_violation' => fn (): mixed => action_delete('student_violations', 'violations'),
+    'save_violation_rule' => 'action_save_violation_rule',
+    'delete_violation_rule' => 'action_delete_violation_rule',
+    'save_sp_threshold' => 'action_save_sp_threshold',
+    'save_reward' => 'action_save_reward',
+    'delete_reward' => 'action_delete_reward',
 
     'save_extracurricular' => 'action_save_extracurricular',
     'save_subject_group' => 'action_save_subject_group',

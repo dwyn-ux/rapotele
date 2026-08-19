@@ -612,6 +612,37 @@ function run_migrations(): void
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             UNIQUE (student_id, extracurricular_id)
         )$engine",
+
+        "CREATE TABLE IF NOT EXISTS violation_rules (
+            id $pk,
+            code VARCHAR(40) NOT NULL,
+            category VARCHAR(80) NOT NULL DEFAULT 'Umum',
+            description TEXT NOT NULL,
+            points INT NOT NULL DEFAULT 0,
+            active $bool NOT NULL DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )$engine",
+
+        "CREATE TABLE IF NOT EXISTS student_rewards (
+            id $pk,
+            student_id INT NOT NULL,
+            date DATE NOT NULL,
+            title VARCHAR(160) NOT NULL,
+            description TEXT NULL,
+            discount_percent INT NOT NULL DEFAULT 0,
+            created_by INT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )$engine",
+
+        "CREATE TABLE IF NOT EXISTS sp_thresholds (
+            id $pk,
+            level INT NOT NULL UNIQUE,
+            label VARCHAR(40) NOT NULL,
+            min_points INT NOT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )$engine",
     ];
 
     foreach ($statements as $sql) {
@@ -627,6 +658,7 @@ function run_migrations(): void
     migration_add_column('teachers', 'position', 'VARCHAR(120) NULL');
     migration_add_column('teachers', 'active', migration_bool() . ' NOT NULL DEFAULT 1');
     migration_add_column('teachers', 'updated_at', 'DATETIME NULL');
+    migration_add_column('teachers', 'is_bk', migration_bool() . ' NOT NULL DEFAULT 0');
     migration_add_column('classes', 'dapodik_id', 'VARCHAR(64) NULL');
     migration_add_column('classes', 'grade', 'VARCHAR(16) NULL');
     migration_add_column('classes', 'major', 'VARCHAR(80) NULL');
@@ -791,16 +823,16 @@ function install_database(): void
 function seed_clean_defaults(): void
 {
     foreach ([
-        'dapodik_url' => '',
-        'dapodik_token' => '',
-        'dapodik_npsn' => '',
-        'whatsapp_mode' => 'simulate',
-        'whatsapp_access_token' => '',
-        'whatsapp_phone_number_id' => '',
-        'whatsapp_waba_id' => '',
-        'whatsapp_graph_version' => 'v23.0',
-        'whatsapp_cloud_delivery' => 'text',
-        'whatsapp_fonnte_token' => '',
+        'dapodik_url'                  => '',
+        'dapodik_token'                => '',
+        'dapodik_npsn'                 => '',
+        'whatsapp_mode'                => 'simulate',
+        'whatsapp_access_token'        => '',
+        'whatsapp_phone_number_id'     => '',
+        'whatsapp_waba_id'             => '',
+        'whatsapp_graph_version'       => 'v23.0',
+        'whatsapp_cloud_delivery'      => 'text',
+        'whatsapp_fonnte_token'        => '',
         'whatsapp_fonnte_country_code' => '62',
     ] as $key => $value) {
         if (get_app_setting($key, null) === null) {
@@ -813,6 +845,24 @@ function seed_clean_defaults(): void
     if (get_app_setting('whatsapp_cron_secret', '') === '') {
         set_app_setting('whatsapp_cron_secret', bin2hex(random_bytes(12)));
     }
+    seed_default_sp_thresholds();
+}
+
+function seed_default_sp_thresholds(): void
+{
+    if (!table_exists('sp_thresholds')) {
+        return;
+    }
+    $defaults = [
+        [1, 'SP-1', 50],
+        [2, 'SP-2', 75],
+        [3, 'SP-3', 100],
+    ];
+    foreach ($defaults as [$level, $label, $minPoints]) {
+        if (!fetch_one('SELECT id FROM sp_thresholds WHERE level = ?', [$level])) {
+            execute_sql('INSERT INTO sp_thresholds (level, label, min_points, updated_at) VALUES (?, ?, ?, ?)', [$level, $label, $minPoints, now_string()]);
+        }
+    }
 }
 
 function seed_extended_defaults(): void
@@ -822,6 +872,7 @@ function seed_extended_defaults(): void
     seed_demo_learning_activity_data();
     seed_demo_student_portal_data();
     seed_demo_whatsapp_data();
+    seed_default_sp_thresholds();
 
     foreach (['dapodik_url' => '', 'dapodik_token' => '', 'dapodik_npsn' => ''] as $key => $value) {
         if (get_app_setting($key, null) === null) {

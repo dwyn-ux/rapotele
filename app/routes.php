@@ -72,6 +72,8 @@ return [
         'lesson-schedule' => 'page_lesson_schedule',
         'journals' => 'page_journals',
         'violations' => 'page_violations',
+        'violation-rules' => 'page_violation_rules',
+        'cetak-sp' => 'page_cetak_sp',
         'reports' => 'page_reports',
         'student-progress' => 'page_student_progress',
         'student-attendance-view' => 'page_student_attendance_view',

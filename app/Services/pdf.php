@@ -1695,3 +1695,144 @@ function page_biodata_download_class(): void
     readfile($zipPath);
     exit;
 }
+
+function page_cetak_sp(): void
+{
+    require_bk();
+    $studentId = (int)($_GET['student_id'] ?? 0);
+    if (!$studentId) {
+        http_response_code(404);
+        exit('Siswa tidak ditemukan.');
+    }
+    $student = fetch_one(
+        'SELECT s.*, c.name AS class_name FROM students s LEFT JOIN classes c ON c.id = s.class_id WHERE s.id = ?',
+        [$studentId]
+    );
+    if (!$student) {
+        http_response_code(404);
+        exit('Siswa tidak ditemukan.');
+    }
+
+    $net = violation_net_points($studentId);
+    $spLevel = violation_sp_level($net['net_points']);
+    if (!$spLevel) {
+        http_response_code(400);
+        exit('Siswa belum mencapai threshold surat peringatan.');
+    }
+
+    $violations = fetch_all(
+        'SELECT * FROM student_violations WHERE student_id = ? ORDER BY date DESC',
+        [$studentId]
+    );
+    $rewards = fetch_all(
+        'SELECT * FROM student_rewards WHERE student_id = ? ORDER BY date DESC',
+        [$studentId]
+    );
+    $school = report_get_school_profile();
+    $schoolLogo = report_logo_signature();
+    $principalSig = report_signature_by_type('principal');
+
+    $pdf = new SimplePdf();
+    $pdf->addPage();
+
+    $pageW = 595.28;
+    $lm = 70.0;
+    $rm = 525.0;
+    $contentW = $rm - $lm;
+
+    draw_report_asset_badge($pdf, $lm, 810.0, 50.0, 50.0, 'SEKOLAH', (string)($schoolLogo['file_path'] ?? ''));
+
+    $pdf->setFont('Helvetica', 13, true);
+    $pdf->centerText($lm + 55, 808.0, $contentW - 55, strtoupper((string)$school['name']), 13, true);
+    $pdf->setFont('Helvetica', 9);
+    $pdf->centerText($lm + 55, 792.0, $contentW - 55, (string)($school['address'] ?: ''), 9);
+    $pdf->line($lm, 775.0, $rm, 775.0);
+    $pdf->line($lm, 773.0, $rm, 773.0);
+
+    $spLabel = (string)$spLevel['label'];
+    $pdf->setFont('Helvetica', 13, true);
+    $pdf->centerText($lm, 748.0, $contentW, 'SURAT PERINGATAN ' . strtoupper($spLabel), 13, true);
+
+    $pdf->setFont('Helvetica', 10);
+    $pdf->centerText($lm, 730.0, $contentW, 'Nomor: ........./........./'.date('Y'), 10);
+
+    $pdf->setFont('Helvetica', 10);
+    $y = 700.0;
+    $pdf->justifyText($lm, $y, $contentW, 'Yang bertanda tangan di bawah ini, Kepala ' . (string)$school['name'] . ' memberikan Surat Peringatan kepada siswa berikut:', 10);
+    $y -= 30.0;
+
+    foreach ([
+        'Nama Siswa'      => (string)$student['name'],
+        'NIS / NISN'      => trim((string)$student['nis'] . ' / ' . (string)$student['nisn']),
+        'Kelas'           => (string)($student['class_name'] ?? '-'),
+        'Total Poin'      => $net['gross_points'] . ' poin (bersih: ' . $net['net_points'] . ' poin)',
+        'Level Peringatan'=> $spLabel,
+    ] as $label => $value) {
+        $pdf->text($lm + 10, $y, $label, 10);
+        $pdf->text($lm + 120, $y, ': ' . $value, 10);
+        $y -= 17.0;
+    }
+
+    $y -= 8.0;
+    $pdf->justifyText($lm, $y, $contentW, 'Sehubungan dengan akumulasi poin pelanggaran tata tertib sekolah yang telah mencapai batas ' . $spLabel . ' (' . $spLevel['min_points'] . ' poin), siswa tersebut diberikan peringatan untuk segera memperbaiki sikap dan perilaku.', 10);
+    $y -= 45.0;
+
+    if ($violations) {
+        $pdf->setFont('Helvetica', 10, true);
+        $pdf->text($lm, $y, 'Rincian Pelanggaran:', 10, true);
+        $y -= 5.0;
+        $pdf->line($lm, $y, $rm, $y);
+        $y -= 14.0;
+        $pdf->setFont('Helvetica', 9);
+        $pdf->text($lm, $y, 'No', 9, true);
+        $pdf->text($lm + 22, $y, 'Tanggal', 9, true);
+        $pdf->text($lm + 80, $y, 'Jenis Pelanggaran', 9, true);
+        $pdf->text($rm - 40, $y, 'Poin', 9, true);
+        $y -= 4.0;
+        $pdf->line($lm, $y, $rm, $y);
+        $y -= 14.0;
+        foreach (array_slice($violations, 0, 15) as $i => $v) {
+            $pdf->text($lm, $y, (string)($i + 1), 9);
+            $pdf->text($lm + 22, $y, (string)$v['date'], 9);
+            $pdf->text($lm + 80, $y, mb_strimwidth((string)$v['type'], 0, 55, '...'), 9);
+            $pdf->text($rm - 40, $y, (string)$v['points'], 9);
+            $y -= 14.0;
+            if ($y < 180) {
+                break;
+            }
+        }
+        $y -= 4.0;
+        $pdf->line($lm, $y, $rm, $y);
+        $y -= 14.0;
+    }
+
+    if ($rewards) {
+        $y -= 5.0;
+        $pdf->text($lm, $y, 'Reward/Prestasi (potongan poin): ' . $net['discount_pct'] . '%', 10, true);
+        $y -= 16.0;
+    }
+
+    $y -= 5.0;
+    $pdf->justifyText($lm, $y, $contentW, 'Surat peringatan ini dikeluarkan agar siswa dan orang tua/wali dapat mengambil langkah perbaikan. Apabila tidak ada perubahan, sekolah berhak mengambil tindakan lebih lanjut sesuai ketentuan yang berlaku.', 10);
+    $y -= 48.0;
+
+    $tanggal = format_indonesian_date(date('Y-m-d'));
+    $pdf->text($rm - 180, $y, (string)($school['address'] ?: 'Sekolah') . ', ' . $tanggal, 10);
+    $y -= 14.0;
+    $pdf->text($rm - 180, $y, 'Kepala Sekolah,', 10);
+    $y -= 60.0;
+    if ($principalSig && !empty($principalSig['file_path'])) {
+        $pdf->image(report_asset_path((string)$principalSig['file_path']), $rm - 180, $y + 60 - 50, 80, 40);
+    }
+    $pdf->text($rm - 180, $y, (string)($school['principal_name'] ?: '..................................'), 10, true);
+    $y -= 14.0;
+    $pdf->text($rm - 180, $y, 'NIP. ' . (string)($school['principal_nip'] ?: '...........................'), 9);
+
+    $pdfContent = $pdf->output();
+    $filename = 'SP_' . preg_replace('/[^A-Za-z0-9_]/', '_', (string)$student['name']) . '_' . $spLabel . '.pdf';
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="' . $filename . '"');
+    header('Content-Length: ' . strlen($pdfContent));
+    echo $pdfContent;
+    exit;
+}
