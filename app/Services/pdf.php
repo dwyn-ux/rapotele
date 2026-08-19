@@ -739,7 +739,12 @@ function draw_report_identity(SimplePdf $pdf, array $payload, int $pageNo): void
 
     $pdf->text(59.53, 746.76, 'Sekolah');
     $pdf->text(161.58, 746.76, ':');
-    $pdf->text(170.08, 746.76, (string)$school['name']);
+    $schoolNameWidth = 391.18 - 170.08 - 10.0; // mentok sebelum label Tahun Ajaran
+    $schoolNameLines = array_slice($pdf->wrapText((string)$school['name'], $schoolNameWidth, 10), 0, 2);
+    $pdf->text(170.08, 746.76, $schoolNameLines[0] ?? '', 10);
+    if (isset($schoolNameLines[1])) {
+    $pdf->text(170.08, 746.76 - 11.34, $schoolNameLines[1], 10);
+    }
     $pdf->text(391.18, 746.76, 'Tahun Ajaran');
     $pdf->text(476.22, 746.76, ':');
     $pdf->text(484.72, 746.76, (string)$school['academic_year']);
@@ -789,8 +794,8 @@ function report_learning_table_columns(): array
     return [
         'no'       => ['x' => 56.69,  'w' => 22.68,  'label' => 'No', 'fill' => true],
         'mapel'    => ['x' => 79.37,  'w' => 120.00, 'label' => 'Mata Pelajaran', 'fill' => true],
-        'nilai'    => ['x' => 199.37, 'w' => 36.00,  'label' => 'Nilai Akhir', 'fill' => false],
-        'capaian'  => ['x' => 235.37, 'w' => 303.21, 'label' => 'Capaian Kompetensi', 'fill' => false],
+        'nilai'    => ['x' => 199.37, 'w' => 55.00,  'label' => 'Nilai Akhir', 'fill' => false],
+        'capaian'  => ['x' => 254.37, 'w' => 284.21, 'label' => 'Capaian Kompetensi', 'fill' => false],
     ];
 }
 
