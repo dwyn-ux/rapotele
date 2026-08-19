@@ -788,11 +788,9 @@ function report_learning_table_columns(): array
 {
     return [
         'no'       => ['x' => 56.69,  'w' => 22.68,  'label' => 'No', 'fill' => true],
-        'mapel'    => ['x' => 79.37,  'w' => 99.21,  'label' => 'Mata Pelajaran', 'fill' => true],
-        'kkm'      => ['x' => 178.58, 'w' => 28.35,  'label' => 'KKM', 'fill' => false],
-        'nilai'    => ['x' => 206.93, 'w' => 36.00,  'label' => 'Nilai', 'fill' => false],
-        'predikat' => ['x' => 242.93, 'w' => 53.00,  'label' => 'Predikat', 'fill' => false],
-        'capaian'  => ['x' => 295.93, 'w' => 242.65, 'label' => 'Capaian Kompetensi', 'fill' => false],
+        'mapel'    => ['x' => 79.37,  'w' => 120.00, 'label' => 'Mata Pelajaran', 'fill' => true],
+        'nilai'    => ['x' => 199.37, 'w' => 36.00,  'label' => 'Nilai Akhir', 'fill' => false],
+        'capaian'  => ['x' => 235.37, 'w' => 303.21, 'label' => 'Capaian Kompetensi', 'fill' => false],
     ];
 }
 
@@ -872,13 +870,9 @@ function draw_report_page_one(SimplePdf $pdf, array $payload): int
         foreach ($mapelLines as $mlIdx => $ml) {
             $pdf->text($cols['mapel']['x'] + 5.67, $mapelStartY - ($mlIdx * 11.34), $ml, 9);
         }
-        $pdf->rect($cols['kkm']['x'], $y, $cols['kkm']['w'], -$height, 'S');
-        $pdf->centerText($cols['kkm']['x'], $y - ($height / 2) - 3, $cols['kkm']['w'], (string)($subject['kkm'] ?? '-'), 9);
         $pdf->rect($cols['nilai']['x'], $y, $cols['nilai']['w'], -$height, 'S');
         $score = $subject['score'] !== null ? (string)$subject['score'] : '';
         $pdf->centerText($cols['nilai']['x'], $y - ($height / 2) - 3, $cols['nilai']['w'], $score, 9);
-        $pdf->rect($cols['predikat']['x'], $y, $cols['predikat']['w'], -$height, 'S');
-        $pdf->centerText($cols['predikat']['x'], $y - ($height / 2) - 3, $cols['predikat']['w'], (string)($subject['predikat'] ?? '-'), 9);
         $pdf->rect($cols['capaian']['x'], $y, $cols['capaian']['w'], -$height, 'S');
         $pdf->justifyText($cols['capaian']['x'] + 5.67, $y - 11.55, $capaianTextWidth, $description, 9);
         $y -= $height;
