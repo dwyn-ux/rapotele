@@ -1946,10 +1946,19 @@ function generate_laporan_belajar_pdf(array $student): string
         ['Semester', current_semester()],
         ['Tahun Ajaran', current_academic_year()],
     ];
+    $leftMaxW = $contentW * 0.60;
     for ($i = 0; $i < count($identityLeft); $i++) {
         $leftVal = $identityLeft[$i][1] ?: '...........';
         $rightVal = $identityRight[$i][1] ?: '...........';
-        $pdf->text($colLeftX, $y, $identityLeft[$i][0] . '  :  ' . $leftVal, 10);
+        $leftText = $identityLeft[$i][0] . '  :  ' . $leftVal;
+        $leftTextW = $pdf->stringWidth($leftText, 10);
+        if ($leftTextW > $leftMaxW) {
+            while ($pdf->stringWidth($leftText . '...', 10) > $leftMaxW && strlen($leftText) > 5) {
+                $leftText = substr($leftText, 0, -1);
+            }
+            $leftText .= '...';
+        }
+        $pdf->text($colLeftX, $y, $leftText, 10);
         $pdf->text($colRightX, $y, $identityRight[$i][0] . '  :  ' . $rightVal, 10);
         $y -= $rowH;
     }
@@ -1967,7 +1976,7 @@ function generate_laporan_belajar_pdf(array $student): string
     $tableW = $contentW;
     $mapelW = max(140.0, $tableW * 0.25);
     $noW = 28.0;
-    $nilaiW = 50.0;
+    $nilaiW = 65.0;
     $capaianW = $tableW - $noW - $mapelW - $nilaiW;
 
     $colNo = ['x' => $lm, 'w' => $noW];
