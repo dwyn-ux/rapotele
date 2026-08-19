@@ -285,10 +285,12 @@ document.addEventListener('DOMContentLoaded', function() {
     var searchSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
 
     document.querySelectorAll('select:not(.search-select-original)').forEach(function(sel) {
-        if (sel.closest('.search-select')) return;
-        if (sel.options.length < 8) return;
+        try {
+            if (sel.closest('.search-select')) return;
+            if (sel.options.length < 8) return;
+            if (sel.multiple) return;
 
-        var wrap = document.createElement('div');
+            var wrap = document.createElement('div');
         wrap.className = 'search-select';
         sel.parentNode.insertBefore(wrap, sel);
         wrap.appendChild(sel);
@@ -403,6 +405,9 @@ document.addEventListener('DOMContentLoaded', function() {
         dd.addEventListener('click', function(e) {
             e.stopPropagation();
         });
+        } catch (err) {
+            console.warn('Search select skipped:', sel.name || sel.id, err);
+        }
     });
 
     document.addEventListener('click', function() {
