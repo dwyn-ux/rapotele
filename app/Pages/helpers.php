@@ -345,6 +345,42 @@ function render_cascading_assignment_selects(array $assignments, int $selected, 
     <?php
 }
 
+function render_file_upload(string $name, string $accept, string $label = 'Pilih file', bool $required = false, string $hint = ''): void
+{
+    $req = $required ? ' <span style="color:var(--danger,#ef4444)">*</span>' : '';
+    $acceptLabel = str_replace(['.', 'image/', 'application/', 'text/'], ['', '', '', ''], $accept);
+    $acceptUpper = strtoupper(str_replace(',', ' / ', $acceptLabel));
+    ?>
+    <div class="file-upload-wrap">
+        <label class="file-upload-label"><?= $label . $req ?></label>
+        <div class="file-upload-box" id="fub-<?= e($name) ?>">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--primary,#6366f1)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div class="file-upload-text">Seret & lepas file ke sini atau <span class="file-upload-browse">cari file</span></div>
+            <div class="file-upload-accept">Format: <?= e($acceptUpper) ?></div>
+            <input type="file" name="<?= e($name) ?>" accept="<?= e($accept) ?>" <?= $required ? 'required' : '' ?> class="file-upload-input" data-target="fub-<?= e($name) ?>">
+            <div class="file-upload-filename"></div>
+        </div>
+        <?php if ($hint !== ''): ?>
+            <p class="file-upload-hint"><?= $hint ?></p>
+        <?php endif; ?>
+    </div>
+    <?php
+}
+
+function render_file_upload_inline(string $name, string $accept, bool $required = false, string $filename = ''): void
+{
+    ?>
+    <div class="file-upload-inline">
+        <label class="file-upload-inline-label">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Pilih File
+            <input type="file" name="<?= e($name) ?>" accept="<?= e($accept) ?>" <?= $required ? 'required' : '' ?> class="file-upload-input">
+        </label>
+        <span class="file-upload-inline-filename"><?= e($filename ?: 'Belum ada file dipilih') ?></span>
+    </div>
+    <?php
+}
+
 function attendance_summary_for_student(int $studentId): array
 {
     $rows = fetch_all('SELECT status, COUNT(*) AS total FROM student_attendance_entries WHERE student_id = ? GROUP BY status', [$studentId]);

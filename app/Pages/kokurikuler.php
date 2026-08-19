@@ -146,7 +146,7 @@ function page_data_logo_ttd(): void
         <label>Jabatan <input type="text" name="title" value="<?= e($edit['title'] ?? '') ?>"></label>
         <label>Nama <input type="text" name="person_name" value="<?= e($edit['person_name'] ?? '') ?>"></label>
         <label>NIP <input type="text" name="nip" value="<?= e($edit['nip'] ?? '') ?>"></label>
-        <label>File <input type="file" name="userfile" accept="image/*"></label>
+        <?php render_file_upload('userfile', 'image/*', 'File Gambar') ?>
     <?php ext_simple_form_end('data-logo-ttd'); ?>
     <?php table_panel('Daftar Logo/TTD', ['Tipe', 'Preview', 'User', 'Nama', 'NIP', 'File', 'Aksi'], $rows, function ($row) use ($types) { ?>
         <td><?= e($types[$row['type']] ?? $row['type']) ?></td>
@@ -225,7 +225,7 @@ function page_foto_siswa(): void
         <form method="post" enctype="multipart/form-data" class="grid four">
             <?= csrf_field() ?><input type="hidden" name="action" value="save_student_photo">
             <label>Siswa <select name="student_id"><?= options($students, '') ?></select></label>
-            <label>Foto <input type="file" name="userfile" accept="image/*" required></label>
+            <?php render_file_upload_inline('userfile', 'image/*', true) ?>
             <div class="actions"><button class="button primary">Upload</button></div>
         </form>
     </section>
@@ -240,10 +240,10 @@ function page_foto_siswa(): void
         </p>
         <form method="post" enctype="multipart/form-data">
             <?= csrf_field() ?><input type="hidden" name="action" value="bulk_student_photo">
-            <label>File ZIP Foto <input type="file" name="zip_file" accept=".zip,application/zip" required></label>
+            <?php render_file_upload('zip_file', '.zip,application/zip', 'File ZIP Foto', true, 'Nama file gambar harus sesuai NISN siswa. Contoh: 0081234001.jpg') ?>
             <div class="actions" style="margin-top:10px;">
                 <button class="button primary" onclick="return confirm('Upload foto bulk dari file ZIP ini? Nama file gambar akan dicocokkan dengan NISN siswa.')">
-                    📦 Upload Bulk Foto
+                    Upload Bulk Foto
                 </button>
             </div>
         </form>

@@ -11,7 +11,7 @@ function page_backup_restore(): void
             <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="create_backup"><button class="button primary">Backup Data</button></form>
             <form method="post" enctype="multipart/form-data" onsubmit="return confirm('Restore akan mengganti data saat ini. Lanjut?')">
                 <?= csrf_field() ?><input type="hidden" name="action" value="restore_backup">
-                <label>File Backup JSON <input type="file" name="userfile" accept=".json,application/json" required></label>
+                <?php render_file_upload('userfile', '.json,application/json', 'File Backup JSON', true, 'Pilih file backup .json untuk direstore.') ?>
                 <div class="actions"><button class="button danger">Restore Data</button></div>
             </form>
         </div>
@@ -82,7 +82,7 @@ function page_update_data(): void
                     <i data-lucide="file-json"></i>
                     File JSON
                 </span>
-                <input type="file" name="json_file" accept=".json,application/json" style="height:auto;padding:var(--space-3)">
+                <?php render_file_upload_inline('json_file', '.json,application/json', false) ?>
             </label>
             <label class="wide">
                 <span class="field-icon">

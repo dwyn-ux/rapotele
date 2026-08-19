@@ -170,7 +170,7 @@ function page_import_nomor_ijazah(): void
     <section class="panel">
         <form method="post" enctype="multipart/form-data" class="grid four">
             <?= csrf_field() ?><input type="hidden" name="action" value="import_certificate_numbers">
-            <label>CSV: nisn, nomor_ijazah, nomor_transkrip, tgl_lulus <input type="file" name="userfile" accept=".csv,text/csv" required></label>
+            <?php render_file_upload('userfile', '.csv,text/csv', 'CSV: nisn, nomor_ijazah, nomor_transkrip, tgl_lulus', true) ?>
             <div class="actions"><button class="button primary">Import Nomor Ijazah</button></div>
         </form>
     </section>

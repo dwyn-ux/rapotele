@@ -30,7 +30,7 @@ function page_violation_rules(): void
         <form method="post" enctype="multipart/form-data" style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="import_violation_rules">
-            <input type="file" name="csv_file" accept=".csv" required style="font-size:.875rem;">
+            <?php render_file_upload_inline('csv_file', '.csv', true) ?>
             <button type="submit" class="button primary">Import CSV</button>
         </form>
     </section>

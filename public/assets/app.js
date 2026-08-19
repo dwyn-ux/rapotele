@@ -231,3 +231,47 @@ document.addEventListener('DOMContentLoaded', () => {
         }, duration);
     };
 });
+
+// ═══════════════════════════════════════
+// FILE UPLOAD COMPONENT
+// ═══════════════════════════════════════
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.file-upload-input').forEach(function(input) {
+        var box = input.closest('.file-upload-box');
+        var inlineWrap = input.closest('.file-upload-inline');
+        var filenameEl = box ? box.querySelector('.file-upload-filename') : null;
+        var inlineNameEl = inlineWrap ? inlineWrap.querySelector('.file-upload-inline-filename') : null;
+        if (!box && !inlineWrap) return;
+
+        function showFileName(files) {
+            if (!files || !files.length) return;
+            var name = files[0].name;
+            var size = (files[0].size / 1024).toFixed(1);
+            var label = name + ' (' + size + ' KB)';
+            if (filenameEl) {
+                filenameEl.textContent = label;
+                box.classList.add('has-file');
+            }
+            if (inlineNameEl) {
+                inlineNameEl.textContent = label;
+            }
+        }
+
+        input.addEventListener('change', function() { showFileName(this.files); });
+
+        if (box) {
+            ['dragenter', 'dragover'].forEach(function(ev) {
+                box.addEventListener(ev, function(e) { e.preventDefault(); e.stopPropagation(); box.classList.add('dragover'); });
+            });
+            ['dragleave', 'drop'].forEach(function(ev) {
+                box.addEventListener(ev, function(e) { e.preventDefault(); e.stopPropagation(); box.classList.remove('dragover'); });
+            });
+            box.addEventListener('drop', function(e) {
+                if (e.dataTransfer.files.length) {
+                    input.files = e.dataTransfer.files;
+                    showFileName(e.dataTransfer.files);
+                }
+            });
+        }
+    });
+});

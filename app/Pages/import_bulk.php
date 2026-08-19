@@ -84,7 +84,7 @@ function page_import_bulk(): void
                 <option value="siswa">Siswa</option>
                 <option value="jadwal">Jadwal Pelajaran</option>
             </select></label>
-            <label>File CSV <input type="file" name="csv_file" accept=".csv,text/csv" required></label>
+            <?php render_file_upload('csv_file', '.csv,text/csv', 'File CSV', true, 'Format: username, password, name, gender, nip, dst.') ?>
             <div class="wide actions">
                 <button class="button primary" id="importBtn" onclick="return confirm(this.dataset.msg)">Import Sekarang</button>
             </div>
