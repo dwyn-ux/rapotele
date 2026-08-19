@@ -593,3 +593,146 @@ function action_save_promotion(): void
     flash('success', 'Status kenaikan kelas tersimpan.');
     redirect_to('naik-kelas', ['class_id' => $classId]);
 }
+
+function action_save_deskripsi_nilai(): void
+{
+    require_role(['admin', 'guru']);
+    $studentId = (int)($_POST['student_id'] ?? 0);
+    $classId = (int)($_POST['class_id'] ?? 0);
+    $grade = trim((string)($_POST['grade'] ?? ''));
+    if ($studentId <= 0 || $grade === '') {
+        throw new RuntimeException('Data tidak valid.');
+    }
+    require_class_access($classId);
+    $descriptions = $_POST['desc'] ?? [];
+    foreach ($descriptions as $subjectId => $desc) {
+        $subjectId = (int)$subjectId;
+        $desc = trim((string)$desc);
+        if ($subjectId <= 0 || $desc === '') {
+            continue;
+        }
+        $existing = fetch_one(
+            'SELECT id FROM student_descriptions WHERE student_id = ? AND subject_id = ? AND grade_val = ?',
+            [$studentId, $subjectId, $grade]
+        );
+        if ($existing) {
+            execute_sql(
+                'UPDATE student_descriptions SET description = ?, auto_generated = 0, updated_at = ? WHERE id = ?',
+                [$desc, now_string(), (int)$existing['id']]
+            );
+        } else {
+            execute_sql(
+                'INSERT INTO student_descriptions (student_id, subject_id, grade_val, description, auto_generated, updated_at) VALUES (?, ?, ?, ?, 0, ?)',
+                [$studentId, $subjectId, $grade, $desc, now_string()]
+            );
+        }
+    }
+    flash('success', 'Deskripsi nilai tersimpan.');
+    redirect_to('deskripsi-nilai', ['class_id' => $classId]);
+}
+
+function action_generate_deskripsi_nilai(): void
+{
+    require_role(['admin', 'guru']);
+    $classId = (int)($_POST['class_id'] ?? 0);
+    $grade = trim((string)($_POST['grade'] ?? ''));
+    if ($classId <= 0 || $grade === '') {
+        throw new RuntimeException('Data tidak valid.');
+    }
+    require_class_access($classId);
+
+    $students = fetch_all('SELECT id FROM students WHERE class_id = ? AND active = 1', [$classId]);
+    $kkm = (int)get_app_setting('grade.kkm', '70');
+    $examWeight = (int)get_app_setting('grade.exam_weight', '40');
+    $dailyWeight = 100 - $examWeight;
+
+    $allObjectives = fetch_all(
+        'SELECT lo.subject_id, lo.description FROM learning_objectives lo WHERE lo.grade = ? AND lo.active = 1',
+        [$grade]
+    );
+    $objectivesBySubject = [];
+    foreach ($allObjectives as $lo) {
+        $objectivesBySubject[(int)$lo['subject_id']][] = $lo['description'];
+    }
+
+    $subjects = fetch_all(
+        'SELECT s.id, s.name FROM subjects s WHERE s.active = 1 ORDER BY s.name'
+    );
+
+    foreach ($students as $student) {
+        $studentId = (int)$student['id'];
+        foreach ($subjects as $subject) {
+            $sid = (int)$subject['id'];
+            $ta = fetch_one(
+                'SELECT id FROM teaching_assignments WHERE subject_id = ? AND class_id = ? AND active = 1 LIMIT 1',
+                [$sid, $classId]
+            );
+            $assignmentId = $ta ? (int)$ta['id'] : 0;
+            $dailyAvg = 0;
+            $examScore = 0;
+            $finalScore = 0;
+            if ($assignmentId) {
+                $g = fetch_one('SELECT AVG(score) AS avg_score FROM grades WHERE assignment_id = ? AND student_id = ?', [$assignmentId, $studentId]);
+                $dailyAvg = (float)($g['avg_score'] ?? 0);
+            }
+            $es = fetch_one('SELECT score FROM exam_scores WHERE subject_id = ? AND student_id = ?', [$sid, $studentId]);
+            $examScore = (float)($es['score'] ?? 0);
+            $fs = fetch_one('SELECT score FROM final_scores WHERE subject_id = ? AND student_id = ?', [$sid, $studentId]);
+            $finalScore = (float)($fs['score'] ?? 0);
+
+            if ($finalScore <= 0 && $dailyAvg > 0) {
+                $finalScore = $examScore > 0
+                    ? ($dailyAvg * $dailyWeight / 100) + ($examScore * $examWeight / 100)
+                    : $dailyAvg;
+            } elseif ($finalScore <= 0 && $examScore > 0) {
+                $finalScore = $examScore;
+            }
+            $finalRounded = $finalScore > 0 ? (int)round($finalScore) : 0;
+
+            $autoDesc = '';
+            $objectives = $objectivesBySubject[$sid] ?? [];
+            if ($objectives) {
+                $achieved = [];
+                $needHelp = [];
+                foreach ($objectives as $obj) {
+                    if ($finalRounded >= $kkm) {
+                        $achieved[] = $obj;
+                    } else {
+                        $needHelp[] = $obj;
+                    }
+                }
+                $parts = [];
+                if ($achieved) {
+                    $parts[] = 'Mencapai kompetensi baik dalam ' . implode(', ', array_slice($achieved, 0, 3));
+                }
+                if ($needHelp) {
+                    $parts[] = 'Perlu peningkatan dalam memahami ' . implode(', ', array_slice($needHelp, 0, 2));
+                }
+                $autoDesc = $parts ? implode('. ', $parts) . '.' : '';
+            }
+            if ($autoDesc === '') {
+                $autoDesc = $finalRounded >= $kkm
+                    ? 'Mencapai kompetensi dengan baik.'
+                    : 'Perlu peningkatan dalam memahami kompetensi dasar.';
+            }
+
+            $existing = fetch_one(
+                'SELECT id FROM student_descriptions WHERE student_id = ? AND subject_id = ? AND grade_val = ?',
+                [$studentId, $sid, $grade]
+            );
+            if ($existing) {
+                execute_sql(
+                    'UPDATE student_descriptions SET description = ?, auto_generated = 1, updated_at = ? WHERE id = ?',
+                    [$autoDesc, now_string(), (int)$existing['id']]
+                );
+            } else {
+                execute_sql(
+                    'INSERT INTO student_descriptions (student_id, subject_id, grade_val, description, auto_generated, updated_at) VALUES (?, ?, ?, ?, 1, ?)',
+                    [$studentId, $sid, $grade, $autoDesc, now_string()]
+                );
+            }
+        }
+    }
+    flash('success', 'Deskripsi nilai otomatis berhasil digenerate untuk semua siswa.');
+    redirect_to('deskripsi-nilai', ['class_id' => $classId]);
+}

@@ -34,6 +34,7 @@ function render_header(string $title): void
             'data-tp' => ['Tujuan Pembelajaran', 'data-tp', 'compass'],
             'status-penilaian' => ['Status Penilaian', 'status-penilaian', 'bar-chart'],
             'grades' => ['Input Nilai', 'grades', 'pencil'],
+            'deskripsi-nilai' => ['Deskripsi Nilai', 'deskripsi-nilai', 'file-text'],
             'student-attendance' => ['Absensi Siswa/Mapel', 'student-attendance', 'clipboard-check'],
             'teacher-attendance' => ['Absensi Mengajar', 'teacher-attendance', 'check-square'],
             'teacher-attendance-self' => ['Absensi Kehadiran Guru', 'teacher-attendance-self', 'clock'],

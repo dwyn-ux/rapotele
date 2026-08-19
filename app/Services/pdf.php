@@ -458,30 +458,45 @@ function report_subjects_for_student(array $student, int $studentId): array
 
         $desc = '';
         $sid = (int)$r['id'];
-        $objectives = $objectivesBySubject[$sid] ?? [];
-        if ($objectives) {
-            $achieved = [];
-            $needHelp = [];
-            foreach ($objectives as $obj) {
-                if ($finalRounded >= $kkm) {
-                    $achieved[] = $obj;
-                } else {
-                    $needHelp[] = $obj;
-                }
+
+        // Check student_descriptions table first (manual override from deskripsi-nilai page)
+        if (table_exists('student_descriptions')) {
+            $saved = fetch_one(
+                'SELECT description FROM student_descriptions WHERE student_id = ? AND subject_id = ? AND grade_val = ?',
+                [$studentId, $sid, (string)$grade]
+            );
+            if ($saved && trim((string)$saved['description']) !== '') {
+                $desc = trim((string)$saved['description']);
             }
-            $parts = [];
-            if ($achieved) {
-                $parts[] = 'Mencapai kompetensi baik dalam ' . implode(', ', array_slice($achieved, 0, 3));
-            }
-            if ($needHelp) {
-                $parts[] = 'Perlu peningkatan dalam memahami ' . implode(', ', array_slice($needHelp, 0, 2));
-            }
-            $desc = $parts ? implode('. ', $parts) . '.' : '';
         }
+
+        // Fallback: auto-generate from learning_objectives
         if ($desc === '') {
-            $desc = $finalRounded >= $kkm
-                ? 'Mencapai kompetensi dengan baik.'
-                : 'Perlu peningkatan dalam memahami kompetensi dasar.';
+            $objectives = $objectivesBySubject[$sid] ?? [];
+            if ($objectives) {
+                $achieved = [];
+                $needHelp = [];
+                foreach ($objectives as $obj) {
+                    if ($finalRounded >= $kkm) {
+                        $achieved[] = $obj;
+                    } else {
+                        $needHelp[] = $obj;
+                    }
+                }
+                $parts = [];
+                if ($achieved) {
+                    $parts[] = 'Mencapai kompetensi baik dalam ' . implode(', ', array_slice($achieved, 0, 3));
+                }
+                if ($needHelp) {
+                    $parts[] = 'Perlu peningkatan dalam memahami ' . implode(', ', array_slice($needHelp, 0, 2));
+                }
+                $desc = $parts ? implode('. ', $parts) . '.' : '';
+            }
+            if ($desc === '') {
+                $desc = $finalRounded >= $kkm
+                    ? 'Mencapai kompetensi dengan baik.'
+                    : 'Perlu peningkatan dalam memahami kompetensi dasar.';
+            }
         }
 
         $subjects[] = [
@@ -1177,6 +1192,18 @@ function page_cetak_nilai_rapor_pdf(): void
     $class = $classId ? fetch_one('SELECT * FROM classes WHERE id = ?', [$classId]) : null;
     $students = $class ? fetch_all('SELECT * FROM students WHERE class_id = ? AND active = 1 ORDER BY name', [$classId]) : [];
     render_header('Cetak Nilai Rapor');
+    // Check mapping completeness
+    $grade = $class ? (string)($class['grade'] ?? '') : '';
+    if ($grade) {
+        $mappedCount = (int)(fetch_one('SELECT COUNT(*) AS total FROM report_mappings WHERE grade = ? AND include_in_report = 1', [$grade])['total'] ?? 0);
+        if ($mappedCount === 0 && table_exists('report_mappings')) {
+            echo '<section class="panel" style="border-left:4px solid var(--warning);background:rgba(255,152,0,.06);">';
+            echo '<h3 style="color:var(--warning);">Mapping Rapor Belum Diisi</h3>';
+            echo '<p>Untuk kelas <strong>' . e($grade) . '</strong> belum ada mapping mata pelajaran. Rapor akan menampilkan <strong>semua mapel aktif</strong> tanpa urutan kelompok yang benar.</p>';
+            echo '<p>Silakan isi mapping terlebih dulu di <a href="' . e(route_url('data-mapping')) . '">Data Mapping Rapor</a>.</p>';
+            echo '</section>';
+        }
+    }
     ?>
     <section class="panel no-print">
         <?php panel_title('Cetak Nilai Rapor Siswa'); ?>

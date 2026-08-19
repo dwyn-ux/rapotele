@@ -64,6 +64,7 @@ return [
         'panduan' => 'page_panduan',
         'import-bulk' => 'page_import_bulk',
         'grades' => 'page_grades',
+        'deskripsi-nilai' => 'page_deskripsi_nilai',
         'student-attendance' => 'page_student_attendance',
         'teacher-attendance' => 'page_teacher_attendance',
         'teacher-attendance-self' => 'page_teacher_attendance_self',

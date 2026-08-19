@@ -653,6 +653,18 @@ function run_migrations(): void
             min_points INT NOT NULL,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )$engine",
+
+        "CREATE TABLE IF NOT EXISTS student_descriptions (
+            id $pk,
+            student_id INT NOT NULL,
+            subject_id INT NOT NULL,
+            grade_val VARCHAR(16) NOT NULL,
+            description TEXT NOT NULL,
+            auto_generated $bool NOT NULL DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (student_id, subject_id, grade_val)
+        )$engine",
     ];
 
     foreach ($statements as $sql) {

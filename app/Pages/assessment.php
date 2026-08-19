@@ -548,4 +548,179 @@ function page_journals(): void
     <?php render_footer();
 }
 
+function page_deskripsi_nilai(): void
+{
+    require_role(['admin', 'guru']);
+    $classId = (int)($_GET['class_id'] ?? 0);
+    $subjectId = (int)($_GET['subject_id'] ?? 0);
+    $classes = classes_for_current_user();
+    if (!$classId && $classes) {
+        $classId = (int)$classes[0]['id'];
+    }
+    if ($classId > 0) {
+        require_class_access($classId);
+    }
+
+    $class = $classId ? fetch_one('SELECT * FROM classes WHERE id = ?', [$classId]) : null;
+    $grade = $class ? (string)($class['grade'] ?? '') : '';
+
+    $subjects = [];
+    if ($classId) {
+        $subjects = fetch_all(
+            'SELECT DISTINCT s.id, s.name
+             FROM subjects s
+             JOIN teaching_assignments ta ON ta.subject_id = s.id AND ta.class_id = ?
+             WHERE s.active = 1 AND ta.active = 1
+             ORDER BY s.name',
+            [$classId]
+        );
+    }
+
+    render_header('Deskripsi Nilai');
+    ?>
+    <section class="panel no-print">
+        <?php panel_title('Deskripsi Nilai per Siswa per Mapel'); ?>
+        <form method="get" class="grid four">
+            <input type="hidden" name="page" value="deskripsi-nilai">
+            <label>Pilih Kelas <select name="class_id" onchange="this.form.submit()"><?= options(array_column_map($classes, 'id', 'name'), $classId) ?></select></label>
+            <label>Pilih Mapel <select name="subject_id" onchange="this.form.submit()">
+                <option value="">-- Semua Mapel --</option>
+                <?php foreach ($subjects as $s): ?>
+                    <option value="<?= e($s['id']) ?>" <?= (int)$subjectId === (int)$s['id'] ? 'selected' : '' ?>><?= e($s['name']) ?></option>
+                <?php endforeach; ?>
+            </select></label>
+            <div class="actions"><button type="submit" class="button">Tampilkan</button>
+            <?php if ($classId): ?>
+                <a class="button warning" href="<?= e(route_url('deskripsi-nilai', ['class_id' => $classId, 'subject_id' => $subjectId, 'generate_all' => 1])) ?>" onclick="return confirm('Generate ulang deskripsi otomatis untuk semua siswa? Deskripsi yang sudah diedit akan ditimpa.')">Generate Ulang Semua</a>
+            <?php endif; ?>
+            </div>
+        </form>
+    </section>
+    <?php
+    if (!$classId || !$grade) {
+        echo '<section class="panel"><p class="empty">Pilih kelas terlebih dulu.</p></section>';
+        render_footer();
+        return;
+    }
+
+    $students = fetch_all(
+        'SELECT * FROM students WHERE class_id = ? AND active = 1 ORDER BY name',
+        [$classId]
+    );
+
+    $kkm = (int)get_app_setting('grade.kkm', '70');
+    $examWeight = (int)get_app_setting('grade.exam_weight', '40');
+    $dailyWeight = 100 - $examWeight;
+
+    $allObjectives = fetch_all(
+        'SELECT lo.id, lo.subject_id, lo.description FROM learning_objectives lo WHERE lo.grade = ? AND lo.active = 1',
+        [$grade]
+    );
+    $objectivesBySubject = [];
+    foreach ($allObjectives as $lo) {
+        $objectivesBySubject[(int)$lo['subject_id']][] = $lo['description'];
+    }
+
+    $filterSubjects = $subjectId > 0 ? array_filter($subjects, fn($s) => (int)$s['id'] === $subjectId) : $subjects;
+
+    foreach ($students as $student):
+        $studentId = (int)$student['id'];
+        ?>
+        <section class="panel">
+            <h3><?= e($student['name']) ?> — <?= e($student['nis'] ?? '') ?></h3>
+            <form method="post">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="save_deskripsi_nilai">
+                <input type="hidden" name="student_id" value="<?= e($studentId) ?>">
+                <input type="hidden" name="class_id" value="<?= e($classId) ?>">
+                <input type="hidden" name="grade" value="<?= e($grade) ?>">
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Mapel</th><th>Nilai Akhir</th><th>Predikat</th><th style="width:50%">Deskripsi Capaian Kompetensi</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($filterSubjects as $subject):
+                            $sid = (int)$subject['id'];
+                            $ta = fetch_one(
+                                'SELECT id FROM teaching_assignments WHERE subject_id = ? AND class_id = ? AND active = 1 LIMIT 1',
+                                [$sid, $classId]
+                            );
+                            $assignmentId = $ta ? (int)$ta['id'] : 0;
+                            $dailyAvg = 0;
+                            $examScore = 0;
+                            $finalScore = 0;
+                            if ($assignmentId) {
+                                $g = fetch_one('SELECT AVG(score) AS avg_score FROM grades WHERE assignment_id = ? AND student_id = ?', [$assignmentId, $studentId]);
+                                $dailyAvg = (float)($g['avg_score'] ?? 0);
+                            }
+                            $es = fetch_one('SELECT score FROM exam_scores WHERE subject_id = ? AND student_id = ?', [$sid, $studentId]);
+                            $examScore = (float)($es['score'] ?? 0);
+                            $fs = fetch_one('SELECT score FROM final_scores WHERE subject_id = ? AND student_id = ?', [$sid, $studentId]);
+                            $finalScore = (float)($fs['score'] ?? 0);
+
+                            if ($finalScore <= 0 && $dailyAvg > 0) {
+                                $finalScore = $examScore > 0
+                                    ? ($dailyAvg * $dailyWeight / 100) + ($examScore * $examWeight / 100)
+                                    : $dailyAvg;
+                            } elseif ($finalScore <= 0 && $examScore > 0) {
+                                $finalScore = $examScore;
+                            }
+                            $finalRounded = $finalScore > 0 ? (int)round($finalScore) : 0;
+                            $predikat = $finalRounded > 0 ? predikat_from_score($finalRounded) : '-';
+
+                            $existing = fetch_one(
+                                'SELECT id, description, auto_generated FROM student_descriptions WHERE student_id = ? AND subject_id = ? AND grade_val = ?',
+                                [$studentId, $sid, $grade]
+                            );
+
+                            $autoDesc = '';
+                            $objectives = $objectivesBySubject[$sid] ?? [];
+                            if ($objectives) {
+                                $achieved = [];
+                                $needHelp = [];
+                                foreach ($objectives as $obj) {
+                                    if ($finalRounded >= $kkm) {
+                                        $achieved[] = $obj;
+                                    } else {
+                                        $needHelp[] = $obj;
+                                    }
+                                }
+                                $parts = [];
+                                if ($achieved) {
+                                    $parts[] = 'Mencapai kompetensi baik dalam ' . implode(', ', array_slice($achieved, 0, 3));
+                                }
+                                if ($needHelp) {
+                                    $parts[] = 'Perlu peningkatan dalam memahami ' . implode(', ', array_slice($needHelp, 0, 2));
+                                }
+                                $autoDesc = $parts ? implode('. ', $parts) . '.' : '';
+                            }
+                            if ($autoDesc === '') {
+                                $autoDesc = $finalRounded >= $kkm
+                                    ? 'Mencapai kompetensi dengan baik.'
+                                    : 'Perlu peningkatan dalam memahami kompetensi dasar.';
+                            }
+
+                            $savedDesc = $existing ? (string)$existing['description'] : $autoDesc;
+                            ?>
+                            <tr>
+                                <td><?= e($subject['name']) ?></td>
+                                <td style="text-align:center;"><?= $finalRounded > 0 ? $finalRounded : '-' ?></td>
+                                <td style="text-align:center;"><?= $predikat ?></td>
+                                <td>
+                                    <textarea name="desc[<?= e($sid) ?>]" rows="3" style="width:100%;font-size:0.875rem;" placeholder="Deskripsi otomatis akan digenerate jika kosong"><?= e($savedDesc) ?></textarea>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="actions">
+                    <button class="button primary">Simpan Deskripsi</button>
+                    <a class="button" href="<?= e(route_url('deskripsi-nilai', ['class_id' => $classId, 'subject_id' => $subjectId])) ?>">Reset</a>
+                </div>
+            </form>
+        </section>
+    <?php endforeach;
+    render_footer();
+}
+
 
