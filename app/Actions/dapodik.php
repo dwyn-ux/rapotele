@@ -440,7 +440,7 @@ function dapodik_academic_year_from_row(array $row): string
         return $match[1] . '/' . ((int)$match[1] + 1);
     }
 
-    return (string)config('school.academic_year', '2025/2026');
+    return (string)current_academic_year();
 }
 
 function dapodik_grade_from_rombel(array $row, string $name): string
@@ -1071,7 +1071,7 @@ function dapodik_semester_from_row(array $row): string
         return $semester;
     }
 
-    return (string)config('school.semester', 'Genap');
+    return (string)current_semester();
 }
 
 function dapodik_import_pembelajaran(array $row): bool
@@ -1163,8 +1163,8 @@ function dapodik_import(string $type, array $json): int
                             $row['npsn'] ?? '',
                             $row['alamat'] ?? $row['alamat_jalan'] ?? '',
                             $row['nama_kepala_sekolah'] ?? $row['kepala_sekolah'] ?? '',
-                            (string)config('school.academic_year', '2025/2026'),
-                            (string)config('school.semester', 'Genap'),
+                            (string)current_academic_year(),
+                            (string)current_semester(),
                             now_string(),
                         ]
                     );

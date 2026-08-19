@@ -314,7 +314,7 @@ function page_classes(): void
             </label>
             <label>
                 <span class="field-icon"><i data-lucide="calendar"></i> Tahun Ajaran</span>
-                <input type="text" name="academic_year" required value="<?= e($edit['academic_year'] ?? config('school.academic_year')) ?>" placeholder="Contoh: 2026/2027">
+                <input type="text" name="academic_year" required value="<?= e($edit['academic_year'] ?? current_academic_year()) ?>" readonly>
             </label>
             <label class="check field-check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> <span>Kelas Aktif</span></label>
             <div class="wide actions form-actions-top"><button type="submit" class="button primary"><i data-lucide="save"></i> Simpan</button><a class="button" href="<?= e(route_url('classes')) ?>"><i data-lucide="rotate-ccw"></i> Reset</a></div>
@@ -410,8 +410,8 @@ function page_assignments(): void
             <label>Guru <select name="teacher_id" required><?= options($teachers, $edit['teacher_id'] ?? '') ?></select></label>
             <label>Kelas <select name="class_id" required><?= options($classes, $edit['class_id'] ?? '') ?></select></label>
             <label>Mapel <select name="subject_id" required><?= options($subjects, $edit['subject_id'] ?? '') ?></select></label>
-            <label>Tahun Ajaran <input type="text" name="academic_year" required value="<?= e($edit['academic_year'] ?? config('school.academic_year')) ?>"></label>
-            <label>Semester <input type="text" name="semester" required value="<?= e($edit['semester'] ?? config('school.semester')) ?>"></label>
+            <label>Tahun Ajaran <input type="text" name="academic_year" required value="<?= e($edit['academic_year'] ?? current_academic_year()) ?>" readonly></label>
+            <label>Semester <input type="text" name="semester" required value="<?= e($edit['semester'] ?? current_semester()) ?>" readonly></label>
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
             <div class="actions span-2"><button class="button primary">Simpan</button><a class="button" href="<?= e(route_url('assignments')) ?>">Reset</a></div>
         </form>

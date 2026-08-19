@@ -327,7 +327,7 @@ function class_phase(string $grade): string
 
 function semester_number(): string
 {
-    return str_contains(strtolower((string)config('school.semester', 'Genap')), 'genap') ? '2' : '1';
+    return current_semester_number();
 }
 
 function report_student_payload(int $studentId): array
@@ -686,8 +686,8 @@ function report_get_school_profile(): array
     if (!table_exists('school_profile')) {
         return [
             'name' => config('school.name'),
-            'academic_year' => config('school.academic_year'),
-            'semester' => config('school.semester'),
+            'academic_year' => current_academic_year(),
+            'semester' => current_semester(),
             'address' => '',
             'principal_name' => '',
             'principal_nip' => '',
@@ -697,8 +697,8 @@ function report_get_school_profile(): array
     $school = fetch_one('SELECT * FROM school_profile ORDER BY id LIMIT 1');
     return $school ?: [
         'name' => config('school.name'),
-        'academic_year' => config('school.academic_year'),
-        'semester' => config('school.semester'),
+        'academic_year' => current_academic_year(),
+        'semester' => current_semester(),
         'address' => '',
         'principal_name' => '',
         'principal_nip' => '',

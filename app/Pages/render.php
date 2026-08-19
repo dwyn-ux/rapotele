@@ -154,7 +154,7 @@ function render_header(string $title): void
                 <?= render_app_mark() ?>
                 <div class="brand-info">
                     <strong><?= e(config('app_name')) ?></strong>
-                    <span><?= e($school['academic_year'] ?? config('school.academic_year')) ?> · <?= e($school['semester'] ?? config('school.semester')) ?></span>
+                    <span><?= e(current_academic_year()) ?> · <?= e(current_semester()) ?></span>
                 </div>
             </div>
             <nav class="sidebar-nav">
@@ -402,4 +402,19 @@ function get_school_profile(): array
         'academic_year' => config('school.academic_year'),
         'semester' => config('school.semester'),
     ];
+}
+
+function current_academic_year(): string
+{
+    return (string)(get_school_profile()['academic_year'] ?? config('school.academic_year', '2025/2026'));
+}
+
+function current_semester(): string
+{
+    return (string)(get_school_profile()['semester'] ?? config('school.semester', 'Ganjil'));
+}
+
+function current_semester_number(): string
+{
+    return str_contains(strtolower(current_semester()), 'genap') ? '2' : '1';
 }

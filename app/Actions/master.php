@@ -431,8 +431,8 @@ function action_import_bulk(): void
             $norm = strtolower(preg_replace('/[^a-z0-9\s]/', '', (string)preg_replace('/\s*,\s*/', ' ', $t['name'])));
             $allTeachers[$norm] = (int)$t['id'];
         }
-        $academicYear = (string)config('school.academic_year', '2025/2026');
-        $semester = (string)config('school.semester', 'Genap');
+        $academicYear = (string)current_academic_year();
+        $semester = (string)current_semester();
 
         $rowNum = 1;
         while (($row = fgetcsv($handle)) !== false) {
@@ -728,8 +728,8 @@ function action_import_bulk_confirm(): void
     unset($_SESSION['import_bulk_pending']);
 
     $dayMap = ['senin' => 1, 'selasa' => 2, 'rabu' => 3, 'kamis' => 4, 'jumat' => 5, 'jum\'at' => 5, 'sabtu' => 6];
-    $academicYear = (string)config('school.academic_year', '2025/2026');
-    $semester = (string)config('school.semester', 'Genap');
+    $academicYear = (string)current_academic_year();
+    $semester = (string)current_semester();
     $imported = 0;
     $skipped = 0;
     $errors = [];
