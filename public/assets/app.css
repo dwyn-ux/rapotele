@@ -3299,9 +3299,11 @@ code.block {
   z-index: 100;
   max-height: 280px;
   overflow: hidden;
-  display: none;
+  display: none !important;
 }
-.search-select-dropdown.open { display: flex; }
+.search-select-dropdown.open {
+  display: flex !important;
+}
 
 .search-select-search {
   position: relative;

@@ -303,7 +303,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var dd = document.createElement('div');
         dd.className = 'search-select-dropdown';
-        dd.style.display = 'none';
         wrap.appendChild(dd);
 
         var searchBox = document.createElement('div');
