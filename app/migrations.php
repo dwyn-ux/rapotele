@@ -669,6 +669,8 @@ function run_migrations(): void
     migration_add_column('teachers', 'active', migration_bool() . ' NOT NULL DEFAULT 1');
     migration_add_column('teachers', 'updated_at', 'DATETIME NULL');
     migration_add_column('teachers', 'is_bk', migration_bool() . ' NOT NULL DEFAULT 0');
+    migration_add_column('grades', 'assessment_type', "VARCHAR(20) NOT NULL DEFAULT 'UH'");
+    migration_add_column('grades', 'learning_objective_id', 'INT NULL');
     migration_add_column('classes', 'dapodik_id', 'VARCHAR(64) NULL');
     migration_add_column('classes', 'grade', 'VARCHAR(16) NULL');
     migration_add_column('classes', 'major', 'VARCHAR(80) NULL');

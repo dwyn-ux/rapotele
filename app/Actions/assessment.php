@@ -3,20 +3,28 @@
 function action_save_grades(): void
 {
     $assignment = require_assignment_access((int)$_POST['assignment_id']);
+    $assessmentType = trim((string)($_POST['assessment_type'] ?? 'UH'));
+    $learningObjectiveId = (int)($_POST['learning_objective_id'] ?? 0) ?: null;
+    $validTypes = array_keys(assessment_type_options());
+    if (!in_array($assessmentType, $validTypes, true)) {
+        $assessmentType = 'UH';
+    }
     foreach ((array)($_POST['score'] ?? []) as $studentId => $score) {
         $studentId = (int)$studentId;
         require_student_in_assignment_class($studentId, $assignment);
         $scoreValue = trim((string)$score) === '' ? null : (float)$score;
-        $description = trim((string)(($_POST['description'][$studentId] ?? '')));
-        $existing = fetch_one('SELECT id FROM grades WHERE assignment_id = ? AND student_id = ?', [(int)$assignment['id'], $studentId]);
+        $existing = fetch_one(
+            'SELECT id FROM grades WHERE assignment_id = ? AND student_id = ? AND assessment_type = ? AND ' . ($learningObjectiveId ? 'learning_objective_id = ?' : 'learning_objective_id IS NULL'),
+            $learningObjectiveId ? [(int)$assignment['id'], $studentId, $assessmentType, $learningObjectiveId] : [(int)$assignment['id'], $studentId, $assessmentType]
+        );
         if ($existing) {
-            execute_sql('UPDATE grades SET score = ?, description = ?, created_by = ?, updated_at = ? WHERE id = ?', [$scoreValue, $description, (int)current_user()['id'], now_string(), (int)$existing['id']]);
+            execute_sql('UPDATE grades SET score = ?, created_by = ?, updated_at = ? WHERE id = ?', [$scoreValue, (int)current_user()['id'], now_string(), (int)$existing['id']]);
         } else {
-            execute_sql('INSERT INTO grades (assignment_id, student_id, score, description, created_by, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [(int)$assignment['id'], $studentId, $scoreValue, $description, (int)current_user()['id'], now_string()]);
+            execute_sql('INSERT INTO grades (assignment_id, student_id, assessment_type, learning_objective_id, score, created_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)', [(int)$assignment['id'], $studentId, $assessmentType, $learningObjectiveId, $scoreValue, (int)current_user()['id'], now_string()]);
         }
     }
-    flash('success', 'Nilai tersimpan.');
-    redirect_to('grades', ['assignment_id' => (int)$assignment['id']]);
+    flash('success', 'Nilai ' . assessment_type_label($assessmentType) . ' tersimpan.');
+    redirect_to('grades', ['assignment_id' => (int)$assignment['id'], 'type' => $assessmentType]);
 }
 
 function action_save_student_attendance(): void

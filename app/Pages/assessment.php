@@ -199,38 +199,108 @@ function page_grades(): void
 {
     require_role(['admin', 'guru']);
     $assignmentId = (int)($_GET['assignment_id'] ?? 0);
+    $assessmentType = (string)($_GET['type'] ?? 'UH');
+    $validTypes = array_keys(assessment_type_options());
+    if (!in_array($assessmentType, $validTypes, true)) {
+        $assessmentType = 'UH';
+    }
     $assignments = assignments_for_current_user();
     $assignment = $assignmentId > 0 ? require_assignment_access($assignmentId) : ($assignments[0] ?? null);
     render_header('Input Nilai');
-    assignment_picker('grades', $assignments, $assignment ? (int)$assignment['id'] : 0);
+    assignment_picker('grades', $assignments, $assignment ? (int)$assignment['id'] : 0, $assessmentType);
     if (!$assignment) {
         echo '<section class="panel"><p class="empty">Belum ada pembelajaran.</p></section>';
         render_footer();
         return;
     }
-    $students = fetch_all('SELECT s.*, g.score, g.description FROM students s LEFT JOIN grades g ON g.student_id = s.id AND g.assignment_id = ? WHERE s.class_id = ? AND s.active = 1 ORDER BY s.name', [(int)$assignment['id'], (int)$assignment['class_id']]);
+
+    $tps = learning_objectives_for_assignment($assignment);
+    $students = fetch_all(
+        'SELECT s.id, s.name, s.nis FROM students s WHERE s.class_id = ? AND s.active = 1 ORDER BY s.name',
+        [(int)$assignment['class_id']]
+    );
+
+    $existingGrades = fetch_all(
+        'SELECT * FROM grades WHERE assignment_id = ? AND assessment_type = ?',
+        [(int)$assignment['id'], $assessmentType]
+    );
+    $gradeMap = [];
+    foreach ($existingGrades as $g) {
+        $key = (int)$g['student_id'] . '_' . ((int)($g['learning_objective_id'] ?? 0));
+        $gradeMap[$key] = $g;
+    }
     ?>
     <section class="panel">
-        <h3><?= e($assignment['class_name']) ?> - <?= e($assignment['subject_name']) ?></h3>
-        <div class="actions" style="margin-bottom:1rem">
+        <h3><?= e($assignment['class_name']) ?> — <?= e($assignment['subject_name']) ?></h3>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;">
+            <?php foreach (assessment_type_options() as $typeKey => $typeLabel): ?>
+                <a class="button <?= $typeKey === $assessmentType ? 'primary' : '' ?>" href="<?= e(route_url('grades', ['assignment_id' => (int)$assignment['id'], 'type' => $typeKey])) ?>"><?= e($typeLabel) ?></a>
+            <?php endforeach; ?>
+        </div>
+        <?php if ($tps): ?>
+            <?php foreach ($tps as $tp): ?>
+                <form method="post" style="margin-bottom:1.5rem;">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="save_grades">
+                    <input type="hidden" name="assignment_id" value="<?= e($assignment['id']) ?>">
+                    <input type="hidden" name="assessment_type" value="<?= e($assessmentType) ?>">
+                    <input type="hidden" name="learning_objective_id" value="<?= e($tp['id']) ?>">
+                    <div class="panel-heading" style="margin:calc(-1 * var(--space-6)) calc(-1 * var(--space-6)) var(--space-4);padding:var(--space-3) var(--space-6);background:var(--surface-secondary);border-radius:var(--radius-xl) var(--radius-xl) 0 0;">
+                        <div class="panel-title" style="font-size:var(--font-size-sm);">
+                            <span style="display:inline-block;background:var(--primary);color:#fff;padding:2px 8px;border-radius:4px;font-size:0.7rem;font-weight:700;margin-right:6px;">TP</span>
+                            <?= e($tp['description']) ?>
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>No</th><th>Nama Siswa</th><th>NIS</th><th>Nilai</th></tr></thead>
+                            <tbody>
+                                <?php foreach ($students as $i => $student): ?>
+                                    <?php $key = $student['id'] . '_' . $tp['id']; $g = $gradeMap[$key] ?? []; ?>
+                                    <tr>
+                                        <td><?= $i + 1 ?></td>
+                                        <td><?= e($student['name']) ?></td>
+                                        <td><?= e($student['nis']) ?></td>
+                                        <td><input class="small-input" type="number" min="0" max="100" step="0.01" name="score[<?= e($student['id']) ?>]" value="<?= e($g['score'] ?? '') ?>"></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="actions"><button class="button primary">Simpan — <?= e(assessment_type_label($assessmentType)) ?></button></div>
+                </form>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <form method="post">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="save_grades">
+                <input type="hidden" name="assignment_id" value="<?= e($assignment['id']) ?>">
+                <input type="hidden" name="assessment_type" value="<?= e($assessmentType) ?>">
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>No</th><th>Nama Siswa</th><th>NIS</th><th>Nilai</th><th>Catatan</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($students as $i => $student): ?>
+                                <?php $key = $student['id'] . '_0'; $g = $gradeMap[$key] ?? []; ?>
+                                <tr>
+                                    <td><?= $i + 1 ?></td>
+                                    <td><?= e($student['name']) ?></td>
+                                    <td><?= e($student['nis']) ?></td>
+                                    <td><input class="small-input" type="number" min="0" max="100" step="0.01" name="score[<?= e($student['id']) ?>]" value="<?= e($g['score'] ?? '') ?>"></td>
+                                    <td><input type="text" name="description[<?= e($student['id']) ?>]" value="<?= e($g['description'] ?? '') ?>"></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="actions"><button class="button primary">Simpan — <?= e(assessment_type_label($assessmentType)) ?></button></div>
+            </form>
+            <p style="color:var(--text-muted);font-size:.875rem;margin-top:1rem;">Belum ada Tujuan Pembelajaran (TP) untuk mapel ini di kelas <?= e($assignment['class_name']) ?>. Input nilai polos tersedia, atau buat TP terlebih dulu di menu <a href="<?= e(route_url('data-tp')) ?>">Tujuan Pembelajaran</a>.</p>
+        <?php endif; ?>
+        <div style="margin-top:1rem;display:flex;gap:.5rem;flex-wrap:wrap;">
             <a class="button" href="<?= e(route_url('export-csv', ['type' => 'nilai', 'assignment_id' => (int)$assignment['id']])) ?>">Export CSV</a>
             <a class="button" href="<?= e(route_url('export-csv', ['type' => 'absensi', 'assignment_id' => (int)$assignment['id']])) ?>">Export Absensi CSV</a>
         </div>
-        <form method="post">
-            <?= csrf_field() ?><input type="hidden" name="action" value="save_grades"><input type="hidden" name="assignment_id" value="<?= e($assignment['id']) ?>">
-            <div class="table-wrap">
-                <table><thead><tr><th>Nama Siswa</th><th>NIS</th><th>Nilai Akhir</th><th>Deskripsi</th></tr></thead><tbody>
-                    <?php foreach ($students as $student): ?>
-                        <tr>
-                            <td><?= e($student['name']) ?></td><td><?= e($student['nis']) ?></td>
-                            <td><input class="small-input" type="number" min="0" max="100" step="0.01" name="score[<?= e($student['id']) ?>]" value="<?= e($student['score']) ?>"></td>
-                            <td><input type="text" name="description[<?= e($student['id']) ?>]" value="<?= e($student['description']) ?>"></td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody></table>
-            </div>
-            <div class="actions"><button class="button primary">Simpan Nilai</button></div>
-        </form>
     </section>
     <?php
     render_footer();

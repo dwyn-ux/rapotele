@@ -111,6 +111,34 @@ function assignments_for_current_user(): array
     );
 }
 
+function learning_objectives_for_assignment(array $assignment): array
+{
+    $subjectId = (int)$assignment['subject_id'];
+    $grade = (string)($assignment['grade'] ?? '');
+    if ($subjectId <= 0 || $grade === '') {
+        return [];
+    }
+    return fetch_all(
+        'SELECT * FROM learning_objectives WHERE subject_id = ? AND grade = ? AND active = 1 ORDER BY id',
+        [$subjectId, $grade]
+    );
+}
+
+function assessment_type_options(): array
+{
+    return [
+        'UH'   => 'Ulangan Harian (UH)',
+        'PTS'  => 'Penilaian Tengah Semester (PTS)',
+        'ASAS' => 'Asesmen Awal Semester (ASAS)',
+        'ASAT' => 'Asesmen Akhir Semester (ASAT)',
+    ];
+}
+
+function assessment_type_label(string $type): string
+{
+    return assessment_type_options()[$type] ?? $type;
+}
+
 function assignment_options(array $assignments, mixed $selected): string
 {
     $options = [];
@@ -164,7 +192,7 @@ function assignment_preselect(array $assignments, int $selected): array
  * Cascading assignment picker: Kelas → Mapel → auto-submit
  * Used by page_grades and other pages with a standalone picker section.
  */
-function assignment_picker(string $page, array $assignments, int $selected): void
+function assignment_picker(string $page, array $assignments, int $selected, string $extraParam = ''): void
 {
     $data = assignment_cascading_data($assignments);
     [$preClass, $preSubject, $preTeacher] = assignment_preselect($assignments, $selected);
@@ -174,6 +202,7 @@ function assignment_picker(string $page, array $assignments, int $selected): voi
         <form method="get" id="<?= e($pickerId) ?>" class="grid four">
             <input type="hidden" name="page" value="<?= e($page) ?>">
             <input type="hidden" name="assignment_id" id="<?= e($pickerId) ?>-assignment" value="<?= e($selected ?: '') ?>">
+            <?php if ($extraParam !== ''): ?><input type="hidden" name="type" value="<?= e($extraParam) ?>"><?php endif; ?>
             <label>Kelas
                 <select id="<?= e($pickerId) ?>-class" data-cascade-class="<?= e($pickerId) ?>">
                     <option value="">Pilih Kelas</option>
