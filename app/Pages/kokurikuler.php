@@ -18,12 +18,24 @@ function page_data_ekskul(): void
         <label>Pembina <select name="teacher_id"><option value="">-</option><?= options($teachers, $edit['teacher_id'] ?? '') ?></select></label>
         <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
         <label class="wide">Anggota Siswa
-            <select name="members[]" multiple size="8">
-                <?php foreach ($students as $student): ?>
-                    <option value="<?= e($student['id']) ?>" <?= in_array((int)$student['id'], $members, true) ? 'selected' : '' ?>><?= e($student['name']) ?> (<?= e($student['nisn'] ?? '') ?>)</option>
-                <?php endforeach; ?>
-            </select>
-            <small style="color:var(--text-muted,#6b7280);">Tahan Ctrl/Cmd untuk pilih multiple. Kosongkan jika semua siswa ikut.</small>
+            <div style="position:relative;">
+                <input type="text" id="ekskul-member-search" placeholder="🔍 Cari nama atau NISN..." style="width:100%;margin-bottom:6px;padding:8px 10px;border:1px solid var(--border-color,#d1d5db);border-radius:6px;font-size:0.9rem;">
+                <select name="members[]" id="ekskul-member-select" multiple size="15" style="width:100%;">
+                    <?php foreach ($students as $student): ?>
+                        <option value="<?= e($student['id']) ?>" <?= in_array((int)$student['id'], $members, true) ? 'selected' : '' ?>><?= e($student['name']) ?> (<?= e($student['nisn'] ?? '') ?>)</option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <small style="color:var(--text-muted,#6b7280);">Ketik untuk cari, tahan Ctrl/Cmd untuk pilih multiple. Kosongkan jika semua siswa ikut.</small>
+            <script>
+            document.getElementById('ekskul-member-search').addEventListener('input', function() {
+                var q = this.value.toLowerCase();
+                var sel = document.getElementById('ekskul-member-select');
+                Array.from(sel.options).forEach(function(opt) {
+                    opt.style.display = (q === '' || opt.text.toLowerCase().indexOf(q) !== -1) ? '' : 'none';
+                });
+            });
+            </script>
         </label>
     <?php ext_simple_form_end('data-ekskul'); ?>
     <?php table_panel('Daftar Ekskul', ['Rombel', 'Jenis', 'Nama', 'Pembina', 'Anggota', 'Status', 'Aksi'], $rows, function ($row) { ?>
