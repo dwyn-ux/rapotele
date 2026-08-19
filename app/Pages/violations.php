@@ -1,5 +1,21 @@
 <?php declare(strict_types=1);
 
+function page_download_template_violation_rules(): void
+{
+    require_role(['admin']);
+    $csv = "kode,kategori,deskripsi,poin,aktif\n"
+        . "P-01,Kehadiran,Terlambat tanpa surat keterangan,5,1\n"
+        . "P-02,Kehadiran,Tanpa keterangan (alpha),10,1\n"
+        . "P-03,Umum,Tidak memakai seragam sekolah,3,1\n"
+        . "P-04,Umum,Membawa barang terlarang di sekolah,8,1\n"
+        . "P-05,Akademik,Kecurangan saat ujian,15,1\n";
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="template_pasal_pelanggaran.csv"');
+    header('Content-Length: ' . strlen($csv));
+    echo $csv;
+    exit;
+}
+
 function page_violation_rules(): void
 {
     require_role(['admin']);
@@ -27,6 +43,12 @@ function page_violation_rules(): void
         <p style="color:var(--muted,#64748b);font-size:.875rem;margin-bottom:1rem;">
             Format CSV: <code>kode, kategori, deskripsi, poin, aktif(1/0)</code> — Baris pertama header akan dilewati otomatis jika ada tulisan <code>kode</code>.
         </p>
+        <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">
+            <a href="<?= e(route_url('download-template-violation-rules')) ?>" class="button small" style="white-space:nowrap;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download Template CSV
+            </a>
+        </div>
         <form method="post" enctype="multipart/form-data" style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="import_violation_rules">

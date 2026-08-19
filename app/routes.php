@@ -73,6 +73,7 @@ return [
         'journals' => 'page_journals',
         'violations' => 'page_violations',
         'violation-rules' => 'page_violation_rules',
+        'download-template-violation-rules' => 'page_download_template_violation_rules',
         'cetak-sp' => 'page_cetak_sp',
         'reports' => 'page_reports',
         'student-progress' => 'page_student_progress',
