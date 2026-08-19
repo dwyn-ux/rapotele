@@ -111,8 +111,20 @@ function action_save_extracurricular(): void
     ];
     if ($id > 0) {
         execute_sql('UPDATE extracurriculars SET class_name = ?, type = ?, name = ?, teacher_id = ?, active = ?, updated_at = ? WHERE id = ?', array_merge($data, [$id]));
+        $ekskulId = $id;
     } else {
         execute_sql('INSERT INTO extracurriculars (class_name, type, name, teacher_id, active, updated_at) VALUES (?, ?, ?, ?, ?, ?)', $data);
+        $ekskulId = (int)db()->lastInsertId();
+    }
+    // Simpan anggota ekskul
+    if ($ekskulId > 0 && table_exists('extracurricular_members')) {
+        execute_sql('DELETE FROM extracurricular_members WHERE extracurricular_id = ?', [$ekskulId]);
+        foreach ((array)($_POST['members'] ?? []) as $studentId) {
+            $studentId = (int)$studentId;
+            if ($studentId > 0) {
+                execute_sql('INSERT INTO extracurricular_members (extracurricular_id, student_id, updated_at) VALUES (?, ?, ?)', [$ekskulId, $studentId, now_string()]);
+            }
+        }
     }
     flash('success', 'Data ekskul tersimpan.');
     redirect_to('data-ekskul');

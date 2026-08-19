@@ -5,6 +5,8 @@ function page_data_ekskul(): void
     require_role(['admin']);
     $edit = ext_edit_row('extracurriculars');
     $teachers = map_options('teachers', 'name');
+    $students = fetch_all('SELECT id, name, nisn FROM students WHERE active = 1 ORDER BY name');
+    $members = $edit && table_exists('extracurricular_members') ? array_map('intval', array_column(fetch_all('SELECT student_id FROM extracurricular_members WHERE extracurricular_id = ?', [(int)$edit['id']]), 'student_id')) : [];
     $memberCountSql = table_exists('extracurricular_members') ? '(SELECT COUNT(*) FROM extracurricular_members em WHERE em.extracurricular_id = e.id)' : '0';
     $rows = fetch_all('SELECT e.*, t.name AS teacher_name, ' . $memberCountSql . ' AS member_count FROM extracurriculars e LEFT JOIN teachers t ON t.id = e.teacher_id ORDER BY e.name');
     render_header('Data Ekskul');
@@ -15,6 +17,14 @@ function page_data_ekskul(): void
         <label>Nama Ekskul <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
         <label>Pembina <select name="teacher_id"><option value="">-</option><?= options($teachers, $edit['teacher_id'] ?? '') ?></select></label>
         <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
+        <label class="wide">Anggota Siswa
+            <select name="members[]" multiple size="8">
+                <?php foreach ($students as $student): ?>
+                    <option value="<?= e($student['id']) ?>" <?= in_array((int)$student['id'], $members, true) ? 'selected' : '' ?>><?= e($student['name']) ?> (<?= e($student['nisn'] ?? '') ?>)</option>
+                <?php endforeach; ?>
+            </select>
+            <small style="color:var(--text-muted,#6b7280);">Tahan Ctrl/Cmd untuk pilih multiple. Kosongkan jika semua siswa ikut.</small>
+        </label>
     <?php ext_simple_form_end('data-ekskul'); ?>
     <?php table_panel('Daftar Ekskul', ['Rombel', 'Jenis', 'Nama', 'Pembina', 'Anggota', 'Status', 'Aksi'], $rows, function ($row) { ?>
         <td><?= e($row['class_name']) ?></td><td><?= e($row['type']) ?></td><td><?= e($row['name']) ?></td><td><?= e($row['teacher_name']) ?></td><td><?= e($row['member_count'] ?? 0) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= ext_delete_button('extracurriculars', 'data-ekskul', (int)$row['id']) ?></td>
@@ -353,8 +363,21 @@ function page_input_nilai_ekskul(): void
     }
     $class = $classId ? fetch_one('SELECT * FROM classes WHERE id = ?', [$classId]) : null;
     $className = $class ? (string)$class['name'] : '';
-    $students = $classId ? fetch_all('SELECT * FROM students WHERE class_id = ? AND active = 1 ORDER BY name', [$classId]) : [];
     $ekskuls = fetch_all('SELECT * FROM extracurriculars WHERE active = 1 ORDER BY name');
+    // Filter siswa: tampilkan hanya yang punya minimal 1 ekskul (ada di extracurricular_members)
+    $hasMembers = table_exists('extracurricular_members');
+    if ($classId && $hasMembers) {
+        $memberStudentIds = array_column(fetch_all(
+            'SELECT DISTINCT em.student_id FROM extracurricular_members em JOIN students s ON s.id = em.student_id WHERE s.class_id = ? AND s.active = 1',
+            [$classId]
+        ), 'student_id');
+        $students = $memberStudentIds ? fetch_all(
+            'SELECT * FROM students WHERE class_id = ? AND active = 1 AND id IN (' . implode(',', array_fill(0, count($memberStudentIds), '?')) . ') ORDER BY name',
+            array_merge([$classId], $memberStudentIds)
+        ) : [];
+    } else {
+        $students = $classId ? fetch_all('SELECT * FROM students WHERE class_id = ? AND active = 1 ORDER BY name', [$classId]) : [];
+    }
     render_header('Input Nilai Ekstrakurikuler');
     ?>
     <section class="panel">
@@ -364,7 +387,8 @@ function page_input_nilai_ekskul(): void
             <div class="actions"><button class="button">Tampilkan</button></div>
         </form>
     </section>
-    <?php if ($classId > 0 && $students && $ekskuls): ?>
+    <?php if ($classId > 0 && $ekskuls): ?>
+    <?php if ($students): ?>
     <section class="panel">
         <form method="post">
             <?= csrf_field() ?>
@@ -401,6 +425,11 @@ function page_input_nilai_ekskul(): void
             <div class="actions"><button class="button primary">Simpan Nilai</button></div>
         </form>
     </section>
+    <?php else: ?>
+    <section class="panel">
+        <p style="color:var(--text-muted,#6b7280);">Belum ada siswa yang ditambahkan sebagai anggota ekskul. Silakan atur anggota di halaman <a href="<?= e(route_url('data-ekskul')) ?>">Data Ekskul</a>.</p>
+    </section>
+    <?php endif; ?>
     <?php endif; ?>
     <?php render_footer();
 }
