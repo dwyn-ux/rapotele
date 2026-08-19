@@ -3301,6 +3301,7 @@ code.block {
   overflow: hidden;
   display: none;
 }
+.search-select-dropdown.open { display: flex; }
 
 .search-select-search {
   position: relative;

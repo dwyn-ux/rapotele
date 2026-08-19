@@ -281,7 +281,7 @@ function render_footer(): void
     </nav>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <script src="<?= e(asset_version_url('assets/app.js')) ?>"></script>
-    <script>lucide.createIcons();</script>
+    <script>try{lucide.createIcons();}catch(e){console.warn('Lucide icons skipped:',e.message);}</script>
     </body>
     </html>
     <?php
