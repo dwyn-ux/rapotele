@@ -80,5 +80,6 @@ return [
         'student-document-download' => 'page_student_document_download',
         'telegram' => 'page_telegram',
         'export-csv' => 'page_export_csv',
+        'bulk-delete' => 'page_bulk_delete',
     ],
 ];
