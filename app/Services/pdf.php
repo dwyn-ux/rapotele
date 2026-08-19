@@ -802,6 +802,7 @@ function report_learning_table_columns(): array
         'nilai'    => ['x' => 199.37, 'w' => 55.00,  'label' => 'Nilai Akhir', 'fill' => false],
         'capaian'  => ['x' => 254.37, 'w' => 284.21, 'label' => 'Capaian Kompetensi', 'fill' => false],
     ];
+}
 
 
 function draw_report_learning_table_header(SimplePdf $pdf): float
