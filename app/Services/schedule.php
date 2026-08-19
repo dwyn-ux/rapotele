@@ -298,6 +298,173 @@ function schedule_send_due_reminders(?DateTimeImmutable $now = null, ?int $minut
     return $result;
 }
 
+function schedule_daily_summary_already_sent(int $teacherId, string $type, string $date): bool
+{
+    if (!table_exists('daily_summary_reminder_logs')) {
+        return false;
+    }
+    return (bool)fetch_one(
+        'SELECT id FROM daily_summary_reminder_logs WHERE teacher_id = ? AND reminder_type = ? AND reminder_date = ?',
+        [$teacherId, $type, $date]
+    );
+}
+
+function schedule_log_daily_summary(int $teacherId, string $type, string $date, string $message): void
+{
+    execute_sql(
+        'INSERT INTO daily_summary_reminder_logs (teacher_id, reminder_type, reminder_date, message, sent_at) VALUES (?, ?, ?, ?, ?)',
+        [$teacherId, $type, $date, $message, now_string()]
+    );
+}
+
+function schedule_fetch_teacher_schedules(int $teacherId, string $date): array
+{
+    $day = (int)(new DateTimeImmutable($date))->format('N');
+    return fetch_all(
+        "SELECT ls.*, c.name AS class_name, s.name AS subject_name
+         FROM lesson_schedules ls
+         JOIN classes c ON c.id = ls.class_id
+         JOIN subjects s ON s.id = ls.subject_id
+         WHERE ls.teacher_id = ? AND ls.day_of_week = ?
+         ORDER BY ls.start_time, ls.period_no",
+        [$teacherId, $day]
+    );
+}
+
+function schedule_send_morning_reminders(?DateTimeImmutable $now = null): array
+{
+    $now ??= new DateTimeImmutable('now');
+    $date = $now->format('Y-m-d');
+    $hasToken = trim((string)config('telegram.bot_token', '')) !== '';
+
+    $result = ['checked' => 0, 'sent' => 0, 'skipped_duplicate' => 0, 'skipped_no_chat' => 0, 'skipped_no_token' => 0, 'skipped_empty' => 0];
+
+    $teachers = fetch_all(
+        "SELECT DISTINCT t.id, t.name,
+                COALESCE(NULLIF(t.telegram_chat_id, ''), (
+                    SELECT NULLIF(u.telegram_chat_id, '')
+                    FROM users u WHERE u.teacher_id = t.id AND u.active = 1 AND u.telegram_chat_id IS NOT NULL AND u.telegram_chat_id <> ''
+                    ORDER BY u.id LIMIT 1
+                )) AS chat_id
+         FROM lesson_schedules ls
+         JOIN teachers t ON t.id = ls.teacher_id
+         WHERE ls.day_of_week = ?
+         ORDER BY t.name",
+        [(int)$now->format('N')]
+    );
+
+    foreach ($teachers as $teacher) {
+        $result['checked']++;
+        if (trim((string)($teacher['chat_id'] ?? '')) === '') {
+            $result['skipped_no_chat']++;
+            continue;
+        }
+        if (schedule_daily_summary_already_sent((int)$teacher['id'], 'morning', $date)) {
+            $result['skipped_duplicate']++;
+            continue;
+        }
+
+        $schedules = schedule_fetch_teacher_schedules((int)$teacher['id'], $date);
+        if (!$schedules) {
+            $result['skipped_empty']++;
+            continue;
+        }
+
+        $dayName = schedule_days()[(int)$now->format('N')] ?? '-';
+        $lines = [
+            'Selamat pagi, <b>' . e($teacher['name']) . '</b> ☀️',
+            '',
+            'Berikut jadwal mengajar hari <b>' . e($dayName) . '</b>, ' . format_indonesian_date($date) . ':',
+            '',
+        ];
+        foreach ($schedules as $i => $s) {
+            $start = substr((string)$s['start_time'], 0, 5);
+            $end = substr((string)$s['end_time'], 0, 5);
+            $time = ($start && $end) ? $start . ' - ' . $end : 'Jam ke-' . (int)$s['period_no'];
+            $lines[] = '📚 <b>' . e($s['subject_name']) . '</b>';
+            $lines[] = '   👥 Kelas ' . e($s['class_name']) . ' · ⏰ ' . $time;
+            $lines[] = '';
+        }
+        $lines[] = 'Selamat bekerja! Semoga lancar 🙏';
+
+        $message = implode("\n", $lines);
+        telegram_send_message((string)$teacher['chat_id'], $message);
+        schedule_log_daily_summary((int)$teacher['id'], 'morning', $date, $message);
+        $result['sent']++;
+    }
+
+    return $result;
+}
+
+function schedule_send_afternoon_reminders(?DateTimeImmutable $now = null): array
+{
+    $now ??= new DateTimeImmutable('now');
+    $date = $now->format('Y-m-d');
+    $tomorrow = $now->modify('+1 day')->format('Y-m-d');
+    $tomorrowDay = (int)$now->modify('+1 day')->format('N');
+    $hasToken = trim((string)config('telegram.bot_token', '')) !== '';
+
+    $result = ['checked' => 0, 'sent' => 0, 'skipped_duplicate' => 0, 'skipped_no_chat' => 0, 'skipped_no_token' => 0, 'skipped_empty' => 0];
+
+    $teachers = fetch_all(
+        "SELECT DISTINCT t.id, t.name,
+                COALESCE(NULLIF(t.telegram_chat_id, ''), (
+                    SELECT NULLIF(u.telegram_chat_id, '')
+                    FROM users u WHERE u.teacher_id = t.id AND u.active = 1 AND u.telegram_chat_id IS NOT NULL AND u.telegram_chat_id <> ''
+                    ORDER BY u.id LIMIT 1
+                )) AS chat_id
+         FROM lesson_schedules ls
+         JOIN teachers t ON t.id = ls.teacher_id
+         WHERE ls.day_of_week = ?
+         ORDER BY t.name",
+        [$tomorrowDay]
+    );
+
+    $tomorrowDayName = schedule_days()[$tomorrowDay] ?? '-';
+
+    foreach ($teachers as $teacher) {
+        $result['checked']++;
+        if (trim((string)($teacher['chat_id'] ?? '')) === '') {
+            $result['skipped_no_chat']++;
+            continue;
+        }
+        if (schedule_daily_summary_already_sent((int)$teacher['id'], 'afternoon', $date)) {
+            $result['skipped_duplicate']++;
+            continue;
+        }
+
+        $schedules = schedule_fetch_teacher_schedules((int)$teacher['id'], $tomorrow);
+        if (!$schedules) {
+            $result['skipped_empty']++;
+            continue;
+        }
+
+        $lines = [
+            'Halo, <b>' . e($teacher['name']) . '</b> 👋',
+            '',
+            'Jadwal mengajar besok, <b>' . e($tomorrowDayName) . '</b>, ' . format_indonesian_date($tomorrow) . ':',
+            '',
+        ];
+        foreach ($schedules as $s) {
+            $start = substr((string)$s['start_time'], 0, 5);
+            $end = substr((string)$s['end_time'], 0, 5);
+            $time = ($start && $end) ? $start . ' - ' . $end : 'Jam ke-' . (int)$s['period_no'];
+            $lines[] = '📚 <b>' . e($s['subject_name']) . '</b>';
+            $lines[] = '   👥 Kelas ' . e($s['class_name']) . ' · ⏰ ' . $time;
+            $lines[] = '';
+        }
+        $lines[] = '📋 Mohon siapkan materi dan perangkat pembelajaran besok.';
+        $lines[] = 'Semangat mengajar! 💪';
+
+        $message = implode("\n", $lines);
+        telegram_send_message((string)$teacher['chat_id'], $message);
+        schedule_log_daily_summary((int)$teacher['id'], 'afternoon', $date, $message);
+        $result['sent']++;
+    }
+
+    return $result;
+}
+
 function schedule_tables_ready(): bool
 {
     return table_exists('teacher_schedule_requests') && table_exists('lesson_schedules');

@@ -27,8 +27,20 @@ try {
         exit;
     }
 
-    $result = schedule_send_due_reminders();
-    echo json_encode(['ok' => true] + $result, JSON_UNESCAPED_UNICODE);
+    $now = new DateTimeImmutable('now');
+    $result = schedule_send_due_reminders($now);
+
+    $minute = (int)$now->format('i');
+    $hour = (int)$now->format('H');
+    $summaryResult = ['morning' => null, 'afternoon' => null];
+    if ($hour === 6 && $minute >= 43 && $minute <= 47) {
+        $summaryResult['morning'] = schedule_send_morning_reminders($now);
+    }
+    if ($hour === 14 && $minute >= 0 && $minute <= 4) {
+        $summaryResult['afternoon'] = schedule_send_afternoon_reminders($now);
+    }
+
+    echo json_encode(['ok' => true] + $result + ['summary' => $summaryResult], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $exception) {
     http_response_code(http_response_code() >= 400 ? http_response_code() : 500);
     echo json_encode(['ok' => false, 'message' => friendly_error($exception)], JSON_UNESCAPED_UNICODE);

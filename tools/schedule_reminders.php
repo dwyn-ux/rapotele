@@ -18,8 +18,20 @@ foreach (array_slice($argv, 1) as $argument) {
 }
 
 try {
-    $result = schedule_send_due_reminders(null, $minutes);
-    echo json_encode(['ok' => true] + $result, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . PHP_EOL;
+    $now = new DateTimeImmutable('now');
+    $result = schedule_send_due_reminders($now, $minutes);
+
+    $minute = (int)$now->format('i');
+    $hour = (int)$now->format('H');
+    $summaryResult = ['morning' => null, 'afternoon' => null];
+    if ($hour === 6 && $minute >= 43 && $minute <= 47) {
+        $summaryResult['morning'] = schedule_send_morning_reminders($now);
+    }
+    if ($hour === 14 && $minute >= 0 && $minute <= 4) {
+        $summaryResult['afternoon'] = schedule_send_afternoon_reminders($now);
+    }
+
+    echo json_encode(['ok' => true] + $result + ['summary' => $summaryResult], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . PHP_EOL;
 } catch (Throwable $exception) {
     fwrite(STDERR, friendly_error($exception) . PHP_EOL);
     exit(1);

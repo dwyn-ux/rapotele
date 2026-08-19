@@ -180,6 +180,16 @@ function run_migrations(): void
             UNIQUE (schedule_id, reminder_date, schedule_start_time, reminder_minutes)
         )$engine",
 
+        "CREATE TABLE IF NOT EXISTS daily_summary_reminder_logs (
+            id $pk,
+            teacher_id INT NOT NULL,
+            reminder_type VARCHAR(20) NOT NULL,
+            reminder_date DATE NOT NULL,
+            message TEXT NULL,
+            sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (teacher_id, reminder_type, reminder_date)
+        )$engine",
+
         "CREATE TABLE IF NOT EXISTS users (
             id $pk,
             username VARCHAR(80) NOT NULL UNIQUE,
