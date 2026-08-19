@@ -18,21 +18,30 @@ function page_data_ekskul(): void
         <label>Pembina <select name="teacher_id"><option value="">-</option><?= options($teachers, $edit['teacher_id'] ?? '') ?></select></label>
         <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
         <label class="wide">Anggota Siswa
-            <div style="position:relative;">
-                <input type="text" id="ekskul-member-search" placeholder="🔍 Cari nama atau NISN..." style="width:100%;margin-bottom:6px;padding:8px 10px;border:1px solid var(--border-color,#d1d5db);border-radius:6px;font-size:0.9rem;">
-                <select name="members[]" id="ekskul-member-select" multiple size="40" style="width:100%;height:40%;">
-                    <?php foreach ($students as $student): ?>
-                        <option value="<?= e($student['id']) ?>" <?= in_array((int)$student['id'], $members, true) ? 'selected' : '' ?>><?= e($student['name']) ?> (<?= e($student['nisn'] ?? '') ?>)</option>
-                    <?php endforeach; ?>
-                </select>
+            <div style="border:1px solid var(--border-color,#d1d5db);border-radius:6px;padding:8px 10px;max-height:450px;overflow-y:auto;background:var(--bg-card,#fff);">
+                <input type="text" id="ekskul-member-search" placeholder="🔍 Cari nama atau NISN..." style="width:100%;margin-bottom:8px;padding:7px 10px;border:1px solid var(--border-color,#d1d5db);border-radius:6px;font-size:0.9rem;box-sizing:border-box;">
+                <label style="display:flex;align-items:center;gap:6px;padding:4px 0 8px;border-bottom:1px solid var(--border-color,#e5e7eb);margin-bottom:4px;cursor:pointer;font-weight:600;font-size:0.85rem;color:var(--text-muted,#6b7280);">
+                    <input type="checkbox" id="ekskul-check-all"> Pilih Semua / Batal Semua
+                </label>
+                <?php foreach ($students as $student): ?>
+                    <label class="ekskul-member-item" style="display:flex;align-items:center;gap:8px;padding:5px 4px;border-radius:4px;cursor:pointer;font-size:0.9rem;" onmouseover="this.style.background='var(--bg-hover,#f3f4f6)'" onmouseout="this.style.background=''">
+                        <input type="checkbox" name="members[]" value="<?= e($student['id']) ?>" <?= in_array((int)$student['id'], $members, true) ? 'checked' : '' ?> style="width:16px;height:16px;">
+                        <span><?= e($student['name']) ?> <small style="color:var(--text-muted,#6b7280);">(<?= e($student['nisn'] ?? '') ?>)</small></span>
+                    </label>
+                <?php endforeach; ?>
             </div>
-            <small style="color:var(--text-muted,#6b7280);">Ketik untuk cari, tahan Ctrl/Cmd untuk pilih multiple. Kosongkan jika semua siswa ikut.</small>
+            <small style="color:var(--text-muted,#6b7280);">Centang siswa yang menjadi anggota ekskul. Kosongkan semua jika semua siswa ikut.</small>
             <script>
             document.getElementById('ekskul-member-search').addEventListener('input', function() {
                 var q = this.value.toLowerCase();
-                var sel = document.getElementById('ekskul-member-select');
-                Array.from(sel.options).forEach(function(opt) {
-                    opt.style.display = (q === '' || opt.text.toLowerCase().indexOf(q) !== -1) ? '' : 'none';
+                document.querySelectorAll('.ekskul-member-item').forEach(function(el) {
+                    el.style.display = (q === '' || el.textContent.toLowerCase().indexOf(q) !== -1) ? '' : 'none';
+                });
+            });
+            document.getElementById('ekskul-check-all').addEventListener('change', function() {
+                var checked = this.checked;
+                document.querySelectorAll('.ekskul-member-item input[type=checkbox]').forEach(function(cb) {
+                    if (cb.offsetParent !== null) cb.checked = checked;
                 });
             });
             </script>
