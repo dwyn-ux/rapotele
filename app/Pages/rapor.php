@@ -321,14 +321,31 @@ function page_input_nilai_skl(): void
 function page_naik_kelas(): void
 {
     require_role(['admin', 'guru']);
+    render_header('Keterangan Naik Kelas');
     $semester = semester_number();
     if ($semester !== '2') {
-        echo '<section class="panel"><p class="empty">Keterangan naik kelas hanya tersedia di semester genap.</p></section>';
+        ?>
+        <section class="panel">
+            <div class="empty">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <p><strong>Keterangan Naik Kelas</strong></p>
+                <p style="color:var(--text-muted);font-size:13px;">Fitur ini hanya tersedia pada <span style="color:var(--warning);font-weight:600;">semester genap</span>. Silakan gunakan saat semester kedua berlangsung.</p>
+            </div>
+        </section>
+        <?php
         render_footer();
         return;
     }
     if (!get_app_setting('promotion.enabled', '1')) {
-        echo '<section class="panel"><p class="empty">Fitur keterangan naik kelas dinonaktifkan oleh administrator.</p></section>';
+        ?>
+        <section class="panel">
+            <div class="empty">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                <p><strong>Fitur Dinonaktifkan</strong></p>
+                <p style="color:var(--text-muted);font-size:13px;">Keterangan naik kelas telah dinonaktifkan oleh administrator.</p>
+            </div>
+        </section>
+        <?php
         render_footer();
         return;
     }
@@ -337,8 +354,15 @@ function page_naik_kelas(): void
     if ($classId <= 0) {
         $homeroom = fetch_one('SELECT id, name FROM classes WHERE homeroom_teacher_id = ? AND active = 1', [$teacherId]);
         if (!$homeroom) {
-            render_header('Keterangan Naik Kelas');
-            echo '<section class="panel"><p class="empty">Anda tidak terdaftar sebagai wali kelas.</p></section>';
+            ?>
+            <section class="panel">
+                <div class="empty">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <p><strong>Bukan Wali Kelas</strong></p>
+                    <p style="color:var(--text-muted);font-size:13px;">Anda tidak terdaftar sebagai wali kelas manapun saat ini.</p>
+                </div>
+            </section>
+            <?php
             render_footer();
             return;
         }
@@ -348,7 +372,6 @@ function page_naik_kelas(): void
     $class = fetch_one('SELECT * FROM classes WHERE id = ?', [$classId]);
     $students = fetch_all('SELECT s.*, g.status, g.notes FROM students s LEFT JOIN graduations g ON g.student_id = s.id WHERE s.class_id = ? AND s.active = 1 ORDER BY s.name', [$classId]);
     $gradeNum = (int)preg_replace('/\D+/', '', (string)$class['grade']);
-    render_header('Keterangan Naik Kelas');
     ?>
     <section class="panel">
         <h3><?= e($class['name']) ?></h3>
