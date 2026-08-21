@@ -1369,6 +1369,33 @@ function generate_student_biodata_pdf(int $studentId): string
     $agencyLogo = report_agency_logo_signature();
     $photo = report_student_photo($studentId);
 
+    // Ambil profil sekolah langsung dari database.
+    // Field alternatif menjaga kompatibilitas dengan struktur database lama.
+    $schoolValue = static function (array $row, array $keys, string $fallback = '-'): string {
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $row) && trim((string)$row[$key]) !== '') {
+                return trim((string)$row[$key]);
+            }
+        }
+        return $fallback;
+    };
+
+    $schoolName = $schoolValue($school, ['name', 'school_name'], config('school.name'));
+    $schoolLevel = strtoupper($schoolValue(
+        $school,
+        ['level', 'school_level', 'jenjang', 'school_type'],
+        'SEKOLAH DASAR'
+    ));
+    $schoolNpsn = $schoolValue($school, ['npsn']);
+    $schoolNisNssNds = $schoolValue($school, ['nis_nss_nds', 'nis_nss', 'nss', 'nds']);
+    $schoolAddress = $schoolValue($school, ['address', 'alamat']);
+    $schoolVillage = $schoolValue($school, ['village', 'desa', 'kelurahan']);
+    $schoolDistrict = $schoolValue($school, ['district', 'kecamatan']);
+    $schoolRegency = $schoolValue($school, ['regency', 'kabupaten', 'city', 'kota']);
+    $schoolProvince = $schoolValue($school, ['province', 'provinsi']);
+    $schoolWebsite = $schoolValue($school, ['website', 'web', 'url']);
+    $schoolEmail = $schoolValue($school, ['email', 'e_mail']);
+
     $pdf = new SimplePdf();
     $marginLeft = 56.69;
     $marginRight = 538.58;
@@ -1380,32 +1407,41 @@ function generate_student_biodata_pdf(int $studentId): string
     // ==========================================
     $pdf->addPage();
 
-    // Logo 1 (Agency/Dinas/Kemdikbud) di atas
-    $logoW = 75.00;
-    $logoH = 75.00;
-    $logoTopY = 750.00;
+    // Dua logo: Dinas/Kementerian dan logo sekolah.
+    // Ditampilkan sejajar agar sampul lebih rapi.
+    $coverLogoW = 62.00;
+    $coverLogoH = 62.00;
+    $coverLogoTopY = 760.00;
+    $leftLogoX = $centerX - 150.00;
+    $rightLogoX = $centerX + 88.00;
+
     if ($agencyLogo && ($assetPath = report_asset_path((string)($agencyLogo['file_path'] ?? ''))) !== '') {
-        $pdf->image($assetPath, $centerX - ($logoW / 2), $logoTopY, $logoW, $logoH);
-    }
-
-    // Judul
-    $pdf->setFont('Helvetica', 16, true);
-    $pdf->centerText($marginLeft, $logoTopY - $logoH - 40.00, $contentWidth, 'SEKOLAH DASAR', 16, true);
-    $pdf->centerText($marginLeft, $logoTopY - $logoH - 60.00, $contentWidth, '( SD )', 16, true);
-
-    // Logo 2 (Sekolah) di tengah
-    $logo2W = 100.00;
-    $logo2H = 100.00;
-    $logo2TopY = $logoTopY - $logoH - 100.00;
-    if ($schoolLogo && ($assetPath = report_asset_path((string)($schoolLogo['file_path'] ?? ''))) !== '') {
-        $pdf->image($assetPath, $centerX - ($logo2W / 2), $logo2TopY, $logo2W, $logo2H);
+        $pdf->image($assetPath, $leftLogoX, $coverLogoTopY, $coverLogoW, $coverLogoH);
     } else {
-        $pdf->rect($centerX - ($logo2W / 2), $logo2TopY, $logo2W, -$logo2H, 'S');
-        $pdf->centerText($centerX - ($logo2W / 2), $logo2TopY - ($logo2H / 2) - 3, $logo2W, 'LOGO SEKOLAH', 10);
+        $pdf->rect($leftLogoX, $coverLogoTopY, $coverLogoW, -$coverLogoH, 'S');
+        $pdf->centerText($leftLogoX, $coverLogoTopY - 33.00, $coverLogoW, 'DINAS', 8, true);
     }
+
+    if ($schoolLogo && ($assetPath = report_asset_path((string)($schoolLogo['file_path'] ?? ''))) !== '') {
+        $pdf->image($assetPath, $rightLogoX, $coverLogoTopY, $coverLogoW, $coverLogoH);
+    } else {
+        $pdf->rect($rightLogoX, $coverLogoTopY, $coverLogoW, -$coverLogoH, 'S');
+        $pdf->centerText($rightLogoX, $coverLogoTopY - 33.00, $coverLogoW, 'SEKOLAH', 8, true);
+    }
+
+    // Judul mengikuti jenjang yang tersimpan di database.
+    $pdf->setFont('Helvetica', 16, true);
+    $pdf->centerText($marginLeft, $coverLogoTopY - $coverLogoH - 38.00, $contentWidth, $schoolLevel, 16, true);
+    if ($schoolLevel === 'SEKOLAH DASAR') {
+        $pdf->centerText($marginLeft, $coverLogoTopY - $coverLogoH - 58.00, $contentWidth, '( SD )', 16, true);
+    }
+
+    // Nama sekolah juga ditampilkan dari database.
+    $pdf->setFont('Helvetica', 11, true);
+    $pdf->centerText($marginLeft, $coverLogoTopY - $coverLogoH - 86.00, $contentWidth, $schoolName, 11, true);
 
     // Box Nama
-    $boxTopY = $logo2TopY - $logo2H - 50.00;
+    $boxTopY = $coverLogoTopY - $coverLogoH - 125.00;
     $pdf->setFont('Helvetica', 12, true);
     $pdf->centerText($marginLeft, $boxTopY, $contentWidth, 'Nama Peserta Didik', 12, true);
     $pdf->rect($centerX - 150.00, $boxTopY - 15.00, 300.00, -30.00, 'S');
@@ -1431,36 +1467,43 @@ function generate_student_biodata_pdf(int $studentId): string
 
     $y = 780.00;
     $pdf->setFont('Helvetica', 12, true);
-    $pdf->centerText($marginLeft, $y, $contentWidth, 'SEKOLAH DASAR', 12, true);
-    $pdf->centerText($marginLeft, $y - 15.00, $contentWidth, '( SD )', 12, true);
-    $y -= 45.00;
-
-    $pdf->setFont('Helvetica', 10);
-    $schoolFields = [
-        'Nama Sekolah' => (string)$school['name'],
-        'NPSN' => (string)($school['npsn'] ?: '-'),
-        'NIS/NSS/NDS' => '001098304321', // Dummy placeholder as requested
-        'Alamat Sekolah' => (string)($school['address'] ?: '-'),
-        'Kelurahan/Desa' => '-',
-        'Kecamatan' => '-',
-        'Kota/Kabupaten' => '-',
-        'Provinsi' => '-',
-        'Website' => '-',
-        'E-mail' => '-',
-    ];
-    $fieldW = 120.00;
-    foreach ($schoolFields as $label => $value) {
-        $pdf->text($marginLeft, $y, $label, 10);
-        $pdf->text($marginLeft + $fieldW, $y, ': ' . $value, 10);
-        $y -= 14.00;
+    $pdf->centerText($marginLeft, $y, $contentWidth, $schoolLevel, 12, true);
+    if ($schoolLevel === 'SEKOLAH DASAR') {
+        $pdf->centerText($marginLeft, $y - 15.00, $contentWidth, '( SD )', 12, true);
+        $y -= 36.00;
+    } else {
+        $y -= 24.00;
     }
 
-    $y -= 20.00;
+    // Profil sekolah: seluruh nilai berasal dari school_profile/database.
+    // Spasi antarbaris dipadatkan agar halaman lebih seimbang.
+    $pdf->setFont('Helvetica', 9.5);
+    $schoolFields = [
+        'Nama Sekolah' => $schoolName,
+        'NPSN' => $schoolNpsn,
+        'NIS/NSS/NDS' => $schoolNisNssNds,
+        'Alamat Sekolah' => $schoolAddress,
+        'Kelurahan/Desa' => $schoolVillage,
+        'Kecamatan' => $schoolDistrict,
+        'Kota/Kabupaten' => $schoolRegency,
+        'Provinsi' => $schoolProvince,
+        'Website' => $schoolWebsite,
+        'E-mail' => $schoolEmail,
+    ];
+    $fieldW = 120.00;
+    $schoolRowH = 12.20;
+    foreach ($schoolFields as $label => $value) {
+        $pdf->text($marginLeft, $y, $label, 9.5);
+        $pdf->text($marginLeft + $fieldW, $y, ': ' . $value, 9.5);
+        $y -= $schoolRowH;
+    }
+
+    $y -= 10.00;
     $pdf->setFont('Helvetica', 12, true);
     $pdf->centerText($marginLeft, $y, $contentWidth, 'IDENTITAS PESERTA DIDIK', 12, true);
-    $y -= 25.00;
+    $y -= 22.00;
 
-    $pdf->setFont('Helvetica', 10);
+    $pdf->setFont('Helvetica', 9.5);
     $numX = $marginLeft;
     $labelX = $marginLeft + 15.00;
     $valX = $marginLeft + 170.00;
@@ -1494,33 +1537,35 @@ function generate_student_biodata_pdf(int $studentId): string
     ];
 
     $no = 1;
+    $studentRowH = 12.35;
     foreach ($studentFields as $idx => [$label, $val]) {
         if (!str_starts_with($label, '  ') && !str_starts_with($label, 'Di kelas') && !str_starts_with($label, 'Pada tanggal')) {
-            $pdf->text($numX, $y, $no . '.', 10);
+            $pdf->text($numX, $y, $no . '.', 9.5);
             $no++;
         }
-        $pdf->text($labelX, $y, $label, 10);
+        $pdf->text($labelX, $y, $label, 9.5);
         if ($val !== '') {
-            $pdf->text($valX, $y, ': ' . $val, 10);
+            $pdf->text($valX, $y, ': ' . $val, 9.5);
         }
-        $y -= 14.00;
+        $y -= $studentRowH;
     }
 
-    $y -= 10.00;
+    $y -= 8.00;
 
-    // Foto
-    $photoW = 85.04; // 3x4 ratio
+    // Foto 3x4 digeser ke kanan agar dekat dengan TTD Kepala Sekolah.
+    $photoW = 85.04;
     $photoH = 113.39;
+    $photoX = 285.00;
     if ($photo && ($photoPath = report_asset_path((string)($photo['file_path'] ?? ''))) !== '') {
-        $pdf->image($photoPath, $marginLeft, $y, $photoW, $photoH);
+        $pdf->image($photoPath, $photoX, $y, $photoW, $photoH);
     } else {
-        $pdf->rect($marginLeft, $y, $photoW, -$photoH, 'S');
+        $pdf->rect($photoX, $y, $photoW, -$photoH, 'S');
         $pdf->setFont('Helvetica', 8);
-        $pdf->centerText($marginLeft, $y - ($photoH / 2) - 3, $photoW, 'Pas Foto 3x4', 8);
+        $pdf->centerText($photoX, $y - ($photoH / 2) - 3, $photoW, 'Pas Foto 3x4', 8);
     }
 
-    // TTD Kepala Sekolah
-    $sigX = $marginRight - 150.00;
+    // TTD Kepala Sekolah ditempatkan tepat di sebelah kanan foto.
+    $sigX = 390.00;
     $pdf->setFont('Helvetica', 10);
     $pdf->text($sigX, $y - 10.00, '................, ....................', 10);
     $pdf->text($sigX, $y - 25.00, 'Kepala Sekolah,', 10);
