@@ -52,6 +52,26 @@ function page_school(): void
                     <label class="school-label">Alamat <span class="required">*</span></label>
                     <textarea class="school-input school-textarea" name="address" rows="3" placeholder="Masukkan alamat lengkap sekolah"><?= e($school['address'] ?? '') ?></textarea>
                 </div>
+                <div class="school-form-grid two-col">
+                    <div class="school-form-group">
+                        <label class="school-label">Kelurahan/Desa</label>
+                        <input type="text" class="school-input" name="village" value="<?= e($school['village'] ?? '') ?>" placeholder="Masukkan nama kelurahan/desa">
+                    </div>
+                    <div class="school-form-group">
+                        <label class="school-label">Kecamatan</label>
+                        <input type="text" class="school-input" name="district" value="<?= e($school['district'] ?? '') ?>" placeholder="Masukkan nama kecamatan">
+                    </div>
+                </div>
+                <div class="school-form-grid two-col">
+                    <div class="school-form-group">
+                        <label class="school-label">Kota/Kabupaten</label>
+                        <input type="text" class="school-input" name="regency" value="<?= e($school['regency'] ?? '') ?>" placeholder="Masukkan nama kota/kabupaten">
+                    </div>
+                    <div class="school-form-group">
+                        <label class="school-label">Provinsi</label>
+                        <input type="text" class="school-input" name="province" value="<?= e($school['province'] ?? '') ?>" placeholder="Masukkan nama provinsi">
+                    </div>
+                </div>
             </div>
         </div>
 

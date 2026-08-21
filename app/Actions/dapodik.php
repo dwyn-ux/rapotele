@@ -1157,11 +1157,15 @@ function dapodik_import(string $type, array $json): int
                 $school = get_school_profile();
                 if (!isset($school['id'])) {
                     execute_sql(
-                        'INSERT INTO school_profile (name, npsn, address, principal_name, academic_year, semester, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                        'INSERT INTO school_profile (name, npsn, address, village, district, regency, province, principal_name, academic_year, semester, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                         [
                             $row['nama'] ?? $row['nama_sekolah'] ?? $school['name'] ?? '',
                             $row['npsn'] ?? '',
                             $row['alamat'] ?? $row['alamat_jalan'] ?? '',
+                            $row['desa_kelurahan'] ?? $row['kelurahan'] ?? $row['nama_desa'] ?? '',
+                            $row['kecamatan'] ?? '',
+                            $row['kabupaten_kota'] ?? $row['kabupaten'] ?? '',
+                            $row['provinsi'] ?? '',
                             $row['nama_kepala_sekolah'] ?? $row['kepala_sekolah'] ?? '',
                             (string)current_academic_year(),
                             (string)current_semester(),
@@ -1170,11 +1174,15 @@ function dapodik_import(string $type, array $json): int
                     );
                 } else {
                     execute_sql(
-                        'UPDATE school_profile SET name = ?, npsn = ?, address = ?, principal_name = ?, updated_at = ? WHERE id = ?',
+                        'UPDATE school_profile SET name = ?, npsn = ?, address = ?, village = ?, district = ?, regency = ?, province = ?, principal_name = ?, updated_at = ? WHERE id = ?',
                         [
                             $row['nama'] ?? $row['nama_sekolah'] ?? $school['name'],
                             $row['npsn'] ?? '',
                             $row['alamat'] ?? $row['alamat_jalan'] ?? '',
+                            $row['desa_kelurahan'] ?? $row['kelurahan'] ?? $row['nama_desa'] ?? '',
+                            $row['kecamatan'] ?? '',
+                            $row['kabupaten_kota'] ?? $row['kabupaten'] ?? '',
+                            $row['provinsi'] ?? '',
                             $row['nama_kepala_sekolah'] ?? $row['kepala_sekolah'] ?? $school['principal_name'] ?? '',
                             now_string(),
                             (int)$school['id'],

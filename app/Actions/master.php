@@ -52,10 +52,14 @@ function action_save_school(): void
         $break1Minutes !== '' ? (int)$break1Minutes : 15,
         $break2After !== '' ? (int)$break2After : 6,
         $break2Minutes !== '' ? (int)$break2Minutes : 15,
+        trim((string)($_POST['village'] ?? '')),
+        trim((string)($_POST['district'] ?? '')),
+        trim((string)($_POST['regency'] ?? '')),
+        trim((string)($_POST['province'] ?? '')),
         now_string(),
     ];
     execute_sql(
-        'UPDATE school_profile SET name = ?, npsn = ?, address = ?, principal_name = ?, principal_nip = ?, academic_year = ?, semester = ?, location_lat = ?, location_lng = ?, attendance_radius_meters = ?, regular_period_minutes = ?, short_period_minutes = ?, short_days = ?, max_periods = ?, start_time = ?, break1_after = ?, break1_minutes = ?, break2_after = ?, break2_minutes = ?, updated_at = ? WHERE id = ?',
+        'UPDATE school_profile SET name = ?, npsn = ?, address = ?, principal_name = ?, principal_nip = ?, academic_year = ?, semester = ?, location_lat = ?, location_lng = ?, attendance_radius_meters = ?, regular_period_minutes = ?, short_period_minutes = ?, short_days = ?, max_periods = ?, start_time = ?, break1_after = ?, break1_minutes = ?, break2_after = ?, break2_minutes = ?, village = ?, district = ?, regency = ?, province = ?, updated_at = ? WHERE id = ?',
         array_merge($data, [(int)$school['id']])
     );
     set_app_setting('promotion.enabled', !empty($_POST['promotion_enabled']) ? '1' : '0');

@@ -734,6 +734,10 @@ function run_migrations(): void
     migration_add_column('school_profile', 'break1_minutes', 'INT NULL DEFAULT 15');
     migration_add_column('school_profile', 'break2_after', 'INT NULL DEFAULT 6');
     migration_add_column('school_profile', 'break2_minutes', 'INT NULL DEFAULT 15');
+    migration_add_column('school_profile', 'village', 'VARCHAR(120) NULL');
+    migration_add_column('school_profile', 'district', 'VARCHAR(120) NULL');
+    migration_add_column('school_profile', 'regency', 'VARCHAR(120) NULL');
+    migration_add_column('school_profile', 'province', 'VARCHAR(120) NULL');
 
     migrate_foreign_keys();
 }
