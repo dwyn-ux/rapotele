@@ -1432,13 +1432,13 @@ function generate_student_biodata_pdf(int $studentId): string
     // Judul mengikuti jenjang yang tersimpan di database.
     $pdf->setFont('Helvetica', 16, true);
     $pdf->centerText($marginLeft, $coverLogoTopY - $coverLogoH - 38.00, $contentWidth, $schoolLevel, 16, true);
-    if ($schoolLevel === 'SEKOLAH DASAR') {
-        $pdf->centerText($marginLeft, $coverLogoTopY - $coverLogoH - 58.00, $contentWidth, '( SD )', 16, true);
+    if ($schoolLevel === '') {
+        $pdf->centerText($marginLeft, $coverLogoTopY - $coverLogoH - 58.00, $contentWidth, '', 16, true);
     }
 
     // Nama sekolah juga ditampilkan dari database.
-    $pdf->setFont('Helvetica', 11, true);
-    $pdf->centerText($marginLeft, $coverLogoTopY - $coverLogoH - 86.00, $contentWidth, $schoolName, 11, true);
+    $pdf->setFont('Helvetica', 14, true);
+    $pdf->centerText($marginLeft, $coverLogoTopY - $coverLogoH - 86.00, $contentWidth, $schoolName, 14, true);
 
     // Box Nama
     $boxTopY = $coverLogoTopY - $coverLogoH - 125.00;
@@ -1477,7 +1477,7 @@ function generate_student_biodata_pdf(int $studentId): string
 
     // Profil sekolah: seluruh nilai berasal dari school_profile/database.
     // Spasi antarbaris dipadatkan agar halaman lebih seimbang.
-    $pdf->setFont('Helvetica', 9.5);
+    $pdf->setFont('Helvetica', 12);
     $schoolFields = [
         'Nama Sekolah' => $schoolName,
         'NPSN' => $schoolNpsn,
@@ -1497,6 +1497,8 @@ function generate_student_biodata_pdf(int $studentId): string
         $pdf->text($marginLeft + $fieldW, $y, ': ' . $value, 9.5);
         $y -= $schoolRowH;
     }
+
+    $pdf->addPage();
 
     $y -= 10.00;
     $pdf->setFont('Helvetica', 12, true);
