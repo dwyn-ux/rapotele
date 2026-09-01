@@ -7,6 +7,12 @@ require $base . '/app/bootstrap.php';
 require $base . '/app/web.php';
 
 $pdo = db();
+set_exception_handler(function (Throwable $e) {
+    echo PHP_EOL . "FATAL: " . $e->getMessage() . PHP_EOL;
+    echo "AT " . $e->getFile() . ":" . $e->getLine() . PHP_EOL;
+    echo $e->getTraceAsString() . PHP_EOL;
+    exit(1);
+});
 $now = now_string();
 $currentYear = '2024/2025';
 $currentSemester = '2';
@@ -226,8 +232,13 @@ $classData = [
 $classIds = [];
 $stmt = $pdo->prepare('INSERT INTO classes (name, grade, level, major, school_id, homeroom_teacher_id, academic_year, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)');
 foreach ($classData as $c) {
-    $stmt->execute([$c[0], $c[1], $c[2], $c[3], $c[4], $c[5], $currentYear, $now, $now]);
-    $classIds[$c[0]] = (int)$pdo->lastInsertId();
+    try {
+        $stmt->execute([$c[0], $c[1], $c[2], $c[3], $c[4], $c[5], $currentYear, $now, $now]);
+        $classIds[$c[0]] = (int)$pdo->lastInsertId();
+    } catch (PDOException $e) {
+        echo "GAGAL insert kelas '{$c[0]}': " . $e->getMessage() . PHP_EOL;
+        throw $e;
+    }
 }
 echo "Classes: " . count($classIds) . "\n\n";
 
