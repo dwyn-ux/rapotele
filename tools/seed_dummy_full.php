@@ -14,6 +14,34 @@ set_exception_handler(function (Throwable $e) {
     exit(1);
 });
 $now = now_string();
+
+function ensure_column(string $table, string $column, string $definition): void
+{
+    if (!table_exists($table)) return;
+    $key = db_driver() === 'sqlite' ? 'name' : 'Field';
+    $cols = array_column(fetch_all(
+        db_driver() === 'sqlite' ? 'PRAGMA table_info(' . $table . ')' : 'SHOW COLUMNS FROM ' . $table
+    ), $key);
+    if (!in_array($column, $cols, true)) {
+        echo "  -> adding column $table.$column\n";
+        db()->exec('ALTER TABLE ' . $table . ' ADD COLUMN ' . $column . ' ' . $definition);
+    }
+}
+
+ensure_column('subjects', 'curriculum', 'VARCHAR(32) NULL');
+ensure_column('subjects', 'kkm', 'INT NULL');
+ensure_column('classes', 'level', 'VARCHAR(16) NULL');
+ensure_column('classes', 'school_id', 'INT UNSIGNED NULL');
+ensure_column('students', 'birth_place', 'VARCHAR(80) NULL');
+ensure_column('students', 'birth_date', 'DATE NULL');
+ensure_column('students', 'religion', 'VARCHAR(64) NULL');
+ensure_column('students', 'address', 'TEXT NULL');
+ensure_column('students', 'phone', 'VARCHAR(32) NULL');
+ensure_column('students', 'father_name', 'VARCHAR(160) NULL');
+ensure_column('students', 'father_occupation', 'VARCHAR(120) NULL');
+ensure_column('students', 'mother_name', 'VARCHAR(160) NULL');
+ensure_column('students', 'mother_occupation', 'VARCHAR(120) NULL');
+echo "Schema check OK\n\n";
 $currentYear = '2024/2025';
 $currentSemester = '2';
 $sqlIgnore = db_insert_ignore();
