@@ -10,6 +10,8 @@ $pdo = db();
 $now = now_string();
 $currentYear = '2024/2025';
 $currentSemester = '2';
+$sqlIgnore = db_insert_ignore();
+$sqlReplace = db_insert_replace();
 
 echo "=== RESET DATA ===\n";
 $pdo->exec('DELETE FROM final_scores');
@@ -143,7 +145,7 @@ echo "SMA mapel: " . count($smaMapelIds) . "\n\n";
 
 echo "=== REPORT MAPPINGS ===\n";
 $order = 1;
-$stmt = $pdo->prepare('INSERT OR IGNORE INTO report_mappings (curriculum, grade, subject_id, group_id, display_order, include_in_report, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)');
+$stmt = $pdo->prepare($sqlIgnore . ' INTO report_mappings (curriculum, grade, subject_id, group_id, display_order, include_in_report, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)');
 foreach (['7', '8', '9'] as $grade) {
     foreach ($smpMapel as $m) {
         $stmt->execute(['merdeka_smp', $grade, $smpMapelIds[$m[0]], $groups[$m[3]], $order++, $now, $now]);
@@ -198,7 +200,7 @@ $users = [
     ['guru3', 'guru3', 'Rina Lestari, S.Pd', 'guru3@eraport.local', 'guru', $teacherIds[3], ''],
     ['guru4', 'guru4', 'Agus Prasetyo, S.Pd', 'guru4@eraport.local', 'guru', $teacherIds[4], ''],
 ];
-$stmt = $pdo->prepare('INSERT OR IGNORE INTO users (username, password_hash, name, email, role, teacher_id, telegram_chat_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)');
+$stmt = $pdo->prepare($sqlIgnore . ' INTO users (username, password_hash, name, email, role, teacher_id, telegram_chat_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)');
 foreach ($users as $u) {
     $hash = password_hash($u[1], PASSWORD_BCRYPT);
     $stmt->execute([$u[0], $hash, $u[2], $u[3], $u[4], $u[5], $u[6], $now, $now]);
@@ -230,7 +232,7 @@ foreach ($classData as $c) {
 echo "Classes: " . count($classIds) . "\n\n";
 
 echo "=== TEACHING ASSIGNMENTS ===\n";
-$stmt = $pdo->prepare('INSERT OR IGNORE INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)');
+$stmt = $pdo->prepare($sqlIgnore . ' INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)');
 foreach ($classIds as $className => $classId) {
     $level = strpos($className, 'MIPA') !== false || strpos($className, 'IPS') !== false ? 'SMA' : 'SMP';
     $mapelIds = $level === 'SMA' ? $smaMapelIds : $smpMapelIds;
@@ -325,7 +327,7 @@ foreach ($siswaByClass as $arr) $totalSiswa += count($arr);
 echo "Siswa: $totalSiswa\n\n";
 
 echo "=== REPORT DATES ===\n";
-$stmt = $pdo->prepare('INSERT OR REPLACE INTO report_dates (grade, report_date, principal_place, homeroom_place, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)');
+$stmt = $pdo->prepare($sqlReplace . ' INTO report_dates (grade, report_date, principal_place, homeroom_place, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)');
 $dates = [
     ['7', '2025-06-20', 'Ngawen', 'Ngawen'],
     ['8', '2025-06-20', 'Ngawen', 'Ngawen'],
@@ -341,9 +343,9 @@ echo "Report dates created\n\n";
 
 echo "=== NILAI (final_scores) ===\n";
 mt_srand(42);
-$stmt = $pdo->prepare('INSERT OR REPLACE INTO final_scores (student_id, subject_id, score, created_at, updated_at) VALUES (?, ?, ?, ?, ?)');
-$examStmt = $pdo->prepare('INSERT OR REPLACE INTO exam_scores (student_id, subject_id, score, created_at, updated_at) VALUES (?, ?, ?, ?, ?)');
-$descStmt = $pdo->prepare('INSERT OR IGNORE INTO learning_objectives (subject_id, grade, description, active, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)');
+$stmt = $pdo->prepare($sqlReplace . ' INTO final_scores (student_id, subject_id, score, created_at, updated_at) VALUES (?, ?, ?, ?, ?)');
+$examStmt = $pdo->prepare($sqlReplace . ' INTO exam_scores (student_id, subject_id, score, created_at, updated_at) VALUES (?, ?, ?, ?, ?)');
+$descStmt = $pdo->prepare($sqlIgnore . ' INTO learning_objectives (subject_id, grade, description, active, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)');
 $loCount = 0;
 foreach ($smaMapelIds as $nama => $id) {
     $descStmt->execute([$id, '10', 'Memahami konsep dasar ' . $nama, $now, $now]);
@@ -381,7 +383,7 @@ foreach ($siswaByClass as $kelasName => $studentIds) {
 echo "Scores: $scoreCount\n\n";
 
 echo "=== GRADUATIONS ===\n";
-$stmt = $pdo->prepare('INSERT OR REPLACE INTO graduations (student_id, status, certificate_no, transcript_no, graduation_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+$stmt = $pdo->prepare($sqlReplace . ' INTO graduations (student_id, status, certificate_no, transcript_no, graduation_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
 foreach ($siswaByClass['XII MIPA 1'] as $sid) {
     $stmt->execute([$sid, 'lulus', 'SKL/' . $currentYear . '/A' . str_pad((string)$sid, 4, '0', STR_PAD_LEFT), 'TR/' . $currentYear . '/A' . str_pad((string)$sid, 4, '0', STR_PAD_LEFT), '2025-05-15', $now, $now]);
 }
@@ -398,8 +400,8 @@ echo "Graduations created\n\n";
 
 echo "=== ATTENDANCE (via teaching_assignments) ===\n";
 mt_srand(123);
-$attSessionStmt = $pdo->prepare('INSERT OR IGNORE INTO student_attendance_sessions (assignment_id, date, meeting_no, topic, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-$attEntryStmt = $pdo->prepare('INSERT OR IGNORE INTO student_attendance_entries (session_id, student_id, status, created_at) VALUES (?, ?, ?, ?)');
+$attSessionStmt = $pdo->prepare($sqlIgnore . ' INTO student_attendance_sessions (assignment_id, date, meeting_no, topic, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+$attEntryStmt = $pdo->prepare($sqlIgnore . ' INTO student_attendance_entries (session_id, student_id, status, created_at) VALUES (?, ?, ?, ?)');
 $attCount = 0;
 $attSessionCount = 0;
 foreach ($classIds as $className => $classId) {
@@ -427,7 +429,7 @@ foreach ($classIds as $className => $classId) {
 echo "Attendance sessions: $attSessionCount, entries: $attCount\n\n";
 
 echo "=== SIGNATURES ===\n";
-$stmt = $pdo->prepare('INSERT OR REPLACE INTO signatures (type, user_id, title, person_name, nip, file_path, created_at, updated_at) VALUES (?, NULL, ?, ?, ?, ?, ?, ?)');
+$stmt = $pdo->prepare($sqlReplace . ' INTO signatures (type, user_id, title, person_name, nip, file_path, created_at, updated_at) VALUES (?, NULL, ?, ?, ?, ?, ?, ?)');
 $stmt->execute(['principal', 'Kepala Sekolah', 'Drs. H. Ahmad Subagyo, M.Pd', '196512151990031005', '', $now, $now]);
 $stmt->execute(['homeroom', 'Wali Kelas', 'Siti Aminah, S.Pd', '198601012010012001', '', $now, $now]);
 echo "Signatures created\n\n";
@@ -447,7 +449,7 @@ $violationRules = [
     ['R011', 'Berat', 'Membolos satu hari penuh', 30],
     ['R012', 'Berat', 'Merusak fasilitas sekolah', 40],
 ];
-$ruleStmt = $pdo->prepare('INSERT OR IGNORE INTO violation_rules (code, category, description, points, active, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)');
+$ruleStmt = $pdo->prepare($sqlIgnore . ' INTO violation_rules (code, category, description, points, active, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)');
 foreach ($violationRules as $r) {
     $ruleStmt->execute([$r[0], $r[1], $r[2], $r[3], $now, $now]);
 }
@@ -456,7 +458,7 @@ echo "Rules: " . count($violationRules) . "\n\n";
 echo "=== STUDENT VIOLATIONS ===\n";
 $ruleIds = [];
 foreach ($pdo->query('SELECT id, code FROM violation_rules ORDER BY id') as $r) $ruleIds[$r['code']] = (int)$r['id'];
-$violStmt = $pdo->prepare('INSERT OR IGNORE INTO student_violations (student_id, date, type, description, points, action_taken, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)');
+$violStmt = $pdo->prepare($sqlIgnore . ' INTO student_violations (student_id, date, type, description, points, action_taken, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)');
 $violCount = 0;
 $vSample = [
     ['R001', 'Terlambat 15 menit', 'Teguran lisan'],
@@ -486,7 +488,7 @@ foreach ($siswaByClass as $kelasName => $studentIds) {
 echo "Violations: $violCount\n\n";
 
 echo "=== STUDENT REWARDS ===\n";
-$rewStmt = $pdo->prepare('INSERT OR IGNORE INTO student_rewards (student_id, date, title, description, discount_percent, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)');
+$rewStmt = $pdo->prepare($sqlIgnore . ' INTO student_rewards (student_id, date, title, description, discount_percent, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)');
 $rSample = [
     ['Juara 1 Lomba Cerdas Cermat', 'Mewakili sekolah di lomba kecamatan', 5],
     ['Juara 2 Olimpiade Matematika', 'Olimpiade tingkat kabupaten', 10],
@@ -519,7 +521,7 @@ $ekskulData = [
     ['English Club', 'Pilihan', 'Hendro Wibowo, S.Pd', $teacherIds[6]],
     ['Jurnalistik', 'Pilihan', 'Dewi Anggraini, S.Pd', $teacherIds[5]],
 ];
-$eksStmt = $pdo->prepare('INSERT OR IGNORE INTO extracurriculars (class_name, name, type, teacher_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)');
+$eksStmt = $pdo->prepare($sqlIgnore . ' INTO extracurriculars (class_name, name, type, teacher_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)');
 foreach ($ekskulData as $e) {
     $eksStmt->execute(['Umum', $e[0], $e[1], $e[3], $now, $now]);
 }
@@ -527,8 +529,8 @@ $ekskulIds = [];
 foreach ($pdo->query('SELECT id, name FROM extracurriculars ORDER BY id') as $r) $ekskulIds[$r['name']] = (int)$r['id'];
 echo "Ekskul: " . count($ekskulIds) . "\n";
 
-$memberStmt = $pdo->prepare('INSERT OR IGNORE INTO extracurricular_members (extracurricular_id, student_id, created_at) VALUES (?, ?, ?)');
-$scoreEksStmt = $pdo->prepare('INSERT OR REPLACE INTO extracurricular_scores (student_id, extracurricular_id, score, notes, updated_at) VALUES (?, ?, ?, ?, ?)');
+$memberStmt = $pdo->prepare($sqlIgnore . ' INTO extracurricular_members (extracurricular_id, student_id, created_at) VALUES (?, ?, ?)');
+$scoreEksStmt = $pdo->prepare($sqlReplace . ' INTO extracurricular_scores (student_id, extracurricular_id, score, notes, updated_at) VALUES (?, ?, ?, ?, ?)');
 $memberCount = 0;
 $scoreEksCount = 0;
 $predikatEkskul = ['Sangat Baik' => 'Sangat Baik', 'Baik' => 'Baik', 'Cukup' => 'Cukup', 'Kurang' => 'Kurang'];
@@ -549,7 +551,7 @@ foreach ($siswaByClass as $kelasName => $studentIds) {
 echo "Ekskul members: $memberCount, scores: $scoreEksCount\n\n";
 
 echo "=== KOKURIKULER ===\n";
-$temaStmt = $pdo->prepare('INSERT OR IGNORE INTO cocurricular_themes (name, status, created_at, updated_at) VALUES (?, ?, ?, ?)');
+$temaStmt = $pdo->prepare($sqlIgnore . ' INTO cocurricular_themes (name, status, created_at, updated_at) VALUES (?, ?, ?, ?)');
 $temaList = [
     'Bhinneka Tunggal Ika',
     'Sustainable Development Goals (SDGs)',
@@ -562,8 +564,8 @@ $temaIds = [];
 foreach ($pdo->query('SELECT id, name FROM cocurricular_themes ORDER BY id') as $r) $temaIds[$r['name']] = (int)$r['id'];
 echo "Tema: " . count($temaIds) . "\n";
 
-$kelompokStmt = $pdo->prepare('INSERT OR IGNORE INTO cocurricular_groups (name, grade, phase, theme_id, coordinator_teacher_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)');
-$kegiatanStmt = $pdo->prepare('INSERT OR IGNORE INTO cocurricular_activities (theme_id, phase, title, description, objective, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)');
+$kelompokStmt = $pdo->prepare($sqlIgnore . ' INTO cocurricular_groups (name, grade, phase, theme_id, coordinator_teacher_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)');
+$kegiatanStmt = $pdo->prepare($sqlIgnore . ' INTO cocurricular_activities (theme_id, phase, title, description, objective, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)');
 $kokurCount = 0;
 foreach ($temaIds as $temaId) {
     $kelompokStmt->execute(['Kelompok ' . $temaId, '7', 'D', $temaId, $teacherIds[($temaId % count($teacherIds))], $now, $now]);
