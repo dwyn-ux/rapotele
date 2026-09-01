@@ -19,7 +19,7 @@ function action_delete(string $table, string $returnPage): void
 function action_save_school(): void
 {
     require_role(['admin']);
-    $school = get_school_profile();
+    $id = (int)($_POST['id'] ?? 0);
     $lat = trim((string)($_POST['location_lat'] ?? ''));
     $lng = trim((string)($_POST['location_lng'] ?? ''));
     $radius = trim((string)($_POST['attendance_radius_meters'] ?? ''));
@@ -38,8 +38,8 @@ function action_save_school(): void
         trim((string)($_POST['address'] ?? '')),
         trim((string)($_POST['principal_name'] ?? '')),
         trim((string)($_POST['principal_nip'] ?? '')),
-        trim((string)$_POST['academic_year']),
-        trim((string)$_POST['semester']),
+        trim((string)($_POST['academic_year'] ?? current_academic_year())),
+        trim((string)($_POST['semester'] ?? current_semester())),
         $lat !== '' ? (float)$lat : null,
         $lng !== '' ? (float)$lng : null,
         $radius !== '' ? (int)$radius : null,
@@ -57,14 +57,42 @@ function action_save_school(): void
         trim((string)($_POST['regency'] ?? '')),
         trim((string)($_POST['province'] ?? '')),
         now_string(),
+        now_string(),
     ];
-    execute_sql(
-        'UPDATE school_profile SET name = ?, npsn = ?, address = ?, principal_name = ?, principal_nip = ?, academic_year = ?, semester = ?, location_lat = ?, location_lng = ?, attendance_radius_meters = ?, regular_period_minutes = ?, short_period_minutes = ?, short_days = ?, max_periods = ?, start_time = ?, break1_after = ?, break1_minutes = ?, break2_after = ?, break2_minutes = ?, village = ?, district = ?, regency = ?, province = ?, updated_at = ? WHERE id = ?',
-        array_merge($data, [(int)$school['id']])
-    );
-    set_app_setting('promotion.enabled', !empty($_POST['promotion_enabled']) ? '1' : '0');
+    if ($id > 0) {
+        execute_sql(
+            'UPDATE school_profile SET name = ?, npsn = ?, address = ?, principal_name = ?, principal_nip = ?, academic_year = ?, semester = ?, location_lat = ?, location_lng = ?, attendance_radius_meters = ?, regular_period_minutes = ?, short_period_minutes = ?, short_days = ?, max_periods = ?, start_time = ?, break1_after = ?, break1_minutes = ?, break2_after = ?, break2_minutes = ?, village = ?, district = ?, regency = ?, province = ?, updated_at = ? WHERE id = ?',
+            array_slice($data, 0, 24, true) + [$id]
+        );
+    } else {
+        $sql = 'INSERT INTO school_profile (name, npsn, address, principal_name, principal_nip, academic_year, semester, location_lat, location_lng, attendance_radius_meters, regular_period_minutes, short_period_minutes, short_days, max_periods, start_time, break1_after, break1_minutes, break2_after, break2_minutes, village, district, regency, province, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+        execute_sql($sql, $data);
+    }
+    if ($id === 0) {
+        set_app_setting('promotion.enabled', !empty($_POST['promotion_enabled']) ? '1' : '0');
+    }
     flash('success', 'Data sekolah tersimpan.');
-    redirect_to('school');
+    redirect_to('schools');
+}
+
+function action_delete_school(): void
+{
+    require_role(['admin']);
+    $id = (int)($_POST['id'] ?? 0);
+    if ($id <= 0) {
+        flash('error', 'ID sekolah tidak valid.');
+        redirect_to('schools');
+        return;
+    }
+    $used = (int)(fetch_one('SELECT COUNT(*) AS c FROM classes WHERE school_id = ?', [$id])['c'] ?? 0);
+    if ($used > 0) {
+        flash('error', 'Sekolah masih dipakai ' . $used . ' kelas. Pindahkan kelas terlebih dahulu.');
+        redirect_to('schools');
+        return;
+    }
+    execute_sql('DELETE FROM school_profile WHERE id = ?', [$id]);
+    flash('success', 'Sekolah dihapus.');
+    redirect_to('schools');
 }
 
 function action_save_teacher(): void
@@ -133,11 +161,18 @@ function action_save_class(): void
 {
     require_role(['admin']);
     $id = (int)($_POST['id'] ?? 0);
+    $schoolId = (int)($_POST['school_id'] ?? 0);
+    if ($schoolId <= 0) {
+        flash('error', 'Pilih sekolah terlebih dahulu.');
+        redirect_to('classes');
+        return;
+    }
     $data = [
         trim((string)$_POST['name']),
         trim((string)$_POST['grade']),
         strtoupper(trim((string)($_POST['level'] ?? ''))),
         trim((string)($_POST['major'] ?? '')),
+        $schoolId,
         (int)($_POST['homeroom_teacher_id'] ?? 0) ?: null,
         trim((string)$_POST['academic_year']),
         isset($_POST['active']) ? 1 : 0,
@@ -145,12 +180,12 @@ function action_save_class(): void
     ];
     if ($id > 0) {
         execute_sql(
-            'UPDATE classes SET name = ?, grade = ?, level = ?, major = ?, homeroom_teacher_id = ?, academic_year = ?, active = ?, updated_at = ? WHERE id = ?',
+            'UPDATE classes SET name = ?, grade = ?, level = ?, major = ?, school_id = ?, homeroom_teacher_id = ?, academic_year = ?, active = ?, updated_at = ? WHERE id = ?',
             array_merge($data, [$id])
         );
     } else {
         execute_sql(
-            'INSERT INTO classes (name, grade, level, major, homeroom_teacher_id, academic_year, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO classes (name, grade, level, major, school_id, homeroom_teacher_id, academic_year, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             $data
         );
     }

@@ -16,6 +16,8 @@ return [
         'dashboard' => 'page_dashboard',
         'update-data' => 'page_update_data',
         'school' => 'page_school',
+        'schools' => 'page_schools',
+        'school-edit' => 'page_school_edit',
         'teachers' => 'page_teachers',
         'students' => 'page_students',
         'classes' => 'page_classes',

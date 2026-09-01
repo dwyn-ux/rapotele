@@ -256,6 +256,181 @@ function page_school(): void
     render_footer();
 }
 
+function page_schools(): void
+{
+    require_role(['admin']);
+    $rows = fetch_all('SELECT sp.*, (SELECT COUNT(*) FROM classes c WHERE c.school_id = sp.id) AS class_count FROM school_profile sp ORDER BY sp.id');
+    render_header('Data Sekolah');
+    ?>
+    <div class="school-page-header">
+        <div class="school-page-header-left">
+            <div class="school-page-header-icon"><i data-lucide="building-2"></i></div>
+            <div>
+                <h1 class="school-page-title">Data Sekolah</h1>
+                <p class="school-page-subtitle">Kelola beberapa sekolah dalam satu aplikasi</p>
+            </div>
+        </div>
+        <div>
+            <a class="button primary" href="<?= e(route_url('school-edit')) ?>">
+                <i data-lucide="plus"></i> Tambah Sekolah
+            </a>
+        </div>
+    </div>
+    <?php table_panel('Daftar Sekolah', ['Nama', 'NPSN', 'Jenjang Dominan', 'Alamat', 'Jumlah Kelas', 'Status', 'Aksi'], $rows, function ($row) {
+        $levels = fetch_all('SELECT level, COUNT(*) AS c FROM classes WHERE school_id = ? AND level IS NOT NULL GROUP BY level', [(int)$row['id']]);
+        $levelStr = [];
+        foreach ($levels as $l) {
+            $levelStr[] = $l['level'] . ' (' . $l['c'] . ')';
+        }
+        ?><td><?= e($row['name']) ?></td>
+        <td><?= e($row['npsn'] ?? '-') ?></td>
+        <td><?= e(implode(', ', $levelStr) ?: '-') ?></td>
+        <td><?= e($row['address'] ?? '-') ?></td>
+        <td><?= e($row['class_count']) ?></td>
+        <td><?= status_badge(1) ?></td>
+        <td>
+            <a href="<?= e(route_url('school-edit', ['id' => (int)$row['id']])) ?>" class="button small primary">Edit</a>
+            <?php if ((int)$row['class_count'] === 0): ?>
+                <form method="post" style="display:inline">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="delete_school">
+                    <input type="hidden" name="id" value="<?= (int)$row['id'] ?>">
+                    <button class="button small danger" type="submit" onclick="return confirm('Hapus sekolah ini?')">Hapus</button>
+                </form>
+            <?php else: ?>
+                <button class="button small danger" disabled title="Sekolah masih dipakai <?= (int)$row['class_count'] ?> kelas">Hapus</button>
+            <?php endif; ?>
+        </td><?php
+    }, '', true);
+    render_footer();
+}
+
+function page_school_edit(): void
+{
+    require_role(['admin']);
+    $id = (int)($_GET['id'] ?? 0);
+    $school = $id > 0 ? fetch_one('SELECT * FROM school_profile WHERE id = ?', [$id]) : null;
+    if ($id > 0 && !$school) {
+        flash('error', 'Sekolah tidak ditemukan.');
+        redirect_to('schools');
+        return;
+    }
+    $school = $school ?: [
+        'name' => '', 'npsn' => '', 'address' => '', 'principal_name' => '', 'principal_nip' => '',
+        'academic_year' => current_academic_year(), 'semester' => current_semester(),
+        'location_lat' => '', 'location_lng' => '', 'attendance_radius_meters' => 500,
+        'regular_period_minutes' => 35, 'short_period_minutes' => 25,
+        'short_days' => '', 'max_periods' => 10, 'start_time' => '07:00',
+        'break1_after' => 3, 'break1_minutes' => 15, 'break2_after' => 6, 'break2_minutes' => 15,
+        'village' => '', 'district' => '', 'regency' => '', 'province' => '',
+    ];
+    render_header($id > 0 ? 'Edit Sekolah' : 'Tambah Sekolah');
+    ?>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <div class="school-page-header">
+        <div class="school-page-header-left">
+            <div class="school-page-header-icon"><i data-lucide="building-2"></i></div>
+            <div>
+                <h1 class="school-page-title"><?= $id > 0 ? 'Edit Sekolah' : 'Tambah Sekolah' ?></h1>
+                <p class="school-page-subtitle">Lengkapi data sekolah</p>
+            </div>
+        </div>
+    </div>
+    <form method="post" id="school-form">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="save_school">
+        <input type="hidden" name="id" value="<?= (int)$id ?>">
+        <div class="school-section-card">
+            <div class="school-section-header">
+                <div class="school-section-icon"><i data-lucide="school"></i></div>
+                <h2 class="school-section-title">Informasi Umum</h2>
+            </div>
+            <div class="school-section-body">
+                <div class="school-form-grid two-col">
+                    <div class="school-form-group">
+                        <label class="school-label">Nama Sekolah <span class="required">*</span></label>
+                        <input type="text" class="school-input" name="name" required value="<?= e($school['name']) ?>" placeholder="Contoh: SMA Negeri 1 Bandung">
+                    </div>
+                    <div class="school-form-group">
+                        <label class="school-label">NPSN</label>
+                        <input type="text" class="school-input" name="npsn" value="<?= e($school['npsn'] ?? '') ?>" placeholder="NPSN Sekolah">
+                    </div>
+                </div>
+                <div class="school-form-group">
+                    <label class="school-label">Alamat <span class="required">*</span></label>
+                    <textarea class="school-input school-textarea" name="address" rows="3" placeholder="Alamat lengkap"><?= e($school['address'] ?? '') ?></textarea>
+                </div>
+                <div class="school-form-grid two-col">
+                    <div class="school-form-group">
+                        <label class="school-label">Kelurahan/Desa</label>
+                        <input type="text" class="school-input" name="village" value="<?= e($school['village'] ?? '') ?>">
+                    </div>
+                    <div class="school-form-group">
+                        <label class="school-label">Kecamatan</label>
+                        <input type="text" class="school-input" name="district" value="<?= e($school['district'] ?? '') ?>">
+                    </div>
+                </div>
+                <div class="school-form-grid two-col">
+                    <div class="school-form-group">
+                        <label class="school-label">Kota/Kabupaten</label>
+                        <input type="text" class="school-input" name="regency" value="<?= e($school['regency'] ?? '') ?>">
+                    </div>
+                    <div class="school-form-group">
+                        <label class="school-label">Provinsi</label>
+                        <input type="text" class="school-input" name="province" value="<?= e($school['province'] ?? '') ?>">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="school-section-card">
+            <div class="school-section-header">
+                <div class="school-section-icon"><i data-lucide="user-check"></i></div>
+                <h2 class="school-section-title">Informasi Kepala Sekolah</h2>
+            </div>
+            <div class="school-section-body">
+                <div class="school-form-grid two-col">
+                    <div class="school-form-group">
+                        <label class="school-label">Nama Kepala Sekolah <span class="required">*</span></label>
+                        <input type="text" class="school-input" name="principal_name" required value="<?= e($school['principal_name'] ?? '') ?>">
+                    </div>
+                    <div class="school-form-group">
+                        <label class="school-label">NIP Kepala Sekolah</label>
+                        <input type="text" class="school-input" name="principal_nip" value="<?= e($school['principal_nip'] ?? '') ?>">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="school-section-card">
+            <div class="school-section-header">
+                <div class="school-section-icon"><i data-lucide="calendar"></i></div>
+                <h2 class="school-section-title">Tahun Ajaran & Semester</h2>
+            </div>
+            <div class="school-section-body">
+                <div class="school-form-grid two-col">
+                    <div class="school-form-group">
+                        <label class="school-label">Tahun Ajaran <span class="required">*</span></label>
+                        <input type="text" class="school-input" name="academic_year" required value="<?= e($school['academic_year']) ?>" placeholder="2025/2026">
+                    </div>
+                    <div class="school-form-group">
+                        <label class="school-label">Semester <span class="required">*</span></label>
+                        <select class="school-input" name="semester" required>
+                            <option value="Ganjil" <?= $school['semester'] === 'Ganjil' ? 'selected' : '' ?>>Ganjil</option>
+                            <option value="Genap" <?= $school['semester'] === 'Genap' ? 'selected' : '' ?>>Genap</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="actions wide" style="margin-top: 16px;">
+            <button class="button primary" type="submit"><i data-lucide="save"></i> Simpan</button>
+            <a class="button" href="<?= e(route_url('schools')) ?>"><i data-lucide="x"></i> Batal</a>
+        </div>
+    </form>
+    <?php
+    render_footer();
+}
+
 function edit_row(string $table): ?array
 {
     $id = (int)($_GET['edit'] ?? 0);
@@ -308,7 +483,8 @@ function page_classes(): void
     require_role(['admin']);
     $edit = edit_row('classes') ?: [];
     $teachers = map_options('teachers', 'name');
-    $rows = fetch_all('SELECT c.*, t.name AS teacher_name FROM classes c LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id ORDER BY c.grade, c.name');
+    $schools = fetch_all('SELECT id, name FROM school_profile ORDER BY name');
+    $rows = fetch_all('SELECT c.*, t.name AS teacher_name, sp.name AS school_name FROM classes c LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id LEFT JOIN school_profile sp ON sp.id = c.school_id ORDER BY sp.name, c.grade, c.name');
     render_header('Data Kelas');
     input_panel_start($edit ? 'Edit Kelas' : 'Input Kelas', 'Tambah Kelas', (bool)$edit || isset($_GET['add']));
     ?>
@@ -319,6 +495,15 @@ function page_classes(): void
             <label>
                 <span class="field-icon"><i data-lucide="hash"></i> Nama Kelas</span>
                 <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>" placeholder="Contoh: 7A, 8B, 9C">
+            </label>
+            <label>
+                <span class="field-icon"><i data-lucide="building"></i> Sekolah <span style="color:#c00">*</span></span>
+                <select name="school_id" required>
+                    <option value="">- Pilih Sekolah -</option>
+                    <?php foreach ($schools as $s): ?>
+                        <option value="<?= (int)$s['id'] ?>"<?= (int)($edit['school_id'] ?? 0) === (int)$s['id'] ? ' selected' : '' ?>><?= e($s['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
             </label>
             <label>
                 <span class="field-icon"><i data-lucide="layers"></i> Tingkat / Grade</span>
@@ -349,9 +534,9 @@ function page_classes(): void
             <div class="wide actions form-actions-top"><button type="submit" class="button primary"><i data-lucide="save"></i> Simpan</button><a class="button" href="<?= e(route_url('classes')) ?>"><i data-lucide="rotate-ccw"></i> Reset</a></div>
         </form>
     <?php input_panel_end(); ?>
-    <?php table_panel('Daftar Kelas', ['Kelas', 'Tingkat', 'Jenjang', 'Jurusan', 'Wali Kelas', 'Jumlah Siswa', 'Status', 'Aksi'], $rows, function ($row) {
+    <?php table_panel('Daftar Kelas', ['Sekolah', 'Kelas', 'Tingkat', 'Jenjang', 'Jurusan', 'Wali Kelas', 'Jumlah Siswa', 'Status', 'Aksi'], $rows, function ($row) {
         $count = (int)fetch_one('SELECT COUNT(*) AS c FROM students WHERE class_id = ?', [(int)$row['id']])['c'];
-        ?><td><?= e($row['name']) ?></td><td><?= e($row['grade']) ?></td><td><?= e($row['level'] ?? '-') ?></td><td><?= e($row['major'] ?? '-') ?></td><td><?= e($row['teacher_name']) ?></td><td><?= e($count) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('classes', (int)$row['id'], 'delete_class') ?></td><?php
+        ?><td><?= e($row['school_name'] ?? '-') ?></td><td><?= e($row['name']) ?></td><td><?= e($row['grade']) ?></td><td><?= e($row['level'] ?? '-') ?></td><td><?= e($row['major'] ?? '-') ?></td><td><?= e($row['teacher_name']) ?></td><td><?= e($count) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('classes', (int)$row['id'], 'delete_class') ?></td><?php
     }, '', true); ?>
     <?php render_footer();
 }

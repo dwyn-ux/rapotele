@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS classes (
   grade VARCHAR(16) NOT NULL,
   level VARCHAR(16) NULL,
   major VARCHAR(80) NULL,
+  school_id INT UNSIGNED NULL,
   homeroom_teacher_id INT NULL,
   academic_year VARCHAR(32) NOT NULL,
   active TINYINT(1) NOT NULL DEFAULT 1,

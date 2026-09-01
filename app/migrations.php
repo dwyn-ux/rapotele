@@ -84,7 +84,9 @@ function run_migrations(): void
             dapodik_id VARCHAR(64) NULL,
             name VARCHAR(80) NOT NULL,
             grade VARCHAR(16) NOT NULL,
+            level VARCHAR(16) NULL,
             major VARCHAR(80) NULL,
+            school_id INT UNSIGNED NULL,
             homeroom_teacher_id INT NULL,
             academic_year VARCHAR(32) NOT NULL,
             active $bool NOT NULL DEFAULT 1,
@@ -693,6 +695,13 @@ function run_migrations(): void
     migration_add_column('classes', 'active', migration_bool() . ' NOT NULL DEFAULT 1');
     migration_add_column('classes', 'updated_at', 'DATETIME NULL');
     migration_add_column('classes', 'level', 'VARCHAR(16) NULL');
+    migration_add_column('classes', 'school_id', 'INT UNSIGNED NULL');
+    if (table_exists('classes') && migration_column_exists('classes', 'school_id')) {
+        $firstSchool = fetch_one('SELECT id FROM school_profile ORDER BY id LIMIT 1');
+        if ($firstSchool) {
+            execute_sql('UPDATE classes SET school_id = ? WHERE school_id IS NULL', [(int)$firstSchool['id']]);
+        }
+    }
     migration_add_column('students', 'dapodik_id', 'VARCHAR(64) NULL');
     migration_add_column('students', 'nis', 'VARCHAR(64) NULL');
     migration_add_column('students', 'nisn', 'VARCHAR(64) NULL');

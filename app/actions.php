@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 return [
     'save_school' => 'action_save_school',
+    'delete_school' => 'action_delete_school',
     'save_teacher' => 'action_save_teacher',
     'delete_teacher' => fn (): mixed => action_delete('teachers', 'teachers'),
     'save_class' => 'action_save_class',

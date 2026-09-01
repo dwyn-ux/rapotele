@@ -368,7 +368,7 @@ function report_student_payload(int $studentId): array
         throw new RuntimeException('Siswa tidak ditemukan.');
     }
 
-    $school = report_get_school_profile();
+    $school = report_get_school_profile($studentId);
     $subjects = report_subjects_for_student($student, $studentId);
     if (!$subjects) {
         $subjects = [
@@ -740,21 +740,9 @@ function report_attendance_summary_for_student(int $studentId): array
     return $summary;
 }
 
-function report_get_school_profile(): array
+function report_get_school_profile(?int $studentId = null, ?int $classId = null): array
 {
-    if (!table_exists('school_profile')) {
-        return [
-            'name' => config('school.name'),
-            'academic_year' => current_academic_year(),
-            'semester' => current_semester(),
-            'address' => '',
-            'principal_name' => '',
-            'principal_nip' => '',
-        ];
-    }
-
-    $school = fetch_one('SELECT * FROM school_profile ORDER BY id LIMIT 1');
-    return $school ?: [
+    $fallback = [
         'name' => config('school.name'),
         'academic_year' => current_academic_year(),
         'semester' => current_semester(),
@@ -762,6 +750,34 @@ function report_get_school_profile(): array
         'principal_name' => '',
         'principal_nip' => '',
     ];
+
+    if (!table_exists('school_profile')) {
+        return $fallback;
+    }
+
+    $schoolId = null;
+    if ($studentId !== null && table_exists('classes') && migration_column_exists('classes', 'school_id')) {
+        $row = fetch_one('SELECT c.school_id FROM students s LEFT JOIN classes c ON c.id = s.class_id WHERE s.id = ?', [$studentId]);
+        if ($row && !empty($row['school_id'])) {
+            $schoolId = (int)$row['school_id'];
+        }
+    }
+    if ($schoolId === null && $classId !== null && table_exists('classes') && migration_column_exists('classes', 'school_id')) {
+        $row = fetch_one('SELECT school_id FROM classes WHERE id = ?', [$classId]);
+        if ($row && !empty($row['school_id'])) {
+            $schoolId = (int)$row['school_id'];
+        }
+    }
+
+    if ($schoolId !== null) {
+        $school = fetch_one('SELECT * FROM school_profile WHERE id = ?', [$schoolId]);
+        if ($school) {
+            return $school;
+        }
+    }
+
+    $school = fetch_one('SELECT * FROM school_profile ORDER BY id LIMIT 1');
+    return $school ?: $fallback;
 }
 
 function generate_student_report_pdf(int $studentId): string
@@ -1191,7 +1207,7 @@ function page_student_document_download(): void
 function generate_student_graduation_document_pdf(array $student, string $kind): string
 {
     $pdf = new SimplePdf();
-    $school = report_get_school_profile();
+    $school = report_get_school_profile((int)($student['id'] ?? 0));
     $schoolLogo = report_logo_signature();
     $agencyLogo = report_agency_logo_signature();
     $graduation = fetch_one('SELECT * FROM graduations WHERE student_id = ?', [(int)$student['id']]) ?: [];
@@ -1464,7 +1480,7 @@ function generate_student_biodata_pdf(int $studentId): string
         throw new RuntimeException('Siswa tidak ditemukan.');
     }
 
-    $school = report_get_school_profile();
+    $school = report_get_school_profile($studentId);
     $schoolLogo = report_logo_signature();
     $agencyLogo = report_agency_logo_signature();
     $photo = report_student_photo($studentId);
@@ -1916,7 +1932,7 @@ function page_cetak_sp(): void
         'SELECT * FROM student_rewards WHERE student_id = ? ORDER BY date DESC',
         [$studentId]
     );
-    $school = report_get_school_profile();
+    $school = report_get_school_profile($studentId);
     $schoolLogo = report_logo_signature();
     $principalSig = report_signature_by_type('principal');
 
@@ -2092,7 +2108,7 @@ function generate_laporan_belajar_pdf(array $student): string
     $pdf = new SimplePdf();
     $pdf->addPage();
 
-    $school = report_get_school_profile();
+    $school = report_get_school_profile((int)($student['id'] ?? 0));
     $studentId = (int)$student['id'];
     $attendance = report_attendance_summary_for_student($studentId);
     $signatures = report_signatures_for_student($student);
