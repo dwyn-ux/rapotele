@@ -290,16 +290,33 @@ $siswaPerKelas = [
     'VII A' => 4, 'VII B' => 4, 'VIII A' => 3, 'VIII B' => 3, 'IX A' => 2, 'IX B' => 3,
     'X MIPA 1' => 3, 'X MIPA 2' => 3, 'XI MIPA 1' => 4, 'XII MIPA 1' => 2, 'XII IPS 1' => 2,
 ];
-$stmt = $pdo->prepare('INSERT INTO students (nis, nisn, name, gender, class_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)');
+$stmt = $pdo->prepare('INSERT INTO students (nis, nisn, name, gender, birth_place, birth_date, religion, address, phone, father_name, father_occupation, mother_name, mother_occupation, class_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)');
 $idx = 0;
 $siswaByClass = [];
+$birthPlaces = ['Ngawen', 'Blora', 'Cepu', 'Rembang', 'Purwodadi', 'Kudus', 'Semarang', 'Solo', 'Sragen'];
+$religions = ['Islam', 'Islam', 'Islam', 'Islam', 'Kristen', 'Katolik', 'Hindu'];
+$fatherOccs = ['Petani', 'Wiraswasta', 'PNS', 'Guru', 'Pedagang', 'Karyawan Swasta', 'Buruh', 'Sopir', 'Nelayan'];
+$motherOccs = ['Ibu Rumah Tangga', 'Ibu Rumah Tangga', 'Ibu Rumah Tangga', 'Guru', 'Pedagang', 'Karyawan', 'PNS', 'Penjahit'];
+mt_srand(2024);
 foreach ($siswaPerKelas as $kelasName => $jumlah) {
     $classId = $classIds[$kelasName];
     $siswaByClass[$kelasName] = [];
     for ($i = 0; $i < $jumlah; $i++) {
         if ($idx >= count($siswaNames)) break;
         $s = $siswaNames[$idx++];
-        $stmt->execute([$s[2], $s[3], $s[0], $s[1], $classId, $now, $now]);
+        $bp = $birthPlaces[array_rand($birthPlaces)];
+        $yob = mt_rand(2008, 2011);
+        $mob = mt_rand(1, 12);
+        $dob = mt_rand(1, 28);
+        $bd = sprintf('%04d-%02d-%02d', $yob, $mob, $dob);
+        $rel = $religions[array_rand($religions)];
+        $addr = 'Dsn. ' . ['Krajan', 'Ngemplak', 'Sambirejo', 'Pojok'][array_rand(['Krajan', 'Ngemplak', 'Sambirejo', 'Pojok'])] . ', Rt ' . mt_rand(1, 8) . '/Rw ' . mt_rand(1, 5) . ', ' . $bp;
+        $phone = '08' . mt_rand(1111111111, 9999999999);
+        $fName = 'Bpk. ' . ['Sutrisno', 'Wahyudi', 'Supriyadi', 'Hartono', 'Sudirman', 'Paiman'][array_rand(['Sutrisno', 'Wahyudi', 'Supriyadi', 'Hartono', 'Sudirman', 'Paiman'])];
+        $mName = 'Ibu ' . ['Sumiati', 'Puji Astuti', 'Suryani', 'Wahyuni', 'Suprapti', 'Sri Rejeki'][array_rand(['Sumiati', 'Puji Astuti', 'Suryani', 'Wahyuni', 'Suprapti', 'Sri Rejeki'])];
+        $fOcc = $fatherOccs[array_rand($fatherOccs)];
+        $mOcc = $motherOccs[array_rand($motherOccs)];
+        $stmt->execute([$s[2], $s[3], $s[0], $s[1], $bp, $bd, $rel, $addr, $phone, $fName, $fOcc, $mName, $mOcc, $classId, $now, $now]);
         $siswaByClass[$kelasName][] = (int)$pdo->lastInsertId();
     }
 }
