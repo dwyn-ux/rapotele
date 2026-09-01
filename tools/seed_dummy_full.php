@@ -214,6 +214,7 @@ foreach ($users as $u) {
 echo "Users: " . count($users) . "\n\n";
 
 echo "=== KELAS ===\n";
+echo "DEBUG: smpId=$smpId smaId=$smaId teacherIds count=" . count($teacherIds) . PHP_EOL;
 $classData = [
     // SMP Ashidiq
     ['VII A', '7', 'SMP', null, $smpId, $teacherIds[1]],
