@@ -197,10 +197,16 @@ function page_telegram_register(): void
     }
 
     $subjects = array_column_map(
-        fetch_all('SELECT id, name FROM subjects WHERE active = 1 ORDER BY group_name, name'),
+        fetch_all('SELECT id, name, level FROM subjects WHERE active = 1 ORDER BY group_name, name'),
         'id',
         'name'
     );
+    $subjectLabels = [];
+    foreach ($subjects as $sid => $sname) {
+        $lv = fetch_one('SELECT level FROM subjects WHERE id = ?', [(int)$sid]);
+        $lvs = trim((string)($lv['level'] ?? ''));
+        $subjectLabels[$sid] = $sname . ($lvs !== '' ? ' [' . $lvs . ']' : '');
+    }
     $classes = array_column_map(
         fetch_all('SELECT id, name FROM classes WHERE active = 1 ORDER BY grade, name'),
         'id',
@@ -257,7 +263,7 @@ function page_telegram_register(): void
         <label>Mapel Utama
             <select name="subject_id">
                 <option value="">Pilih mapel</option>
-                <?= options($subjects, $values['subject_id'] ?? '') ?>
+                <?= options($subjectLabels, $values['subject_id'] ?? '') ?>
             </select>
         </label>
         <fieldset class="check-group">

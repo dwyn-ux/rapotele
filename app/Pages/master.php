@@ -590,6 +590,10 @@ function page_subjects(): void
     require_role(['admin']);
     $edit = edit_row('subjects') ?: [];
     $rows = fetch_all('SELECT * FROM subjects ORDER BY group_name, name');
+    $selectedLevels = [];
+    if (!empty($edit['level'])) {
+        $selectedLevels = array_values(array_intersect(explode(',', (string)$edit['level']), SUBJECT_LEVELS));
+    }
     render_header('Data Mapel');
     input_panel_start($edit ? 'Edit Mapel' : 'Input Mapel', 'Tambah Mapel', (bool)$edit || isset($_GET['add']));
     ?>
@@ -598,12 +602,13 @@ function page_subjects(): void
             <label class="span-2">Nama Mapel <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
             <label>Nama Singkat <input type="text" name="short_name" value="<?= e($edit['short_name'] ?? '') ?>"></label>
             <label>Kelompok <input type="text" name="group_name" value="<?= e($edit['group_name'] ?? '') ?>"></label>
+            <?= subject_levels_input($selectedLevels) ?>
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
             <div class="actions span-2"><button class="button primary">Simpan</button><a class="button" href="<?= e(route_url('subjects')) ?>">Reset</a></div>
         </form>
     <?php input_panel_end(); ?>
-    <?php table_panel('Daftar Mapel', ['Nama Mapel', 'Singkat', 'Kelompok', 'Status', 'Aksi'], $rows, function ($row) { ?>
-        <td><?= e($row['name']) ?></td><td><?= e($row['short_name']) ?></td><td><?= e($row['group_name']) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('subjects', (int)$row['id'], 'delete_subject') ?></td>
+    <?php table_panel('Daftar Mapel', ['Nama Mapel', 'Singkat', 'Kelompok', 'Jenjang', 'Status', 'Aksi'], $rows, function ($row) { ?>
+        <td><?= e($row['name']) ?></td><td><?= e($row['short_name']) ?></td><td><?= e($row['group_name']) ?></td><td><?= subject_levels_badge($row['level'] ?? '') ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('subjects', (int)$row['id'], 'delete_subject') ?></td>
     <?php }, '', true); ?>
     <?php render_footer();
 }
@@ -613,25 +618,78 @@ function page_assignments(): void
     require_role(['admin']);
     $edit = edit_row('teaching_assignments') ?: [];
     $teachers = map_options('teachers', 'name');
-    $classes = map_options('classes', 'name');
-    $subjects = map_options('subjects', 'name');
+    $allClasses = fetch_all('SELECT id, name, level FROM classes WHERE active = 1 ORDER BY grade, name');
+    $allSubjects = fetch_all('SELECT id, name, level FROM subjects WHERE active = 1 ORDER BY name');
+    $editClass = $edit ? fetch_one('SELECT id, name, level FROM classes WHERE id = ?', [(int)$edit['class_id']]) : null;
+    $editLevel = (string)($editClass['level'] ?? '');
     $rows = assignment_rows();
+    $subjectsJson = json_encode($allSubjects, JSON_UNESCAPED_UNICODE);
+    $classesJson = json_encode($allClasses, JSON_UNESCAPED_UNICODE);
     render_header('Data Pembelajaran');
     input_panel_start($edit ? 'Edit Pembelajaran' : 'Input Pembelajaran', 'Tambah Pembelajaran', (bool)$edit || isset($_GET['add']));
     ?>
         <form method="post" class="grid four">
             <?= csrf_field() ?><input type="hidden" name="action" value="save_assignment"><input type="hidden" name="id" value="<?= e($edit['id'] ?? 0) ?>">
             <label>Guru <select name="teacher_id" required><?= options($teachers, $edit['teacher_id'] ?? '') ?></select></label>
-            <label>Kelas <select name="class_id" required><?= options($classes, $edit['class_id'] ?? '') ?></select></label>
-            <label>Mapel <select name="subject_id" required><?= options($subjects, $edit['subject_id'] ?? '') ?></select></label>
+            <label>Jenjang
+                <select id="asg-level" data-edit-level="<?= e($editLevel) ?>">
+                    <option value="">Pilih Jenjang</option>
+                    <?php foreach (SUBJECT_LEVELS as $lv): ?>
+                        <option value="<?= e($lv) ?>"<?= $editLevel === $lv ? ' selected' : '' ?>><?= e($lv) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label>Kelas
+                <select name="class_id" id="asg-class" required>
+                    <option value="">Pilih Kelas</option>
+                    <?php foreach ($allClasses as $c): ?>
+                        <option value="<?= (int)$c['id'] ?>" data-level="<?= e($c['level'] ?? '') ?>"<?= (int)($edit['class_id'] ?? 0) === (int)$c['id'] ? ' selected' : '' ?>><?= e($c['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label>Mapel
+                <select name="subject_id" id="asg-subject" required>
+                    <option value="">Pilih Mapel</option>
+                    <?php foreach ($allSubjects as $s): ?>
+                        <option value="<?= (int)$s['id'] ?>" data-level="<?= e($s['level'] ?? '') ?>"<?= (int)($edit['subject_id'] ?? 0) === (int)$s['id'] ? ' selected' : '' ?>><?= e($s['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
             <label>Tahun Ajaran <input type="text" name="academic_year" required value="<?= e($edit['academic_year'] ?? current_academic_year()) ?>" readonly></label>
             <label>Semester <input type="text" name="semester" required value="<?= e($edit['semester'] ?? current_semester()) ?>" readonly></label>
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
             <div class="actions span-2"><button class="button primary">Simpan</button><a class="button" href="<?= e(route_url('assignments')) ?>">Reset</a></div>
         </form>
+        <script>
+        (function(){
+            var levelEl = document.getElementById('asg-level');
+            var classEl = document.getElementById('asg-class');
+            var subjectEl = document.getElementById('asg-subject');
+            var allClassOpts = Array.from(classEl.options).map(function(o){ return {value:o.value, level:o.getAttribute('data-level')||'', text:o.textContent}; });
+            var allSubjectOpts = Array.from(subjectEl.options).map(function(o){ return {value:o.value, level:o.getAttribute('data-level')||'', text:o.textContent}; });
+            var preLevel = levelEl.value || levelEl.getAttribute('data-edit-level') || '';
+            function rebuild(selectEl, allOpts, level) {
+                var prev = selectEl.value;
+                selectEl.innerHTML = '<option value="">' + (selectEl === classEl ? 'Pilih Kelas' : 'Pilih Mapel') + '</option>';
+                allOpts.filter(function(o){ return !o.value || !level || subjectMatch(o.level, level); }).forEach(function(o){
+                    var opt = document.createElement('option');
+                    opt.value = o.value; opt.textContent = o.text;
+                    opt.setAttribute('data-level', o.level);
+                    selectEl.appendChild(opt);
+                });
+                if (prev && selectEl.querySelector('option[value="' + prev + '"]')) selectEl.value = prev;
+            }
+            function subjectMatch(subjectLevel, classLevel) {
+                if (!subjectLevel) return true;
+                return subjectLevel.split(',').map(function(s){return s.trim();}).indexOf(classLevel) !== -1;
+            }
+            levelEl.addEventListener('change', function(){ rebuild(classEl, allClassOpts, levelEl.value); rebuild(subjectEl, allSubjectOpts, levelEl.value); });
+            if (preLevel) { rebuild(classEl, allClassOpts, preLevel); rebuild(subjectEl, allSubjectOpts, preLevel); }
+        })();
+        </script>
     <?php input_panel_end(); ?>
-    <?php table_panel('Daftar Pembelajaran', ['Guru', 'Kelas', 'Mapel', 'Tahun', 'Semester', 'Status', 'Aksi'], $rows, function ($row) { ?>
-        <td><?= e($row['teacher_name']) ?></td><td><?= e($row['class_name']) ?></td><td><?= e($row['subject_name']) ?></td><td><?= e($row['academic_year']) ?></td><td><?= e($row['semester']) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('assignments', (int)$row['id'], 'delete_assignment') ?></td>
+    <?php table_panel('Daftar Pembelajaran', ['Guru', 'Jenjang', 'Kelas', 'Mapel', 'Tahun', 'Semester', 'Status', 'Aksi'], $rows, function ($row) { ?>
+        <td><?= e($row['teacher_name']) ?></td><td><?= e($row['class_level'] ?? '-') ?></td><td><?= e($row['class_name']) ?></td><td><?= e($row['subject_name']) ?></td><td><?= e($row['academic_year']) ?></td><td><?= e($row['semester']) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('assignments', (int)$row['id'], 'delete_assignment') ?></td>
     <?php }, '', true); ?>
     <?php render_footer();
 }

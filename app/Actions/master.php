@@ -259,17 +259,29 @@ function action_save_subject(): void
 {
     require_role(['admin']);
     $id = (int)($_POST['id'] ?? 0);
+    $name = trim((string)$_POST['name']);
+    if ($name === '') {
+        flash('danger', 'Nama mapel wajib diisi.');
+        redirect_to('subjects');
+    }
+    $levels = array_values(array_intersect((array)($_POST['levels'] ?? []), SUBJECT_LEVELS));
+    if (!$levels) {
+        flash('danger', 'Pilih minimal 1 jenjang untuk mapel.');
+        redirect_to('subjects');
+    }
+    $levelCsv = implode(',', $levels);
     $data = [
-        trim((string)$_POST['name']),
+        $name,
         trim((string)($_POST['short_name'] ?? '')),
         trim((string)($_POST['group_name'] ?? '')),
+        $levelCsv,
         isset($_POST['active']) ? 1 : 0,
         now_string(),
     ];
     if ($id > 0) {
-        execute_sql('UPDATE subjects SET name = ?, short_name = ?, group_name = ?, active = ?, updated_at = ? WHERE id = ?', array_merge($data, [$id]));
+        execute_sql('UPDATE subjects SET name = ?, short_name = ?, group_name = ?, level = ?, active = ?, updated_at = ? WHERE id = ?', array_merge($data, [$id]));
     } else {
-        execute_sql('INSERT INTO subjects (name, short_name, group_name, active, updated_at) VALUES (?, ?, ?, ?, ?)', $data);
+        execute_sql('INSERT INTO subjects (name, short_name, group_name, level, active, updated_at) VALUES (?, ?, ?, ?, ?, ?)', $data);
     }
     flash('success', 'Data mapel tersimpan.');
     redirect_to('subjects');
@@ -279,10 +291,23 @@ function action_save_assignment(): void
 {
     require_role(['admin']);
     $id = (int)($_POST['id'] ?? 0);
+    $teacherId = (int)$_POST['teacher_id'];
+    $classId = (int)$_POST['class_id'];
+    $subjectId = (int)$_POST['subject_id'];
+    $classRow = fetch_one('SELECT name, level FROM classes WHERE id = ?', [$classId]);
+    $subjectRow = fetch_one('SELECT name, level FROM subjects WHERE id = ?', [$subjectId]);
+    if (!$classRow || !$subjectRow) {
+        flash('danger', 'Kelas atau mapel tidak valid.');
+        redirect_to('assignments');
+    }
+    if (!subject_has_level($subjectRow['level'] ?? null, (string)($classRow['level'] ?? ''))) {
+        flash('danger', 'Mapel "' . $subjectRow['name'] . '" tidak berlaku untuk jenjang kelas "' . $classRow['name'] . '".');
+        redirect_to('assignments');
+    }
     $data = [
-        (int)$_POST['teacher_id'],
-        (int)$_POST['class_id'],
-        (int)$_POST['subject_id'],
+        $teacherId,
+        $classId,
+        $subjectId,
         trim((string)$_POST['academic_year']),
         trim((string)$_POST['semester']),
         isset($_POST['active']) ? 1 : 0,
@@ -509,6 +534,13 @@ function action_import_bulk(): void
                 $errors[] = "Baris $rowNum: mapel '$subjectName' tidak ditemukan, dilewati.";
                 $skipped++; continue;
             }
+            // Validate subject level matches class level
+            $classRow = fetch_one('SELECT name, level FROM classes WHERE id = ?', [$classId]);
+            $subjectRow = fetch_one('SELECT name, level FROM subjects WHERE id = ?', [$subjectId]);
+            if (!subject_has_level($subjectRow['level'] ?? null, (string)($classRow['level'] ?? ''))) {
+                $errors[] = "Baris $rowNum: mapel '{$subjectRow['name']}' tidak berlaku untuk jenjang kelas '{$classRow['name']}', dilewati.";
+                $skipped++; continue;
+            }
             // Resolve teacher
             $teacherId = null;
             foreach ($allTeachers as $normName => $tid) {
@@ -733,6 +765,13 @@ function action_import_bulk_validate(): void
         $subjectId = $allSubjects[$subjectName] ?? null;
         if ($subjectId === null) { $r['error'] = 'Mapel tidak ditemukan'; $rows[] = $r; continue; }
         $r['subject_id'] = $subjectId;
+
+        $classRow = fetch_one('SELECT name, level FROM classes WHERE id = ?', [$classId]);
+        $subjectRow = fetch_one('SELECT name, level FROM subjects WHERE id = ?', [$subjectId]);
+        if (!subject_has_level($subjectRow['level'] ?? null, (string)($classRow['level'] ?? ''))) {
+            $r['error'] = 'Mapel "' . $subjectRow['name'] . '" tidak berlaku untuk jenjang kelas "' . $classRow['name'] . '"';
+            $rows[] = $r; continue;
+        }
 
         $teacherId = null;
         foreach ($allTeachers as $normName => $tid) {

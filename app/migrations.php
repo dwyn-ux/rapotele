@@ -726,6 +726,7 @@ function run_migrations(): void
     migration_add_column('subjects', 'kkm', 'INT NULL');
     migration_add_column('subjects', 'active', migration_bool() . ' NOT NULL DEFAULT 1');
     migration_add_column('subjects', 'updated_at', 'DATETIME NULL');
+    migration_add_column('subjects', 'level', 'VARCHAR(64) NULL');
     migration_add_column('teaching_assignments', 'dapodik_id', 'VARCHAR(64) NULL');
     migration_add_column('teaching_assignments', 'academic_year', 'VARCHAR(32) NULL');
     migration_add_column('teaching_assignments', 'semester', 'VARCHAR(32) NULL');
@@ -788,13 +789,13 @@ function seed_defaults(): void
     $stmt->execute(['2A', '2', 2, (string)config('school.academic_year', '2025/2026')]);
 
     $subjects = [
-        ['Bahasa Indonesia', 'B.Indo', 'Wajib'],
-        ['Matematika', 'MTK', 'Wajib'],
-        ['Pendidikan Pancasila', 'PP', 'Wajib'],
-        ['PJOK', 'PJOK', 'Wajib'],
-        ['Seni Budaya', 'SBdP', 'Wajib'],
+        ['Bahasa Indonesia', 'B.Indo', 'Wajib', 'SMP,SMA'],
+        ['Matematika', 'MTK', 'Wajib', 'SMP,SMA'],
+        ['Pendidikan Pancasila', 'PP', 'Wajib', 'SMP,SMA'],
+        ['PJOK', 'PJOK', 'Wajib', 'SMP,SMA'],
+        ['Seni Budaya', 'SBdP', 'Wajib', 'SMP'],
     ];
-    $stmt = db()->prepare('INSERT INTO subjects (name, short_name, group_name, active) VALUES (?, ?, ?, 1)');
+    $stmt = db()->prepare('INSERT INTO subjects (name, short_name, group_name, level, active) VALUES (?, ?, ?, ?, 1)');
     foreach ($subjects as $subject) {
         $stmt->execute($subject);
     }
@@ -1250,14 +1251,14 @@ function seed_demo_class(string $name, string $grade, int $homeroomTeacherId): i
     return (int)db()->lastInsertId();
 }
 
-function seed_demo_subject(string $name, string $shortName, string $groupName): int
+function seed_demo_subject(string $name, string $shortName, string $groupName, string $level = 'SMP,SMA'): int
 {
     $row = fetch_one('SELECT id FROM subjects WHERE name = ? ORDER BY id LIMIT 1', [$name]);
     if ($row) {
-        execute_sql('UPDATE subjects SET short_name = COALESCE(NULLIF(short_name, \'\'), ?), group_name = COALESCE(NULLIF(group_name, \'\'), ?), active = 1, updated_at = ? WHERE id = ?', [$shortName, $groupName, now_string(), (int)$row['id']]);
+        execute_sql('UPDATE subjects SET short_name = COALESCE(NULLIF(short_name, \'\'), ?), group_name = COALESCE(NULLIF(group_name, \'\'), ?), level = COALESCE(NULLIF(level, \'\'), ?), active = 1, updated_at = ? WHERE id = ?', [$shortName, $groupName, $level, now_string(), (int)$row['id']]);
         return (int)$row['id'];
     }
-    execute_sql('INSERT INTO subjects (name, short_name, group_name, active, updated_at) VALUES (?, ?, ?, 1, ?)', [$name, $shortName, $groupName, now_string()]);
+    execute_sql('INSERT INTO subjects (name, short_name, group_name, level, active, updated_at) VALUES (?, ?, ?, ?, 1, ?)', [$name, $shortName, $groupName, $level, now_string()]);
     return (int)db()->lastInsertId();
 }
 

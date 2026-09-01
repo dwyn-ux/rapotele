@@ -658,19 +658,20 @@ function dapodik_import_subject(array $row, bool $requireTeacher = true): ?int
     $dapodikId = dapodik_limit(dapodik_external_id($row, ['mata_pelajaran_id', 'mapel_id', 'id_mapel', 'id_mata_pelajaran']), 64);
     $short = dapodik_limit(dapodik_subject_short_from_row($row, $name), 40);
     $group = dapodik_limit(dapodik_row_value($row, ['kelompok', 'kelompok_mapel', 'group_name']), 80);
+    $level = dapodik_limit(dapodik_row_value($row, ['jenjang', 'jenjang_pendidikan', 'level', 'bentuk_pendidikan']), 64);
     $existingId = dapodik_subject_id_from_row($row);
 
     if ($existingId) {
         execute_sql(
-            'UPDATE subjects SET dapodik_id = COALESCE(NULLIF(?, \'\'), dapodik_id), name = ?, short_name = ?, group_name = COALESCE(NULLIF(?, \'\'), group_name), active = 1, updated_at = ? WHERE id = ?',
-            [$dapodikId, $name, $short, $group, now_string(), $existingId]
+            'UPDATE subjects SET dapodik_id = COALESCE(NULLIF(?, \'\'), dapodik_id), name = ?, short_name = ?, group_name = COALESCE(NULLIF(?, \'\'), group_name), level = COALESCE(NULLIF(?, \'\'), level), active = 1, updated_at = ? WHERE id = ?',
+            [$dapodikId, $name, $short, $group, $level, now_string(), $existingId]
         );
         return $existingId;
     }
 
     execute_sql(
-        'INSERT INTO subjects (dapodik_id, name, short_name, group_name, active, updated_at) VALUES (?, ?, ?, ?, 1, ?)',
-        [$dapodikId, $name, $short, $group, now_string()]
+        'INSERT INTO subjects (dapodik_id, name, short_name, group_name, level, active, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?)',
+        [$dapodikId, $name, $short, $group, $level, now_string()]
     );
     return (int)db()->lastInsertId();
 }

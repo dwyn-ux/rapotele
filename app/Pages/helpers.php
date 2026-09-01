@@ -1,5 +1,7 @@
 <?php declare(strict_types=1);
 
+const SUBJECT_LEVELS = ['SD', 'SMP', 'MTS', 'SMA', 'MA'];
+
 function options(array $options, mixed $selected): string
 {
     $html = '';
@@ -8,6 +10,48 @@ function options(array $options, mixed $selected): string
         $html .= '<option value="' . e($value) . '"' . $isSelected . '>' . e($label) . '</option>';
     }
     return $html;
+}
+
+function subject_has_level(?string $subjectLevel, string $classLevel): bool
+{
+    $sl = trim((string)$subjectLevel);
+    if ($sl === '' || $classLevel === '') {
+        return true;
+    }
+    foreach (explode(',', $sl) as $l) {
+        if (trim($l) === $classLevel) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function subject_levels_input(array $selected): string
+{
+    $html = '<fieldset class="check-group subject-levels" style="grid-column:1/-1"><legend>Jenjang * (pilih minimal 1)</legend>';
+    foreach (SUBJECT_LEVELS as $code) {
+        $isChecked = in_array($code, $selected, true) ? ' checked' : '';
+        $html .= '<label class="check"><input type="checkbox" name="levels[]" value="' . e($code) . '"' . $isChecked . '> ' . e($code) . '</label>';
+    }
+    $html .= '</fieldset>';
+    return $html;
+}
+
+function subject_levels_badge(?string $level): string
+{
+    $sl = trim((string)$level);
+    if ($sl === '') {
+        return '<span class="badge muted">— (lintas)</span>';
+    }
+    $out = '';
+    foreach (explode(',', $sl) as $l) {
+        $code = trim($l);
+        if ($code === '') {
+            continue;
+        }
+        $out .= '<span class="badge ok" style="margin-right:.25rem">' . e($code) . '</span>';
+    }
+    return $out;
 }
 
 function checked(mixed $value): string
@@ -70,6 +114,22 @@ function map_options(string $table, string $labelColumn): array
     return array_column_map($rows, 'id', 'label');
 }
 
+function subject_options_for_level(?string $classLevel): array
+{
+    $rows = fetch_all('SELECT id, name FROM subjects WHERE active = 1 ORDER BY name');
+    if ($classLevel === null || $classLevel === '') {
+        return array_column_map($rows, 'id', 'name');
+    }
+    $out = [];
+    foreach ($rows as $r) {
+        $rowLevel = fetch_one('SELECT level FROM subjects WHERE id = ?', [(int)$r['id']]);
+        if (subject_has_level($rowLevel['level'] ?? null, $classLevel)) {
+            $out[(string)$r['id']] = (string)$r['name'];
+        }
+    }
+    return $out;
+}
+
 function array_column_map(array $rows, string $key, string $value): array
 {
     $out = [];
@@ -82,7 +142,7 @@ function array_column_map(array $rows, string $key, string $value): array
 function assignment_rows(): array
 {
     return fetch_all(
-        'SELECT ta.*, t.name AS teacher_name, c.name AS class_name, s.name AS subject_name
+        'SELECT ta.*, t.name AS teacher_name, c.name AS class_name, c.level AS class_level, s.name AS subject_name
          FROM teaching_assignments ta
          JOIN teachers t ON t.id = ta.teacher_id
          JOIN classes c ON c.id = ta.class_id
@@ -100,7 +160,7 @@ function assignments_for_current_user(): array
         $params[] = (int)(current_user()['teacher_id'] ?? 0);
     }
     return fetch_all(
-        "SELECT ta.*, t.name AS teacher_name, c.name AS class_name, s.name AS subject_name
+        "SELECT ta.*, t.name AS teacher_name, c.name AS class_name, c.level AS class_level, s.name AS subject_name
          FROM teaching_assignments ta
          JOIN teachers t ON t.id = ta.teacher_id
          JOIN classes c ON c.id = ta.class_id
@@ -150,7 +210,7 @@ function assignment_options(array $assignments, mixed $selected): string
 
 /**
  * Build cascading data JSON from assignments.
- * Returns structure: { classId: { name: "Kelas 7A", subjects: { subjectId: { name: "Matematika", teachers: [{id, name}] } } } }
+ * Returns structure: { classId: { name: "Kelas 7A", level: "SMP", subjects: { subjectId: { name: "Matematika", teachers: [{id, name}] } } } }
  */
 function assignment_cascading_data(array $assignments): array
 {
@@ -159,7 +219,7 @@ function assignment_cascading_data(array $assignments): array
         $cid = (string)$a['class_id'];
         $sid = (string)$a['subject_id'];
         if (!isset($data[$cid])) {
-            $data[$cid] = ['name' => $a['class_name'], 'subjects' => []];
+            $data[$cid] = ['name' => $a['class_name'], 'level' => $a['class_level'] ?? '', 'subjects' => []];
         }
         if (!isset($data[$cid]['subjects'][$sid])) {
             $data[$cid]['subjects'][$sid] = ['name' => $a['subject_name'], 'teachers' => []];
@@ -189,7 +249,7 @@ function assignment_preselect(array $assignments, int $selected): array
 }
 
 /**
- * Cascading assignment picker: Kelas → Mapel → auto-submit
+ * Cascading assignment picker: Jenjang → Kelas → Mapel → auto-submit
  * Used by page_grades and other pages with a standalone picker section.
  */
 function assignment_picker(string $page, array $assignments, int $selected, string $extraParam = ''): void
@@ -197,14 +257,27 @@ function assignment_picker(string $page, array $assignments, int $selected, stri
     $data = assignment_cascading_data($assignments);
     [$preClass, $preSubject, $preTeacher] = assignment_preselect($assignments, $selected);
     $pickerId = 'picker-' . $page;
+    $preLevel = '';
+    if ($preClass > 0 && isset($data[(string)$preClass])) {
+        $preLevel = (string)($data[(string)$preClass]['level'] ?? '');
+    }
+    $levels = SUBJECT_LEVELS;
     ?>
     <section class="panel">
         <form method="get" id="<?= e($pickerId) ?>" class="grid four">
             <input type="hidden" name="page" value="<?= e($page) ?>">
             <input type="hidden" name="assignment_id" id="<?= e($pickerId) ?>-assignment" value="<?= e($selected ?: '') ?>">
             <?php if ($extraParam !== ''): ?><input type="hidden" name="type" value="<?= e($extraParam) ?>"><?php endif; ?>
+            <label>Jenjang
+                <select id="<?= e($pickerId) ?>-level" data-cascade-level="<?= e($pickerId) ?>">
+                    <option value="">Pilih Jenjang</option>
+                    <?php foreach ($levels as $lv): ?>
+                        <option value="<?= e($lv) ?>"<?= $preLevel === $lv ? ' selected' : '' ?>><?= e($lv) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
             <label>Kelas
-                <select id="<?= e($pickerId) ?>-class" data-cascade-class="<?= e($pickerId) ?>">
+                <select id="<?= e($pickerId) ?>-class" data-cascade-class="<?= e($pickerId) ?>" disabled>
                     <option value="">Pilih Kelas</option>
                 </select>
             </label>
@@ -225,24 +298,39 @@ function assignment_picker(string $page, array $assignments, int $selected, stri
     (function(){
         var data = <?= json_encode($data, JSON_UNESCAPED_UNICODE) ?>;
         var pickerId = <?= json_encode($pickerId) ?>;
+        var preLevel = <?= json_encode($preLevel) ?>;
         var preClass = <?= json_encode($preClass) ?>;
         var preSubject = <?= json_encode($preSubject) ?>;
         var preAssignment = <?= json_encode($preSubject ? $selected : 0) ?>;
+        var levelEl = document.getElementById(pickerId + '-level');
         var classEl = document.getElementById(pickerId + '-class');
         var subjectEl = document.getElementById(pickerId + '-subject');
         var assignmentEl = document.getElementById(pickerId + '-assignment');
 
-        /* Populate class dropdown */
-        Object.keys(data).sort(function(a,b){ return data[a].name.localeCompare(data[b].name); }).forEach(function(cid){
-            var opt = document.createElement('option');
-            opt.value = cid;
-            opt.textContent = data[cid].name;
-            classEl.appendChild(opt);
-        });
+        function classKeys() {
+            return Object.keys(data).filter(function(cid){
+                if (!levelEl.value) return true;
+                return (data[cid].level || '') === levelEl.value;
+            }).sort(function(a,b){ return data[a].name.localeCompare(data[b].name); });
+        }
 
-        /* If pre-selected, set class */
-        if (preClass && data[preClass]) {
-            classEl.value = preClass;
+        function updateClasses() {
+            classEl.innerHTML = '<option value="">Pilih Kelas</option>';
+            classEl.disabled = !levelEl.value;
+            subjectEl.innerHTML = '<option value="">Pilih Mapel</option>';
+            subjectEl.disabled = true;
+            assignmentEl.value = '';
+            if (!levelEl.value) return;
+            classKeys().forEach(function(cid){
+                var opt = document.createElement('option');
+                opt.value = cid;
+                opt.textContent = data[cid].name;
+                classEl.appendChild(opt);
+            });
+            if (preClass && data[preClass] && (!levelEl.value || data[preClass].level === levelEl.value)) {
+                classEl.value = preClass;
+            }
+            updateSubjects();
         }
 
         function updateSubjects() {
@@ -261,11 +349,9 @@ function assignment_picker(string $page, array $assignments, int $selected, stri
                 opt.textContent = subjects[sid].name;
                 subjectEl.appendChild(opt);
             });
-            /* If pre-selected, set subject */
             if (preSubject && subjects[preSubject]) {
                 subjectEl.value = preSubject;
             } else {
-                /* Auto-select if only one subject */
                 var keys = Object.keys(subjects);
                 if (keys.length === 1) {
                     subjectEl.value = keys[0];
@@ -291,9 +377,12 @@ function assignment_picker(string $page, array $assignments, int $selected, stri
             }
         }
 
+        levelEl.addEventListener('change', function(){
+            preClass = 0; preSubject = 0; preAssignment = 0;
+            updateClasses();
+        });
         classEl.addEventListener('change', function(){
-            preSubject = 0;
-            preAssignment = 0;
+            preSubject = 0; preAssignment = 0;
             updateSubjects();
         });
         subjectEl.addEventListener('change', function(){
@@ -301,7 +390,10 @@ function assignment_picker(string $page, array $assignments, int $selected, stri
             selectAssignment();
         });
 
-        updateSubjects();
+        if (preLevel) {
+            levelEl.value = preLevel;
+        }
+        updateClasses();
     })();
     </script>
     <?php
@@ -311,11 +403,24 @@ function render_cascading_assignment_selects(array $assignments, int $selected, 
 {
     $data = assignment_cascading_data($assignments);
     [$preClass, $preSubject] = assignment_preselect($assignments, $selected);
+    $preLevel = '';
+    if ($preClass > 0 && isset($data[(string)$preClass])) {
+        $preLevel = (string)($data[(string)$preClass]['level'] ?? '');
+    }
+    $levels = SUBJECT_LEVELS;
     ?>
     <div class="cascade-assignment" id="<?= e($pickerId) ?>">
         <input type="hidden" name="assignment_id" id="<?= e($pickerId) ?>-assignment" value="<?= e($selected ?: '') ?>">
+        <label>Jenjang
+            <select id="<?= e($pickerId) ?>-level" data-cascade-inline-level="<?= e($pickerId) ?>">
+                <option value="">Pilih Jenjang</option>
+                <?php foreach ($levels as $lv): ?>
+                    <option value="<?= e($lv) ?>"<?= $preLevel === $lv ? ' selected' : '' ?>><?= e($lv) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
         <label>Kelas
-            <select id="<?= e($pickerId) ?>-class" data-cascade-inline="<?= e($pickerId) ?>">
+            <select id="<?= e($pickerId) ?>-class" data-cascade-inline="<?= e($pickerId) ?>" disabled>
                 <option value="">Pilih Kelas</option>
             </select>
         </label>
@@ -329,17 +434,36 @@ function render_cascading_assignment_selects(array $assignments, int $selected, 
     (function(){
         var data = <?= json_encode($data, JSON_UNESCAPED_UNICODE) ?>;
         var pickerId = <?= json_encode($pickerId) ?>;
+        var preLevel = <?= json_encode($preLevel) ?>;
         var preClass = <?= json_encode($preClass) ?>;
         var preSubject = <?= json_encode($preSubject) ?>;
+        var levelEl = document.getElementById(pickerId + '-level');
         var classEl = document.getElementById(pickerId + '-class');
         var subjectEl = document.getElementById(pickerId + '-subject');
         var assignmentEl = document.getElementById(pickerId + '-assignment');
-        Object.keys(data).sort(function(a,b){ return data[a].name.localeCompare(data[b].name); }).forEach(function(cid){
-            var opt = document.createElement('option');
-            opt.value = cid; opt.textContent = data[cid].name;
-            classEl.appendChild(opt);
-        });
-        if (preClass && data[preClass]) classEl.value = preClass;
+        function classKeys() {
+            return Object.keys(data).filter(function(cid){
+                if (!levelEl.value) return true;
+                return (data[cid].level || '') === levelEl.value;
+            }).sort(function(a,b){ return data[a].name.localeCompare(data[b].name); });
+        }
+        function updateClasses() {
+            classEl.innerHTML = '<option value="">Pilih Kelas</option>';
+            classEl.disabled = !levelEl.value;
+            subjectEl.innerHTML = '<option value="">Pilih Mapel</option>';
+            subjectEl.disabled = true;
+            assignmentEl.value = '';
+            if (!levelEl.value) return;
+            classKeys().forEach(function(cid){
+                var opt = document.createElement('option');
+                opt.value = cid; opt.textContent = data[cid].name;
+                classEl.appendChild(opt);
+            });
+            if (preClass && data[preClass] && data[preClass].level === levelEl.value) {
+                classEl.value = preClass;
+            }
+            updateSubjects();
+        }
         function updateSubjects() {
             var cid = classEl.value;
             subjectEl.innerHTML = '<option value="">Pilih Mapel</option>';
@@ -366,9 +490,11 @@ function render_cascading_assignment_selects(array $assignments, int $selected, 
             var teachers = data[cid].subjects[sid].teachers;
             assignmentEl.value = teachers[0].id;
         }
+        levelEl.addEventListener('change', function(){ preClass = 0; preSubject = 0; updateClasses(); });
         classEl.addEventListener('change', function(){ preSubject = 0; updateSubjects(); });
         subjectEl.addEventListener('change', function(){ selectAssignment(); });
-        updateSubjects();
+        if (preLevel) levelEl.value = preLevel;
+        updateClasses();
     })();
     </script>
     <?php
