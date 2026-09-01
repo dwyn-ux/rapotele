@@ -116,6 +116,8 @@ function run_migrations(): void
             name VARCHAR(160) NOT NULL,
             short_name VARCHAR(40) NULL,
             group_name VARCHAR(80) NULL,
+            curriculum VARCHAR(32) NULL,
+            kkm INT NULL,
             active $bool NOT NULL DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -690,6 +692,7 @@ function run_migrations(): void
     migration_add_column('classes', 'academic_year', 'VARCHAR(32) NULL');
     migration_add_column('classes', 'active', migration_bool() . ' NOT NULL DEFAULT 1');
     migration_add_column('classes', 'updated_at', 'DATETIME NULL');
+    migration_add_column('classes', 'level', 'VARCHAR(16) NULL');
     migration_add_column('students', 'dapodik_id', 'VARCHAR(64) NULL');
     migration_add_column('students', 'nis', 'VARCHAR(64) NULL');
     migration_add_column('students', 'nisn', 'VARCHAR(64) NULL');
@@ -710,6 +713,8 @@ function run_migrations(): void
     migration_add_column('subjects', 'dapodik_id', 'VARCHAR(64) NULL');
     migration_add_column('subjects', 'short_name', 'VARCHAR(40) NULL');
     migration_add_column('subjects', 'group_name', 'VARCHAR(80) NULL');
+    migration_add_column('subjects', 'curriculum', 'VARCHAR(32) NULL');
+    migration_add_column('subjects', 'kkm', 'INT NULL');
     migration_add_column('subjects', 'active', migration_bool() . ' NOT NULL DEFAULT 1');
     migration_add_column('subjects', 'updated_at', 'DATETIME NULL');
     migration_add_column('teaching_assignments', 'dapodik_id', 'VARCHAR(64) NULL');
@@ -987,6 +992,9 @@ function seed_demo_reference_data(): void
     }
 
     foreach ([['A', 'Kelompok A', 1], ['B', 'Kelompok B', 2], ['C', 'Muatan Lokal', 3], ['P5', 'Kokurikuler/P5', 4]] as $group) {
+        seed_demo_subject_group($group[0], $group[1], $group[2]);
+    }
+    foreach ([['WAJIB_A', 'Mata Pelajaran Wajib A', 10], ['WAJIB_B', 'Mata Pelajaran Wajib B', 11], ['PILIHAN', 'Mata Pelajaran Pilihan', 12], ['MULOK', 'Muatan Lokal', 13]] as $group) {
         seed_demo_subject_group($group[0], $group[1], $group[2]);
     }
 

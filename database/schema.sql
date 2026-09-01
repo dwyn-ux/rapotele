@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS classes (
   dapodik_id VARCHAR(64) NULL,
   name VARCHAR(80) NOT NULL,
   grade VARCHAR(16) NOT NULL,
+  level VARCHAR(16) NULL,
   major VARCHAR(80) NULL,
   homeroom_teacher_id INT NULL,
   academic_year VARCHAR(32) NOT NULL,
@@ -72,6 +73,8 @@ CREATE TABLE IF NOT EXISTS subjects (
   name VARCHAR(160) NOT NULL,
   short_name VARCHAR(40) NULL,
   group_name VARCHAR(80) NULL,
+  curriculum VARCHAR(32) NULL,
+  kkm INT NULL,
   active TINYINT(1) NOT NULL DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP

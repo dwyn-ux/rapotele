@@ -27,5 +27,5 @@ foreach ($streams[1] as $index => $stream) {
 
     $printable = preg_replace('/[^\x09\x0A\x0D\x20-\x7E]/', ' ', $decoded);
     echo "--- stream {$index} len=" . strlen($decoded) . " ---" . PHP_EOL;
-    echo substr($printable, 0, 12000) . PHP_EOL;
+    echo $printable . PHP_EOL;
 }
