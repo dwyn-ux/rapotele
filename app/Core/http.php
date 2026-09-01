@@ -184,7 +184,7 @@ function app_render_exception(Throwable $exception): void
         @mkdir($logDir, 0775, true);
     }
     $logFile = $logDir . '/app-errors.log';
-    $logLine = '[' . date('Y-m-d H:i:s') . '] ' . ($_SERVER['REQUEST_URI'] ?? 'cli') . PHP_EOL
+    $logLine = '[' . date('Y-m-d H:i:s') . '] ' . ($_SERVER['REQUEST_URI'] ?? 'cli') . ' ' . ($_SERVER['REQUEST_METHOD'] ?? 'CLI') . PHP_EOL
         . '  ' . get_class($exception) . ': ' . $exception->getMessage() . PHP_EOL
         . '  at ' . $exception->getFile() . ':' . $exception->getLine() . PHP_EOL
         . $exception->getTraceAsString() . PHP_EOL . PHP_EOL;

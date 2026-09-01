@@ -545,10 +545,35 @@ function page_students(): void
 {
     require_role(['admin']);
     $edit = edit_row('students') ?: [];
-    $classes = map_options('classes', 'name');
-    $rows = fetch_all('SELECT s.*, c.name AS class_name FROM students s LEFT JOIN classes c ON c.id = s.class_id ORDER BY c.grade, c.name, s.name');
+    $allClasses = fetch_all('SELECT id, name, level FROM classes WHERE active = 1 ORDER BY grade, name');
+    $classes = array_column_map($allClasses, 'id', 'name');
+    $levelFilter = (string)($_GET['level'] ?? '');
+    $rows = fetch_all('SELECT s.*, c.name AS class_name, c.level AS class_level FROM students s LEFT JOIN classes c ON c.id = s.class_id ORDER BY c.grade, c.name, s.name');
+    if ($levelFilter !== '') {
+        $rows = array_values(array_filter($rows, function ($r) use ($levelFilter) {
+            return ($r['class_level'] ?? '') === $levelFilter;
+        }));
+    }
     $existingUser = $edit ? fetch_one('SELECT id, username FROM users WHERE student_id = ?', [(int)$edit['id']]) : null;
     render_header('Data Siswa');
+    ?>
+    <section class="panel no-print">
+        <form method="get" class="grid three" style="margin-bottom:1rem">
+            <input type="hidden" name="page" value="students">
+            <label>Filter Jenjang
+                <select name="level" onchange="this.form.submit()">
+                    <option value="">Semua Jenjang</option>
+                    <?php foreach (SUBJECT_LEVELS as $lv): ?>
+                        <option value="<?= e($lv) ?>"<?= $levelFilter === $lv ? ' selected' : '' ?>><?= e($lv) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <?php if ($levelFilter !== ''): ?>
+                <div class="actions" style="align-self:end"><a class="button" href="?page=students">Reset Filter</a></div>
+            <?php endif; ?>
+        </form>
+    </section>
+    <?php
     input_panel_start($edit ? 'Edit Siswa' : 'Input Siswa', 'Tambah Siswa', (bool)$edit || isset($_GET['add']));
     ?>
         <form method="post" class="grid four">
@@ -567,7 +592,22 @@ function page_students(): void
             <label>Nama Ibu <input type="text" name="mother_name" value="<?= e($edit['mother_name'] ?? '') ?>"></label>
             <label>Pekerjaan Ibu <input type="text" name="mother_occupation" value="<?= e($edit['mother_occupation'] ?? '') ?>"></label>
             <label>Nama Wali <input type="text" name="guardian_name" value="<?= e($edit['guardian_name'] ?? '') ?>"></label>
-            <label>Kelas <select name="class_id"><option value="">-</option><?= options($classes, $edit['class_id'] ?? '') ?></select></label>
+            <label>Jenjang
+                <select id="stu-level" data-edit-level="<?= e((string)($_GET['level'] ?? '')) ?>">
+                    <option value="">Pilih Jenjang</option>
+                    <?php foreach (SUBJECT_LEVELS as $lv): ?>
+                        <option value="<?= e($lv) ?>"<?= (string)($_GET['level'] ?? '') === $lv ? ' selected' : '' ?>><?= e($lv) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label>Kelas
+                <select name="class_id" id="stu-class">
+                    <option value="">-</option>
+                    <?php foreach ($allClasses as $c): ?>
+                        <option value="<?= (int)$c['id'] ?>" data-level="<?= e($c['level'] ?? '') ?>"<?= (int)($edit['class_id'] ?? 0) === (int)$c['id'] ? ' selected' : '' ?>><?= e($c['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
             <?php if ($existingUser): ?>
                 <label>Username Login <input type="text" name="username" value="<?= e($existingUser['username'] ?? '') ?>" readonly></label>
                 <label>Password Baru <input type="password" name="password" placeholder="Kosongkan jika tidak diganti"></label>
@@ -578,8 +618,31 @@ function page_students(): void
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
             <div class="actions span-2"><button class="button primary">Simpan</button><a class="button" href="<?= e(route_url('students')) ?>">Reset</a></div>
         </form>
+        <script>
+        (function(){
+            var levelEl = document.getElementById('stu-level');
+            var classEl = document.getElementById('stu-class');
+            if (!levelEl || !classEl) return;
+            var allClassOpts = Array.from(classEl.options).map(function(o){ return {value:o.value, level:o.getAttribute('data-level')||'', text:o.textContent}; });
+            var preLevel = levelEl.value || levelEl.getAttribute('data-edit-level') || '';
+            var editClassId = '<?= e((string)($edit['class_id'] ?? '')) ?>';
+            function rebuild() {
+                var prev = editClassId || classEl.value;
+                classEl.innerHTML = '<option value="">-</option>';
+                allClassOpts.filter(function(o){ return !o.value || !levelEl.value || o.level === levelEl.value; }).forEach(function(o){
+                    var opt = document.createElement('option');
+                    opt.value = o.value; opt.textContent = o.text;
+                    opt.setAttribute('data-level', o.level);
+                    classEl.appendChild(opt);
+                });
+                if (prev && classEl.querySelector('option[value="' + prev + '"]')) classEl.value = prev;
+            }
+            levelEl.addEventListener('change', rebuild);
+            if (preLevel) { levelEl.value = preLevel; rebuild(); }
+        })();
+        </script>
     <?php input_panel_end(); ?>
-    <?php table_panel('Daftar Siswa', ['Nama', 'NIS', 'NISN', 'JK', 'Kelas', 'Status', 'Aksi'], $rows, function ($row) { ?>
+    <?php table_panel('Daftar Siswa' . ($levelFilter !== '' ? ' — Jenjang ' . $levelFilter : ''), ['Nama', 'NIS', 'NISN', 'JK', 'Kelas', 'Status', 'Aksi'], $rows, function ($row) { ?>
         <td><?= e($row['name']) ?></td><td><?= e($row['nis']) ?></td><td><?= e($row['nisn']) ?></td><td><?= e($row['gender']) ?></td><td><?= e($row['class_name']) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('students', (int)$row['id'], 'delete_student') ?></td>
     <?php }, '', true); ?>
     <?php render_footer();
@@ -594,6 +657,13 @@ function page_subjects(): void
     if (!empty($edit['level'])) {
         $selectedLevels = array_values(array_intersect(explode(',', (string)$edit['level']), SUBJECT_LEVELS));
     }
+    $levelFilter = (string)($_GET['level'] ?? '');
+    if ($levelFilter !== '') {
+        $rows = array_values(array_filter($rows, function ($r) use ($levelFilter) {
+            $lv = (string)($r['level'] ?? '');
+            return $lv === '' || in_array($levelFilter, array_map('trim', explode(',', $lv)), true);
+        }));
+    }
     render_header('Data Mapel');
     input_panel_start($edit ? 'Edit Mapel' : 'Input Mapel', 'Tambah Mapel', (bool)$edit || isset($_GET['add']));
     ?>
@@ -602,12 +672,21 @@ function page_subjects(): void
             <label class="span-2">Nama Mapel <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
             <label>Nama Singkat <input type="text" name="short_name" value="<?= e($edit['short_name'] ?? '') ?>"></label>
             <label>Kelompok <input type="text" name="group_name" value="<?= e($edit['group_name'] ?? '') ?>"></label>
+            <label>Filter Tampilan
+                <select name="level_filter" form="subject-filter-form" onchange="window.location='?page=subjects&level='+this.value">
+                    <option value="">Semua Jenjang</option>
+                    <?php foreach (SUBJECT_LEVELS as $lv): ?>
+                        <option value="<?= e($lv) ?>"<?= $levelFilter === $lv ? ' selected' : '' ?>><?= e($lv) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
             <?= subject_levels_input($selectedLevels) ?>
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
             <div class="actions span-2"><button class="button primary">Simpan</button><a class="button" href="<?= e(route_url('subjects')) ?>">Reset</a></div>
         </form>
+        <form id="subject-filter-form" method="get" style="display:none"><input type="hidden" name="page" value="subjects"></form>
     <?php input_panel_end(); ?>
-    <?php table_panel('Daftar Mapel', ['Nama Mapel', 'Singkat', 'Kelompok', 'Jenjang', 'Status', 'Aksi'], $rows, function ($row) { ?>
+    <?php table_panel('Daftar Mapel' . ($levelFilter !== '' ? ' — Jenjang ' . $levelFilter : ''), ['Nama Mapel', 'Singkat', 'Kelompok', 'Jenjang', 'Status', 'Aksi'], $rows, function ($row) { ?>
         <td><?= e($row['name']) ?></td><td><?= e($row['short_name']) ?></td><td><?= e($row['group_name']) ?></td><td><?= subject_levels_badge($row['level'] ?? '') ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('subjects', (int)$row['id'], 'delete_subject') ?></td>
     <?php }, '', true); ?>
     <?php render_footer();
@@ -620,11 +699,9 @@ function page_assignments(): void
     $teachers = map_options('teachers', 'name');
     $allClasses = fetch_all('SELECT id, name, level FROM classes WHERE active = 1 ORDER BY grade, name');
     $allSubjects = fetch_all('SELECT id, name, level FROM subjects WHERE active = 1 ORDER BY name');
-    $editClass = $edit ? fetch_one('SELECT id, name, level FROM classes WHERE id = ?', [(int)$edit['class_id']]) : null;
+    $editClass = (!empty($edit) && !empty($edit['class_id'])) ? fetch_one('SELECT id, name, level FROM classes WHERE id = ?', [(int)$edit['class_id']]) : null;
     $editLevel = (string)($editClass['level'] ?? '');
     $rows = assignment_rows();
-    $subjectsJson = json_encode($allSubjects, JSON_UNESCAPED_UNICODE);
-    $classesJson = json_encode($allClasses, JSON_UNESCAPED_UNICODE);
     render_header('Data Pembelajaran');
     input_panel_start($edit ? 'Edit Pembelajaran' : 'Input Pembelajaran', 'Tambah Pembelajaran', (bool)$edit || isset($_GET['add']));
     ?>
