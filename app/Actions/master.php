@@ -136,6 +136,7 @@ function action_save_class(): void
     $data = [
         trim((string)$_POST['name']),
         trim((string)$_POST['grade']),
+        strtoupper(trim((string)($_POST['level'] ?? ''))),
         trim((string)($_POST['major'] ?? '')),
         (int)($_POST['homeroom_teacher_id'] ?? 0) ?: null,
         trim((string)$_POST['academic_year']),
@@ -144,12 +145,12 @@ function action_save_class(): void
     ];
     if ($id > 0) {
         execute_sql(
-            'UPDATE classes SET name = ?, grade = ?, major = ?, homeroom_teacher_id = ?, academic_year = ?, active = ?, updated_at = ? WHERE id = ?',
+            'UPDATE classes SET name = ?, grade = ?, level = ?, major = ?, homeroom_teacher_id = ?, academic_year = ?, active = ?, updated_at = ? WHERE id = ?',
             array_merge($data, [$id])
         );
     } else {
         execute_sql(
-            'INSERT INTO classes (name, grade, major, homeroom_teacher_id, academic_year, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO classes (name, grade, level, major, homeroom_teacher_id, academic_year, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             $data
         );
     }

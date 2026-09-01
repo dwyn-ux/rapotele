@@ -322,11 +322,20 @@ function page_classes(): void
             </label>
             <label>
                 <span class="field-icon"><i data-lucide="layers"></i> Tingkat / Grade</span>
-                <input type="text" name="grade" required value="<?= e($edit['grade'] ?? '') ?>" placeholder="Contoh: 7, 8, 9">
+                <input type="text" name="grade" required value="<?= e($edit['grade'] ?? '') ?>" placeholder="Contoh: 7, 8, 9, 10, 11, 12">
             </label>
             <label>
-                <span class="field-icon"><i data-lucide="bookmark"></i> Jurusan / Fase</span>
-                <input type="text" name="major" value="<?= e($edit['major'] ?? '') ?>" placeholder="Contoh: Reguler">
+                <span class="field-icon"><i data-lucide="graduation-cap"></i> Jenjang</span>
+                <select name="level">
+                    <option value="">- Pilih Jenjang -</option>
+                    <?php foreach (['SD' => 'SD (Sekolah Dasar)', 'SMP' => 'SMP (Sekolah Menengah Pertama)', 'MTS' => 'MTs (Madrasah Tsanawiyah)', 'SMA' => 'SMA (Sekolah Menengah Atas)', 'MA' => 'MA (Madrasah Aliyah)'] as $code => $label): ?>
+                        <option value="<?= e($code) ?>"<?= (string)($edit['level'] ?? '') === $code ? ' selected' : '' ?>><?= e($label) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label>
+                <span class="field-icon"><i data-lucide="bookmark"></i> Jurusan / Program (khusus SMA/MA)</span>
+                <input type="text" name="major" value="<?= e($edit['major'] ?? '') ?>" placeholder="Contoh: IPA, IPS, Bahasa, Reguler">
             </label>
             <label>
                 <span class="field-icon"><i data-lucide="user"></i> Wali Kelas</span>
@@ -340,9 +349,9 @@ function page_classes(): void
             <div class="wide actions form-actions-top"><button type="submit" class="button primary"><i data-lucide="save"></i> Simpan</button><a class="button" href="<?= e(route_url('classes')) ?>"><i data-lucide="rotate-ccw"></i> Reset</a></div>
         </form>
     <?php input_panel_end(); ?>
-    <?php table_panel('Daftar Kelas', ['Kelas', 'Tingkat', 'Wali Kelas', 'Jumlah Siswa', 'Status', 'Aksi'], $rows, function ($row) {
+    <?php table_panel('Daftar Kelas', ['Kelas', 'Tingkat', 'Jenjang', 'Jurusan', 'Wali Kelas', 'Jumlah Siswa', 'Status', 'Aksi'], $rows, function ($row) {
         $count = (int)fetch_one('SELECT COUNT(*) AS c FROM students WHERE class_id = ?', [(int)$row['id']])['c'];
-        ?><td><?= e($row['name']) ?></td><td><?= e($row['grade']) ?></td><td><?= e($row['teacher_name']) ?></td><td><?= e($count) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('classes', (int)$row['id'], 'delete_class') ?></td><?php
+        ?><td><?= e($row['name']) ?></td><td><?= e($row['grade']) ?></td><td><?= e($row['level'] ?? '-') ?></td><td><?= e($row['major'] ?? '-') ?></td><td><?= e($row['teacher_name']) ?></td><td><?= e($count) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('classes', (int)$row['id'], 'delete_class') ?></td><?php
     }, '', true); ?>
     <?php render_footer();
 }
