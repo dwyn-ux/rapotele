@@ -113,7 +113,7 @@ function db_insert_ignore(): string
 
 function db_insert_replace(): string
 {
-    return db_driver() === 'mysql' ? 'INSERT REPLACE' : 'INSERT OR REPLACE';
+    return db_driver() === 'mysql' ? 'REPLACE' : 'INSERT OR REPLACE';
 }
 
 function db_identifier(string $identifier): string
