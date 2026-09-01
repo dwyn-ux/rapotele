@@ -179,6 +179,17 @@ function app_render_exception(Throwable $exception): void
         $renderAuthenticatedShell = false;
     }
 
+    $logDir = dirname(__DIR__, 2) . '/storage/logs';
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0775, true);
+    }
+    $logFile = $logDir . '/app-errors.log';
+    $logLine = '[' . date('Y-m-d H:i:s') . '] ' . ($_SERVER['REQUEST_URI'] ?? 'cli') . PHP_EOL
+        . '  ' . get_class($exception) . ': ' . $exception->getMessage() . PHP_EOL
+        . '  at ' . $exception->getFile() . ':' . $exception->getLine() . PHP_EOL
+        . $exception->getTraceAsString() . PHP_EOL . PHP_EOL;
+    @file_put_contents($logFile, $logLine, FILE_APPEND | LOCK_EX);
+
     if ($renderAuthenticatedShell) {
         render_header('Terjadi Kesalahan');
         echo '<section class="panel"><h3>Aplikasi gagal memproses halaman.</h3><p>' . e($message) . '</p></section>';
