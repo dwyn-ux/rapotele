@@ -2,6 +2,27 @@
 
 const SUBJECT_LEVELS = ['SD', 'SMP', 'MTS', 'SMA', 'MA'];
 
+function school_levels(): array
+{
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    $rows = fetch_all("SELECT DISTINCT level FROM classes WHERE active = 1 AND level IS NOT NULL AND level <> '' ORDER BY level");
+    $allowed = SUBJECT_LEVELS;
+    $cache = [];
+    foreach ($rows as $r) {
+        $lv = trim((string)($r['level'] ?? ''));
+        if (in_array($lv, $allowed, true) && !in_array($lv, $cache, true)) {
+            $cache[] = $lv;
+        }
+    }
+    if (!$cache) {
+        $cache = $allowed;
+    }
+    return $cache;
+}
+
 function options(array $options, mixed $selected): string
 {
     $html = '';
@@ -26,10 +47,11 @@ function subject_has_level(?string $subjectLevel, string $classLevel): bool
     return false;
 }
 
-function subject_levels_input(array $selected): string
+function subject_levels_input(array $selected, ?array $levels = null): string
 {
+    $levels = $levels ?? school_levels();
     $html = '<fieldset class="check-group subject-levels" style="grid-column:1/-1"><legend>Jenjang * (pilih minimal 1)</legend>';
-    foreach (SUBJECT_LEVELS as $code) {
+    foreach ($levels as $code) {
         $isChecked = in_array($code, $selected, true) ? ' checked' : '';
         $html .= '<label class="check"><input type="checkbox" name="levels[]" value="' . e($code) . '"' . $isChecked . '> ' . e($code) . '</label>';
     }
@@ -261,7 +283,7 @@ function assignment_picker(string $page, array $assignments, int $selected, stri
     if ($preClass > 0 && isset($data[(string)$preClass])) {
         $preLevel = (string)($data[(string)$preClass]['level'] ?? '');
     }
-    $levels = SUBJECT_LEVELS;
+    $levels = school_levels();
     ?>
     <section class="panel">
         <form method="get" id="<?= e($pickerId) ?>" class="grid four">
@@ -407,7 +429,7 @@ function render_cascading_assignment_selects(array $assignments, int $selected, 
     if ($preClass > 0 && isset($data[(string)$preClass])) {
         $preLevel = (string)($data[(string)$preClass]['level'] ?? '');
     }
-    $levels = SUBJECT_LEVELS;
+    $levels = school_levels();
     ?>
     <div class="cascade-assignment" id="<?= e($pickerId) ?>">
         <input type="hidden" name="assignment_id" id="<?= e($pickerId) ?>-assignment" value="<?= e($selected ?: '') ?>">

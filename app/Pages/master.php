@@ -563,7 +563,7 @@ function page_students(): void
             <label>Filter Jenjang
                 <select name="level" onchange="this.form.submit()">
                     <option value="">Semua Jenjang</option>
-                    <?php foreach (SUBJECT_LEVELS as $lv): ?>
+                    <?php foreach (school_levels() as $lv): ?>
                         <option value="<?= e($lv) ?>"<?= $levelFilter === $lv ? ' selected' : '' ?>><?= e($lv) ?></option>
                     <?php endforeach; ?>
                 </select>
@@ -595,7 +595,7 @@ function page_students(): void
             <label>Jenjang
                 <select id="stu-level" data-edit-level="<?= e((string)($_GET['level'] ?? '')) ?>">
                     <option value="">Pilih Jenjang</option>
-                    <?php foreach (SUBJECT_LEVELS as $lv): ?>
+                    <?php foreach (school_levels() as $lv): ?>
                         <option value="<?= e($lv) ?>"<?= (string)($_GET['level'] ?? '') === $lv ? ' selected' : '' ?>><?= e($lv) ?></option>
                     <?php endforeach; ?>
                 </select>
@@ -655,7 +655,7 @@ function page_subjects(): void
     $rows = fetch_all('SELECT * FROM subjects ORDER BY group_name, name');
     $selectedLevels = [];
     if (!empty($edit['level'])) {
-        $selectedLevels = array_values(array_intersect(explode(',', (string)$edit['level']), SUBJECT_LEVELS));
+        $selectedLevels = array_values(array_intersect(explode(',', (string)$edit['level']), school_levels()));
     }
     $levelFilter = (string)($_GET['level'] ?? '');
     if ($levelFilter !== '') {
@@ -675,7 +675,7 @@ function page_subjects(): void
             <label>Filter Tampilan
                 <select name="level_filter" form="subject-filter-form" onchange="window.location='?page=subjects&level='+this.value">
                     <option value="">Semua Jenjang</option>
-                    <?php foreach (SUBJECT_LEVELS as $lv): ?>
+                    <?php foreach (school_levels() as $lv): ?>
                         <option value="<?= e($lv) ?>"<?= $levelFilter === $lv ? ' selected' : '' ?>><?= e($lv) ?></option>
                     <?php endforeach; ?>
                 </select>
@@ -711,7 +711,7 @@ function page_assignments(): void
             <label>Jenjang
                 <select id="asg-level" data-edit-level="<?= e($editLevel) ?>">
                     <option value="">Pilih Jenjang</option>
-                    <?php foreach (SUBJECT_LEVELS as $lv): ?>
+                    <?php foreach (school_levels() as $lv): ?>
                         <option value="<?= e($lv) ?>"<?= $editLevel === $lv ? ' selected' : '' ?>><?= e($lv) ?></option>
                     <?php endforeach; ?>
                 </select>

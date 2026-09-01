@@ -260,10 +260,21 @@ function page_telegram_register(): void
         <label>Jabatan
             <input type="text" name="position" value="<?= e($values['position'] ?? 'Guru Mapel') ?>">
         </label>
+        <label>Jenjang Mapel
+            <select id="tg-level">
+                <option value="">Semua Jenjang</option>
+                <?php foreach (school_levels() as $lv): ?>
+                    <option value="<?= e($lv) ?>"><?= e($lv) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
         <label>Mapel Utama
-            <select name="subject_id">
+            <select name="subject_id" id="tg-subject">
                 <option value="">Pilih mapel</option>
-                <?= options($subjectLabels, $values['subject_id'] ?? '') ?>
+                <?php foreach ($subjects as $sid => $sname): ?>
+                    <?php $lv = fetch_one('SELECT level FROM subjects WHERE id = ?', [(int)$sid]); $lvs = trim((string)($lv['level'] ?? '')); ?>
+                    <option value="<?= e((string)$sid) ?>" data-level="<?= e($lvs) ?>"<?= (string)($values['subject_id'] ?? '') === (string)$sid ? ' selected' : '' ?>><?= e($sname) . ($lvs !== '' ? ' [' . $lvs . ']' : '') ?></option>
+                <?php endforeach; ?>
             </select>
         </label>
         <fieldset class="check-group">
@@ -278,6 +289,27 @@ function page_telegram_register(): void
         </fieldset>
         <button class="button primary full" type="submit">Daftar</button>
     </form>
+    <script>
+    (function(){
+        var levelEl = document.getElementById('tg-level');
+        var subjectEl = document.getElementById('tg-subject');
+        if (!levelEl || !subjectEl) return;
+        var allSubjectOpts = Array.from(subjectEl.options).map(function(o){ return {value:o.value, level:o.getAttribute('data-level')||'', text:o.textContent}; });
+        var preSubject = subjectEl.value;
+        function rebuild() {
+            var prev = preSubject;
+            subjectEl.innerHTML = '<option value="">Pilih mapel</option>';
+            allSubjectOpts.filter(function(o){ return !o.value || !levelEl.value || (o.level && o.level.split(',').map(function(s){return s.trim();}).indexOf(levelEl.value) !== -1); }).forEach(function(o){
+                var opt = document.createElement('option');
+                opt.value = o.value; opt.textContent = o.text;
+                opt.setAttribute('data-level', o.level);
+                subjectEl.appendChild(opt);
+            });
+            if (prev && subjectEl.querySelector('option[value="' + prev + '"]')) subjectEl.value = prev;
+        }
+        levelEl.addEventListener('change', function(){ preSubject = subjectEl.value; rebuild(); });
+    })();
+    </script>
     <?php
     render_public_footer();
 }

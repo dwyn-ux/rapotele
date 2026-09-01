@@ -264,9 +264,9 @@ function action_save_subject(): void
         flash('danger', 'Nama mapel wajib diisi.');
         redirect_to('subjects');
     }
-    $levels = array_values(array_intersect((array)($_POST['levels'] ?? []), SUBJECT_LEVELS));
+    $levels = array_values(array_intersect((array)($_POST['levels'] ?? []), school_levels()));
     if (!$levels) {
-        flash('danger', 'Pilih minimal 1 jenjang untuk mapel.');
+        flash('danger', 'Pilih minimal 1 jenjang untuk mapel (sesuai jenjang kelas yang ada).');
         redirect_to('subjects');
     }
     $levelCsv = implode(',', $levels);
