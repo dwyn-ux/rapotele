@@ -671,26 +671,35 @@ function page_subjects(): void
         }));
     }
     render_header('Data Mapel');
-    input_panel_start($edit ? 'Edit Mapel' : 'Input Mapel', 'Tambah Mapel', (bool)$edit || isset($_GET['add']));
     ?>
-        <form method="post" class="grid four">
-            <?= csrf_field() ?><input type="hidden" name="action" value="save_subject"><input type="hidden" name="id" value="<?= e($edit['id'] ?? 0) ?>">
-            <label class="span-2">Nama Mapel <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
-            <label>Nama Singkat <input type="text" name="short_name" value="<?= e($edit['short_name'] ?? '') ?>"></label>
-            <label>Kelompok <input type="text" name="group_name" value="<?= e($edit['group_name'] ?? '') ?>"></label>
-            <label>Filter Tampilan
-                <select name="level_filter" form="subject-filter-form" onchange="window.location='?page=subjects&level='+this.value">
+    <section class="panel no-print">
+        <form method="get" class="grid three" style="margin-bottom:0">
+            <input type="hidden" name="page" value="subjects">
+            <label>Filter Jenjang
+                <select name="level" onchange="this.form.submit()">
                     <option value="">Semua Jenjang</option>
                     <?php foreach (school_levels() as $lv): ?>
                         <option value="<?= e($lv) ?>"<?= $levelFilter === $lv ? ' selected' : '' ?>><?= e($lv) ?></option>
                     <?php endforeach; ?>
                 </select>
             </label>
+            <?php if ($levelFilter !== ''): ?>
+                <div class="actions" style="align-self:end"><a class="button" href="?page=subjects">Reset Filter</a></div>
+            <?php endif; ?>
+        </form>
+    </section>
+    <?php
+    input_panel_start($edit ? 'Edit Mapel' : 'Input Mapel', 'Tambah Mapel', (bool)$edit || isset($_GET['add']));
+    ?>
+        <form method="post" class="grid four">
+            <?= csrf_field() ?><input type="hidden" name="action" value="save_subject"><input type="hidden" name="id" value="<?= e($edit['id'] ?? 0) ?>">
+            <label class="span-2">Nama Mapel <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
+            <label>Nama Singkat <input type="text" name="short_name" value="<?= e($edit['short_name'] ?? '') ?>"></label>
+            <label>Kelompok <input type="text" name="group_name" value="<?= e($row['group_name'] ?? '') ?>"></label>
             <?= subject_levels_input($selectedLevels) ?>
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
             <div class="actions span-2"><button class="button primary">Simpan</button><a class="button" href="<?= e(route_url('subjects')) ?>">Reset</a></div>
         </form>
-        <form id="subject-filter-form" method="get" style="display:none"><input type="hidden" name="page" value="subjects"></form>
     <?php input_panel_end(); ?>
     <?php table_panel('Daftar Mapel' . ($levelFilter !== '' ? ' — Jenjang ' . $levelFilter : ''), ['Nama Mapel', 'Singkat', 'Kelompok', 'Jenjang', 'Status', 'Aksi'], $rows, function ($row) { ?>
         <td><?= e($row['name']) ?></td><td><?= e($row['short_name']) ?></td><td><?= e($row['group_name']) ?></td><td><?= subject_levels_badge($row['level'] ?? '') ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('subjects', (int)$row['id'], 'delete_subject') ?></td>
@@ -716,7 +725,31 @@ function page_assignments(): void
     }
     $editLevel = (string)($editClass['level'] ?? '');
     $rows = assignment_rows();
+    $levelFilter = (string)($_GET['level'] ?? '');
+    if ($levelFilter !== '') {
+        $rows = array_values(array_filter($rows, function ($r) use ($levelFilter) {
+            return (string)($r['class_level'] ?? '') === $levelFilter;
+        }));
+    }
     render_header('Data Pembelajaran');
+    ?>
+    <section class="panel no-print">
+        <form method="get" class="grid three" style="margin-bottom:0">
+            <input type="hidden" name="page" value="assignments">
+            <label>Filter Jenjang
+                <select name="level" onchange="this.form.submit()">
+                    <option value="">Semua Jenjang</option>
+                    <?php foreach (school_levels() as $lv): ?>
+                        <option value="<?= e($lv) ?>"<?= $levelFilter === $lv ? ' selected' : '' ?>><?= e($lv) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <?php if ($levelFilter !== ''): ?>
+                <div class="actions" style="align-self:end"><a class="button" href="?page=assignments">Reset Filter</a></div>
+            <?php endif; ?>
+        </form>
+    </section>
+    <?php
     input_panel_start($edit ? 'Edit Pembelajaran' : 'Input Pembelajaran', 'Tambah Pembelajaran', (bool)$edit || isset($_GET['add']));
     ?>
         <form method="post" class="grid four">
@@ -779,7 +812,7 @@ function page_assignments(): void
         })();
         </script>
     <?php input_panel_end(); ?>
-    <?php table_panel('Daftar Pembelajaran', ['Guru', 'Jenjang', 'Kelas', 'Mapel', 'Tahun', 'Semester', 'Status', 'Aksi'], $rows, function ($row) { ?>
+    <?php table_panel('Daftar Pembelajaran' . ($levelFilter !== '' ? ' — Jenjang ' . $levelFilter : ''), ['Guru', 'Jenjang', 'Kelas', 'Mapel', 'Tahun', 'Semester', 'Status', 'Aksi'], $rows, function ($row) { ?>
         <td><?= e($row['teacher_name']) ?></td><td><?= e($row['class_level'] ?? '-') ?></td><td><?= e($row['class_name']) ?></td><td><?= e($row['subject_name']) ?></td><td><?= e($row['academic_year']) ?></td><td><?= e($row['semester']) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('assignments', (int)$row['id'], 'delete_assignment') ?></td>
     <?php }, '', true); ?>
     <?php render_footer();
