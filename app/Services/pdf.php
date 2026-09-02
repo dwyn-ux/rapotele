@@ -370,14 +370,28 @@ function semester_number(): string
 
 function report_student_payload(int $studentId): array
 {
-    $student = fetch_one(
-        'SELECT s.*, c.name AS class_name, c.grade, c.level AS class_level, c.major AS class_major, c.homeroom_teacher_id, t.name AS homeroom_name, t.nip AS homeroom_nip
-         FROM students s
-         LEFT JOIN classes c ON c.id = s.class_id
-         LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id
-         WHERE s.id = ?',
-        [$studentId]
-    );
+    try {
+        $student = fetch_one(
+            'SELECT s.*, c.name AS class_name, c.grade, c.level AS class_level, c.major AS class_major, c.homeroom_teacher_id, t.name AS homeroom_name, t.nip AS homeroom_nip
+             FROM students s
+             LEFT JOIN classes c ON c.id = s.class_id
+             LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id
+             WHERE s.id = ?',
+            [$studentId]
+        );
+    } catch (Throwable) {
+        $student = fetch_one(
+            'SELECT s.*, c.name AS class_name, c.grade, c.major AS class_major, c.homeroom_teacher_id, t.name AS homeroom_name, t.nip AS homeroom_nip
+             FROM students s
+             LEFT JOIN classes c ON c.id = s.class_id
+             LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id
+             WHERE s.id = ?',
+            [$studentId]
+        );
+        if ($student) {
+            $student['class_level'] = null;
+        }
+    }
     if (!$student) {
         throw new RuntimeException('Siswa tidak ditemukan.');
     }
@@ -440,23 +454,45 @@ function report_subjects_for_student(array $student, int $studentId): array
             $extra = ' AND (sub.curriculum IS NULL OR sub.curriculum = ?)';
             $params[] = $classMajor;
         }
-        $rows = fetch_all(
-            "SELECT sub.id, sub.name, sub.group_name, sub.kkm AS subject_kkm, sub.level,
-                    COALESCE(sg.name, sub.group_name, ?) AS group_name,
-                    AVG(g.score) AS daily_avg, es.score AS exam_score, fs.score AS final_score,
-                    MIN(rm.display_order) AS display_order, MIN(sg.display_order) AS group_order
-             FROM report_mappings rm
-             JOIN subjects sub ON sub.id = rm.subject_id
-             LEFT JOIN subject_groups sg ON sg.id = rm.group_id
-             LEFT JOIN teaching_assignments ta ON ta.subject_id = sub.id AND ta.class_id = ?
-             LEFT JOIN grades g ON g.assignment_id = ta.id AND g.student_id = ?
-             LEFT JOIN exam_scores es ON es.subject_id = sub.id AND es.student_id = ?
-             LEFT JOIN final_scores fs ON fs.subject_id = sub.id AND fs.student_id = ?
-             WHERE rm.grade = ? AND rm.include_in_report = 1 AND sub.active = 1{$extra}
-             GROUP BY sub.id, sub.name, sub.group_name, sub.kkm, sub.level, sg.name, es.score, fs.score
-             ORDER BY COALESCE(MIN(sg.display_order), 999), MIN(rm.display_order), sub.name",
-            $params
-        );
+        try {
+            $rows = fetch_all(
+                "SELECT sub.id, sub.name, sub.group_name, sub.kkm AS subject_kkm, sub.level,
+                        COALESCE(sg.name, sub.group_name, ?) AS group_name,
+                        AVG(g.score) AS daily_avg, es.score AS exam_score, fs.score AS final_score,
+                        MIN(rm.display_order) AS display_order, MIN(sg.display_order) AS group_order
+                 FROM report_mappings rm
+                 JOIN subjects sub ON sub.id = rm.subject_id
+                 LEFT JOIN subject_groups sg ON sg.id = rm.group_id
+                 LEFT JOIN teaching_assignments ta ON ta.subject_id = sub.id AND ta.class_id = ?
+                 LEFT JOIN grades g ON g.assignment_id = ta.id AND g.student_id = ?
+                 LEFT JOIN exam_scores es ON es.subject_id = sub.id AND es.student_id = ?
+                 LEFT JOIN final_scores fs ON fs.subject_id = sub.id AND fs.student_id = ?
+                 WHERE rm.grade = ? AND rm.include_in_report = 1 AND sub.active = 1{$extra}
+                 GROUP BY sub.id, sub.name, sub.group_name, sub.kkm, sub.level, sg.name, es.score, fs.score
+                 ORDER BY COALESCE(MIN(sg.display_order), 999), MIN(rm.display_order), sub.name",
+                $params
+            );
+        } catch (Throwable) {
+            $rows = fetch_all(
+                "SELECT sub.id, sub.name, sub.group_name, sub.kkm AS subject_kkm,
+                        COALESCE(sg.name, sub.group_name, ?) AS group_name,
+                        AVG(g.score) AS daily_avg, es.score AS exam_score, fs.score AS final_score,
+                        MIN(rm.display_order) AS display_order, MIN(sg.display_order) AS group_order
+                 FROM report_mappings rm
+                 JOIN subjects sub ON sub.id = rm.subject_id
+                 LEFT JOIN subject_groups sg ON sg.id = rm.group_id
+                 LEFT JOIN teaching_assignments ta ON ta.subject_id = sub.id AND ta.class_id = ?
+                 LEFT JOIN grades g ON g.assignment_id = ta.id AND g.student_id = ?
+                 LEFT JOIN exam_scores es ON es.subject_id = sub.id AND es.student_id = ?
+                 LEFT JOIN final_scores fs ON fs.subject_id = sub.id AND fs.student_id = ?
+                 WHERE rm.grade = ? AND rm.include_in_report = 1 AND sub.active = 1{$extra}
+                 GROUP BY sub.id, sub.name, sub.group_name, sub.kkm, sg.name, es.score, fs.score
+                 ORDER BY COALESCE(MIN(sg.display_order), 999), MIN(rm.display_order), sub.name",
+                $params
+            );
+            foreach ($rows as &$r) { $r['level'] = null; }
+            unset($r);
+        }
         if ($classLevel !== '' && $rows) {
             $rows = array_values(array_filter($rows, function ($r) use ($classLevel) {
                 return report_subject_visible_for_level($r, $classLevel);
@@ -471,20 +507,39 @@ function report_subjects_for_student(array $student, int $studentId): array
             $extra = ' AND (sub.curriculum IS NULL OR sub.curriculum = ?)';
             $params[] = $classMajor;
         }
-        $rows = fetch_all(
-            "SELECT sub.id, sub.name, sub.group_name, sub.kkm AS subject_kkm, sub.level,
-                    COALESCE(sub.group_name, ?) AS group_name,
-                    AVG(g.score) AS daily_avg, es.score AS exam_score, fs.score AS final_score
-             FROM subjects sub
-             LEFT JOIN teaching_assignments ta ON ta.subject_id = sub.id AND ta.class_id = ?
-             LEFT JOIN grades g ON g.assignment_id = ta.id AND g.student_id = ?
-             LEFT JOIN exam_scores es ON es.subject_id = sub.id AND es.student_id = ?
-             LEFT JOIN final_scores fs ON fs.subject_id = sub.id AND fs.student_id = ?
-             WHERE sub.active = 1{$extra}
-             GROUP BY sub.id, sub.name, sub.group_name, sub.kkm, sub.level, es.score, fs.score
-             ORDER BY sub.group_name, sub.name",
-            $params
-        );
+        try {
+            $rows = fetch_all(
+                "SELECT sub.id, sub.name, sub.group_name, sub.kkm AS subject_kkm, sub.level,
+                        COALESCE(sub.group_name, ?) AS group_name,
+                        AVG(g.score) AS daily_avg, es.score AS exam_score, fs.score AS final_score
+                 FROM subjects sub
+                 LEFT JOIN teaching_assignments ta ON ta.subject_id = sub.id AND ta.class_id = ?
+                 LEFT JOIN grades g ON g.assignment_id = ta.id AND g.student_id = ?
+                 LEFT JOIN exam_scores es ON es.subject_id = sub.id AND es.student_id = ?
+                 LEFT JOIN final_scores fs ON fs.subject_id = sub.id AND fs.student_id = ?
+                 WHERE sub.active = 1{$extra}
+                 GROUP BY sub.id, sub.name, sub.group_name, sub.kkm, sub.level, es.score, fs.score
+                 ORDER BY sub.group_name, sub.name",
+                $params
+            );
+        } catch (Throwable) {
+            $rows = fetch_all(
+                "SELECT sub.id, sub.name, sub.group_name, sub.kkm AS subject_kkm,
+                        COALESCE(sub.group_name, ?) AS group_name,
+                        AVG(g.score) AS daily_avg, es.score AS exam_score, fs.score AS final_score
+                 FROM subjects sub
+                 LEFT JOIN teaching_assignments ta ON ta.subject_id = sub.id AND ta.class_id = ?
+                 LEFT JOIN grades g ON g.assignment_id = ta.id AND g.student_id = ?
+                 LEFT JOIN exam_scores es ON es.subject_id = sub.id AND es.student_id = ?
+                 LEFT JOIN final_scores fs ON fs.subject_id = sub.id AND fs.student_id = ?
+                 WHERE sub.active = 1{$extra}
+                 GROUP BY sub.id, sub.name, sub.group_name, sub.kkm, es.score, fs.score
+                 ORDER BY sub.group_name, sub.name",
+                $params
+            );
+            foreach ($rows as &$r) { $r['level'] = null; }
+            unset($r);
+        }
         if ($classLevel !== '' && $rows) {
             $rows = array_values(array_filter($rows, function ($r) use ($classLevel) {
                 return report_subject_visible_for_level($r, $classLevel);
@@ -1397,11 +1452,36 @@ function page_rapor_generate_class(): void
     require_role(['admin', 'guru']);
     $classId = (int)($_GET['class_id'] ?? 0);
     require_class_access($classId);
-    $students = fetch_all('SELECT id FROM students WHERE class_id = ? AND active = 1 ORDER BY name', [$classId]);
+    $students = fetch_all('SELECT id, name FROM students WHERE class_id = ? AND active = 1 ORDER BY name', [$classId]);
+    $success = 0;
+    $failed = [];
     foreach ($students as $student) {
-        generate_student_report_pdf((int)$student['id']);
+        try {
+            generate_student_report_pdf((int)$student['id']);
+            $success++;
+        } catch (Throwable $e) {
+            $failed[] = [
+                'id' => (int)$student['id'],
+                'name' => (string)($student['name'] ?? ''),
+                'error' => $e->getMessage(),
+            ];
+            @file_put_contents(
+                dirname(__DIR__, 2) . '/storage/logs/app-errors.log',
+                '[' . date('Y-m-d H:i:s') . '] rapor-generate-class student=' . (int)$student['id'] . PHP_EOL
+                . '  ' . get_class($e) . ': ' . $e->getMessage() . PHP_EOL
+                . '  at ' . $e->getFile() . ':' . $e->getLine() . PHP_EOL
+                . $e->getTraceAsString() . PHP_EOL . PHP_EOL,
+                FILE_APPEND | LOCK_EX
+            );
+        }
     }
-    flash('success', 'PDF rapor kelas berhasil digenerate.');
+    if ($failed) {
+        $names = array_slice(array_column($failed, 'name'), 0, 5);
+        $msg = 'Generate rapor selesai. Berhasil: ' . $success . ', Gagal: ' . count($failed) . ' (' . implode(', ', $names) . (count($failed) > 5 ? ', ...' : '') . '). Cek storage/logs/app-errors.log untuk detail.';
+        flash('warning', $msg);
+    } else {
+        flash('success', 'PDF rapor kelas berhasil digenerate (' . $success . ' siswa).');
+    }
     redirect_to('cetak-nilai-rapor', ['class_id' => $classId]);
 }
 
@@ -1415,8 +1495,20 @@ function page_rapor_generate_student(): void
         exit('Siswa tidak ditemukan.');
     }
     require_class_access((int)$student['class_id']);
-    generate_student_report_pdf($studentId);
-    flash('success', 'PDF rapor siswa berhasil digenerate.');
+    try {
+        generate_student_report_pdf($studentId);
+        flash('success', 'PDF rapor siswa berhasil digenerate.');
+    } catch (Throwable $e) {
+        @file_put_contents(
+            dirname(__DIR__, 2) . '/storage/logs/app-errors.log',
+            '[' . date('Y-m-d H:i:s') . '] rapor-generate-student student=' . $studentId . PHP_EOL
+            . '  ' . get_class($e) . ': ' . $e->getMessage() . PHP_EOL
+            . '  at ' . $e->getFile() . ':' . $e->getLine() . PHP_EOL
+            . $e->getTraceAsString() . PHP_EOL . PHP_EOL,
+            FILE_APPEND | LOCK_EX
+        );
+        flash('danger', 'Gagal generate rapor siswa: ' . $e->getMessage());
+    }
     redirect_to('cetak-nilai-rapor', ['class_id' => (int)($_GET['class_id'] ?? 0)]);
 }
 
