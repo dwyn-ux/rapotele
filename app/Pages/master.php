@@ -545,10 +545,16 @@ function page_students(): void
 {
     require_role(['admin']);
     $edit = edit_row('students') ?: [];
-    $allClasses = fetch_all('SELECT id, name, level FROM classes WHERE active = 1 ORDER BY grade, name');
+    $allClasses = classes_with_level();
     $classes = array_column_map($allClasses, 'id', 'name');
     $levelFilter = (string)($_GET['level'] ?? '');
-    $rows = fetch_all('SELECT s.*, c.name AS class_name, c.level AS class_level FROM students s LEFT JOIN classes c ON c.id = s.class_id ORDER BY c.grade, c.name, s.name');
+    try {
+        $rows = fetch_all('SELECT s.*, c.name AS class_name, c.level AS class_level FROM students s LEFT JOIN classes c ON c.id = s.class_id ORDER BY c.grade, c.name, s.name');
+    } catch (Throwable) {
+        $rows = fetch_all('SELECT s.*, c.name AS class_name FROM students s LEFT JOIN classes c ON c.id = s.class_id ORDER BY c.grade, c.name, s.name');
+        foreach ($rows as &$r) { $r['class_level'] = null; }
+        unset($r);
+    }
     if ($levelFilter !== '') {
         $rows = array_values(array_filter($rows, function ($r) use ($levelFilter) {
             return ($r['class_level'] ?? '') === $levelFilter;
@@ -697,9 +703,17 @@ function page_assignments(): void
     require_role(['admin']);
     $edit = edit_row('teaching_assignments') ?: [];
     $teachers = map_options('teachers', 'name');
-    $allClasses = fetch_all('SELECT id, name, level FROM classes WHERE active = 1 ORDER BY grade, name');
-    $allSubjects = fetch_all('SELECT id, name, level FROM subjects WHERE active = 1 ORDER BY name');
-    $editClass = (!empty($edit) && !empty($edit['class_id'])) ? fetch_one('SELECT id, name, level FROM classes WHERE id = ?', [(int)$edit['class_id']]) : null;
+    $allClasses = classes_with_level();
+    $allSubjects = subjects_with_level();
+    $editClass = null;
+    if (!empty($edit) && !empty($edit['class_id'])) {
+        try {
+            $editClass = fetch_one('SELECT id, name, level FROM classes WHERE id = ?', [(int)$edit['class_id']]);
+        } catch (Throwable) {
+            $editClass = fetch_one('SELECT id, name FROM classes WHERE id = ?', [(int)$edit['class_id']]);
+            if ($editClass) { $editClass['level'] = ''; }
+        }
+    }
     $editLevel = (string)($editClass['level'] ?? '');
     $rows = assignment_rows();
     render_header('Data Pembelajaran');

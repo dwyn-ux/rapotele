@@ -30,13 +30,16 @@ function migration_add_column(string $table, string $column, string $definition)
             db()->exec('ALTER TABLE ' . db_identifier($table) . ' ADD COLUMN ' . db_identifier($column) . ' ' . $definition);
         } catch (PDOException $exception) {
             if (!(db_driver() === 'mysql' && str_contains($exception->getMessage(), 'Duplicate column name'))) {
-                throw $exception;
+                $logDir = dirname(__DIR__) . '/storage/logs';
+                if (is_dir($logDir)) {
+                    @file_put_contents($logDir . '/app-errors.log',
+                        '[' . date('Y-m-d H:i:s') . '] migration_add_column ' . $table . '.' . $column . PHP_EOL
+                        . '  ' . $exception->getMessage() . PHP_EOL . PHP_EOL,
+                        FILE_APPEND | LOCK_EX
+                    );
+                }
             }
         }
-    }
-
-    if (!migration_column_exists($table, $column)) {
-        throw new RuntimeException('Kolom ' . $table . '.' . $column . ' belum berhasil dibuat. Jalankan install.php sekali atau beri user database izin ALTER TABLE.');
     }
 }
 

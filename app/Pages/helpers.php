@@ -8,17 +8,22 @@ function school_levels(): array
     if ($cache !== null) {
         return $cache;
     }
-    $rows = fetch_all("SELECT DISTINCT level FROM classes WHERE active = 1 AND level IS NOT NULL AND level <> '' ORDER BY level");
-    $allowed = SUBJECT_LEVELS;
-    $cache = [];
-    foreach ($rows as $r) {
-        $lv = trim((string)($r['level'] ?? ''));
-        if (in_array($lv, $allowed, true) && !in_array($lv, $cache, true)) {
-            $cache[] = $lv;
+    $cache = SUBJECT_LEVELS;
+    try {
+        $rows = fetch_all("SELECT DISTINCT level FROM classes WHERE active = 1 AND level IS NOT NULL AND level <> '' ORDER BY level");
+        $allowed = SUBJECT_LEVELS;
+        $out = [];
+        foreach ($rows as $r) {
+            $lv = trim((string)($r['level'] ?? ''));
+            if (in_array($lv, $allowed, true) && !in_array($lv, $out, true)) {
+                $out[] = $lv;
+            }
         }
-    }
-    if (!$cache) {
-        $cache = $allowed;
+        if ($out) {
+            $cache = $out;
+        }
+    } catch (Throwable) {
+        // table/column belum ada atau DB error -> pakai default
     }
     return $cache;
 }
@@ -136,6 +141,28 @@ function map_options(string $table, string $labelColumn): array
     return array_column_map($rows, 'id', 'label');
 }
 
+function subjects_with_level(): array
+{
+    try {
+        return fetch_all('SELECT id, name, level FROM subjects WHERE active = 1 ORDER BY name');
+    } catch (Throwable) {
+        return array_map(function ($r) {
+            return ['id' => (int)$r['id'], 'name' => (string)$r['name'], 'level' => null];
+        }, fetch_all('SELECT id, name FROM subjects WHERE active = 1 ORDER BY name'));
+    }
+}
+
+function classes_with_level(): array
+{
+    try {
+        return fetch_all('SELECT id, name, level FROM classes WHERE active = 1 ORDER BY grade, name');
+    } catch (Throwable) {
+        return array_map(function ($r) {
+            return ['id' => (int)$r['id'], 'name' => (string)$r['name'], 'level' => null];
+        }, fetch_all('SELECT id, name FROM classes WHERE active = 1 ORDER BY grade, name'));
+    }
+}
+
 function subject_options_for_level(?string $classLevel): array
 {
     $rows = fetch_all('SELECT id, name FROM subjects WHERE active = 1 ORDER BY name');
@@ -163,14 +190,28 @@ function array_column_map(array $rows, string $key, string $value): array
 
 function assignment_rows(): array
 {
-    return fetch_all(
-        'SELECT ta.*, t.name AS teacher_name, c.name AS class_name, c.level AS class_level, s.name AS subject_name
-         FROM teaching_assignments ta
-         JOIN teachers t ON t.id = ta.teacher_id
-         JOIN classes c ON c.id = ta.class_id
-         JOIN subjects s ON s.id = ta.subject_id
-         ORDER BY c.grade, c.name, s.name'
-    );
+    try {
+        return fetch_all(
+            'SELECT ta.*, t.name AS teacher_name, c.name AS class_name, c.level AS class_level, s.name AS subject_name
+             FROM teaching_assignments ta
+             JOIN teachers t ON t.id = ta.teacher_id
+             JOIN classes c ON c.id = ta.class_id
+             JOIN subjects s ON s.id = ta.subject_id
+             ORDER BY c.grade, c.name, s.name'
+        );
+    } catch (Throwable) {
+        $rows = fetch_all(
+            'SELECT ta.*, t.name AS teacher_name, c.name AS class_name, s.name AS subject_name
+             FROM teaching_assignments ta
+             JOIN teachers t ON t.id = ta.teacher_id
+             JOIN classes c ON c.id = ta.class_id
+             JOIN subjects s ON s.id = ta.subject_id
+             ORDER BY c.grade, c.name, s.name'
+        );
+        foreach ($rows as &$r) { $r['class_level'] = null; }
+        unset($r);
+        return $rows;
+    }
 }
 
 function assignments_for_current_user(): array
@@ -181,16 +222,32 @@ function assignments_for_current_user(): array
         $where .= ' AND ta.teacher_id = ?';
         $params[] = (int)(current_user()['teacher_id'] ?? 0);
     }
-    return fetch_all(
-        "SELECT ta.*, t.name AS teacher_name, c.name AS class_name, c.level AS class_level, s.name AS subject_name
-         FROM teaching_assignments ta
-         JOIN teachers t ON t.id = ta.teacher_id
-         JOIN classes c ON c.id = ta.class_id
-         JOIN subjects s ON s.id = ta.subject_id
-         WHERE $where
-         ORDER BY c.grade, c.name, s.name",
-        $params
-    );
+    try {
+        return fetch_all(
+            "SELECT ta.*, t.name AS teacher_name, c.name AS class_name, c.level AS class_level, s.name AS subject_name
+             FROM teaching_assignments ta
+             JOIN teachers t ON t.id = ta.teacher_id
+             JOIN classes c ON c.id = ta.class_id
+             JOIN subjects s ON s.id = ta.subject_id
+             WHERE $where
+             ORDER BY c.grade, c.name, s.name",
+            $params
+        );
+    } catch (Throwable) {
+        $rows = fetch_all(
+            "SELECT ta.*, t.name AS teacher_name, c.name AS class_name, s.name AS subject_name
+             FROM teaching_assignments ta
+             JOIN teachers t ON t.id = ta.teacher_id
+             JOIN classes c ON c.id = ta.class_id
+             JOIN subjects s ON s.id = ta.subject_id
+             WHERE $where
+             ORDER BY c.grade, c.name, s.name",
+            $params
+        );
+        foreach ($rows as &$r) { $r['class_level'] = null; }
+        unset($r);
+        return $rows;
+    }
 }
 
 function learning_objectives_for_assignment(array $assignment): array
