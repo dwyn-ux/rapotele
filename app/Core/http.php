@@ -192,12 +192,18 @@ function app_render_exception(Throwable $exception): void
 
     if ($renderAuthenticatedShell) {
         render_header('Terjadi Kesalahan');
-        echo '<section class="panel"><h3>Aplikasi gagal memproses halaman.</h3><p>' . e($message) . '</p></section>';
+        echo '<section class="panel"><h3>Aplikasi gagal memproses halaman.</h3><p>' . e($message) . '</p>';
+        if (app_debug()) {
+            echo '<pre style="background:#f5f5f5;padding:1rem;overflow:auto;font-size:.75rem;">' . e($exception->getTraceAsString()) . '</pre>';
+        }
         render_footer();
         return;
     }
 
     render_public_header('Terjadi Kesalahan');
     echo '<h1>Terjadi Kesalahan</h1><p>' . e($message) . '</p>';
+    if (app_debug()) {
+        echo '<pre style="background:#f5f5f5;padding:1rem;overflow:auto;font-size:.75rem;">' . e($exception->getTraceAsString()) . '</pre>';
+    }
     render_public_footer();
 }
