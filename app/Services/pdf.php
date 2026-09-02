@@ -339,6 +339,20 @@ function report_is_sma(array $payload): bool
     return report_school_level($payload) === 'SMA';
 }
 
+function report_subject_visible_for_level(array $subject, string $classLevel): bool
+{
+    $lv = trim((string)($subject['level'] ?? ''));
+    if ($lv === '' || $classLevel === '') {
+        return true;
+    }
+    foreach (explode(',', $lv) as $token) {
+        if (strtoupper(trim($token)) === strtoupper($classLevel)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function report_predikat_sma(int $score): string
 {
     return match (true) {
@@ -427,7 +441,7 @@ function report_subjects_for_student(array $student, int $studentId): array
             $params[] = $classMajor;
         }
         $rows = fetch_all(
-            "SELECT sub.id, sub.name, sub.group_name, sub.kkm AS subject_kkm,
+            "SELECT sub.id, sub.name, sub.group_name, sub.kkm AS subject_kkm, sub.level,
                     COALESCE(sg.name, sub.group_name, ?) AS group_name,
                     AVG(g.score) AS daily_avg, es.score AS exam_score, fs.score AS final_score,
                     MIN(rm.display_order) AS display_order, MIN(sg.display_order) AS group_order
@@ -439,10 +453,15 @@ function report_subjects_for_student(array $student, int $studentId): array
              LEFT JOIN exam_scores es ON es.subject_id = sub.id AND es.student_id = ?
              LEFT JOIN final_scores fs ON fs.subject_id = sub.id AND fs.student_id = ?
              WHERE rm.grade = ? AND rm.include_in_report = 1 AND sub.active = 1{$extra}
-             GROUP BY sub.id, sub.name, sub.group_name, sub.kkm, sg.name, es.score, fs.score
+             GROUP BY sub.id, sub.name, sub.group_name, sub.kkm, sub.level, sg.name, es.score, fs.score
              ORDER BY COALESCE(MIN(sg.display_order), 999), MIN(rm.display_order), sub.name",
             $params
         );
+        if ($classLevel !== '' && $rows) {
+            $rows = array_values(array_filter($rows, function ($r) use ($classLevel) {
+                return report_subject_visible_for_level($r, $classLevel);
+            }));
+        }
     }
 
     if (!$rows) {
@@ -453,7 +472,7 @@ function report_subjects_for_student(array $student, int $studentId): array
             $params[] = $classMajor;
         }
         $rows = fetch_all(
-            "SELECT sub.id, sub.name, sub.group_name, sub.kkm AS subject_kkm,
+            "SELECT sub.id, sub.name, sub.group_name, sub.kkm AS subject_kkm, sub.level,
                     COALESCE(sub.group_name, ?) AS group_name,
                     AVG(g.score) AS daily_avg, es.score AS exam_score, fs.score AS final_score
              FROM subjects sub
@@ -462,10 +481,15 @@ function report_subjects_for_student(array $student, int $studentId): array
              LEFT JOIN exam_scores es ON es.subject_id = sub.id AND es.student_id = ?
              LEFT JOIN final_scores fs ON fs.subject_id = sub.id AND fs.student_id = ?
              WHERE sub.active = 1{$extra}
-             GROUP BY sub.id, sub.name, sub.group_name, sub.kkm, es.score, fs.score
+             GROUP BY sub.id, sub.name, sub.group_name, sub.kkm, sub.level, es.score, fs.score
              ORDER BY sub.group_name, sub.name",
             $params
         );
+        if ($classLevel !== '' && $rows) {
+            $rows = array_values(array_filter($rows, function ($r) use ($classLevel) {
+                return report_subject_visible_for_level($r, $classLevel);
+            }));
+        }
     }
 
     $allObjectives = fetch_all(
@@ -897,16 +921,16 @@ function report_learning_table_columns(bool $sma = false): array
         return [
             'no'       => ['x' => 56.69,  'w' => 22.68,  'label' => 'No', 'fill' => true],
             'mapel'    => ['x' => $xMapel,    'w' => $mapelW,   'label' => 'Mata Pelajaran', 'fill' => true],
-            'nilai'    => ['x' => $xNilai,    'w' => $nilaiW,   'label' => 'Nilai', 'fill' => false],
-            'predikat' => ['x' => $xPred,     'w' => $predW,    'label' => 'Predikat', 'fill' => false],
-            'capaian'  => ['x' => $xCapaian,  'w' => $capaianW, 'label' => 'Capaian Kompetensi', 'fill' => false],
+            'nilai'    => ['x' => $xNilai,    'w' => $nilaiW,   'label' => 'Nilai', 'fill' => true],
+            'predikat' => ['x' => $xPred,     'w' => $predW,    'label' => 'Predikat', 'fill' => true],
+            'capaian'  => ['x' => $xCapaian,  'w' => $capaianW, 'label' => 'Capaian Kompetensi', 'fill' => true],
         ];
     }
     return [
         'no'       => ['x' => 56.69,  'w' => 22.68,  'label' => 'No', 'fill' => true],
         'mapel'    => ['x' => 79.37,  'w' => 120.00, 'label' => 'Mata Pelajaran', 'fill' => true],
-        'nilai'    => ['x' => 199.37, 'w' => 55.00,  'label' => 'Nilai Akhir', 'fill' => false],
-        'capaian'  => ['x' => 254.37, 'w' => 284.21, 'label' => 'Capaian Kompetensi', 'fill' => false],
+        'nilai'    => ['x' => 199.37, 'w' => 55.00,  'label' => 'Nilai Akhir', 'fill' => true],
+        'capaian'  => ['x' => 254.37, 'w' => 284.21, 'label' => 'Capaian Kompetensi', 'fill' => true],
     ];
 }
 
@@ -917,7 +941,8 @@ function draw_report_learning_table_header(SimplePdf $pdf, bool $sma = false): f
     $titleHeight = 17.01;
     // Title band: plain text, no fill and no border.
     $pdf->setFont('Helvetica', 12, true);
-    $pdf->centerText(56.69, $y - 11.50, 481.89, 'LAPORAN HASIL BELAJAR', 12, true);
+    $title = $sma ? 'LAPORAN PENILAIAN HASIL BELAJAR' : 'LAPORAN HASIL BELAJAR';
+    $pdf->centerText(56.69, $y - 11.50, 481.89, $title, 12, true);
     $y -= $titleHeight;
 
     // Column header row: only "No" and "Mata Pelajaran" get the light-blue fill.
