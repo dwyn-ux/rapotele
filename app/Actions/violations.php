@@ -24,8 +24,7 @@ function require_bk(): void
 {
     require_login();
     if (!is_bk()) {
-        http_response_code(403);
-        exit('Akses ditolak. Halaman ini hanya untuk Admin dan Guru BK.');
+        render_access_denied('Halaman ini hanya untuk Admin dan Guru BK yang ditandai di data guru.');
     }
 }
 

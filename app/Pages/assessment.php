@@ -58,8 +58,9 @@ function require_class_access(int $classId): void
 
     $teacherId = (int)(current_user()['teacher_id'] ?? 0);
     if ($teacherId <= 0 || !fetch_one('SELECT id FROM teaching_assignments WHERE class_id = ? AND teacher_id = ? AND active = 1 LIMIT 1', [$classId, $teacherId])) {
-        http_response_code(403);
-        exit('Akses kelas ditolak.');
+        $classRow = fetch_one('SELECT name FROM classes WHERE id = ?', [$classId]);
+        $className = $classRow ? (string)$classRow['name'] : ('#' . $classId);
+        render_access_denied('Anda tidak mengajar di kelas ' . $className . '. Hanya admin yang dapat mengakses data kelas ini.');
     }
 }
 
@@ -72,8 +73,11 @@ function require_subject_access(int $subjectId, int $classId): void
     $teacherId = (int)(current_user()['teacher_id'] ?? 0);
     if ($subjectId <= 0 || $classId <= 0 || $teacherId <= 0
         || !fetch_one('SELECT id FROM teaching_assignments WHERE subject_id = ? AND class_id = ? AND teacher_id = ? AND active = 1 LIMIT 1', [$subjectId, $classId, $teacherId])) {
-        http_response_code(403);
-        exit('Akses mapel di kelas ini ditolak.');
+        $classRow = fetch_one('SELECT name FROM classes WHERE id = ?', [$classId]);
+        $subjectRow = fetch_one('SELECT name FROM subjects WHERE id = ?', [$subjectId]);
+        $className = $classRow ? (string)$classRow['name'] : ('kelas #' . $classId);
+        $subjectName = $subjectRow ? (string)$subjectRow['name'] : ('mapel #' . $subjectId);
+        render_access_denied('Anda tidak mengajar ' . $subjectName . ' di kelas ' . $className . '. Hanya guru pengampu mapel ini atau admin yang dapat mengakses.');
     }
 }
 
@@ -212,8 +216,7 @@ function current_student(): array
     $user = current_user();
     $studentId = (int)($user['student_id'] ?? 0);
     if ($studentId <= 0) {
-        http_response_code(403);
-        exit('Akun ini belum terhubung dengan data siswa.');
+        render_access_denied('Akun ini belum terhubung dengan data siswa. Hubungi admin untuk ربط akun dengan data siswa.');
     }
     $student = fetch_one(
         'SELECT s.*, c.name AS class_name, c.grade, s.location_lat, s.location_lng, sp.location_lat AS school_lat, sp.location_lng AS school_lng, sp.attendance_radius_meters AS radius

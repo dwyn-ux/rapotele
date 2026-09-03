@@ -1267,8 +1267,7 @@ function page_student_document_download(): void
     $grade = (int)preg_replace('/\D+/', '', (string)($student['grade'] ?? '0'));
     $allowed = ($level === 'SMA' && $grade === 12) || (in_array($level, ['SMP', 'MTS'], true) && $grade === 9);
     if (!$allowed) {
-        http_response_code(403);
-        exit('Dokumen kelulusan hanya tersedia untuk siswa kelas 9 (SMP/MTs) atau kelas 12 (SMA).');
+        render_access_denied('Dokumen kelulusan hanya tersedia untuk siswa kelas 9 (SMP/MTs) atau kelas 12 (SMA).');
     }
     $kind = strtolower((string)($_GET['kind'] ?? 'skl'));
     if (!in_array($kind, ['skl', 'ijazah', 'transkrip'], true)) {
@@ -1519,8 +1518,7 @@ function page_rapor_download_student(): void
     if (user_role() === 'siswa') {
         $currentStudentId = (int)(current_user()['student_id'] ?? 0);
         if (!$currentStudentId || $studentId !== $currentStudentId) {
-            http_response_code(403);
-            exit('Akses ditolak.');
+            render_access_denied('Siswa hanya dapat mencetak dokumen miliknya sendiri.');
         }
     } else {
         require_role(['admin', 'guru']);

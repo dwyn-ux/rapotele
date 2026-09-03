@@ -40,8 +40,7 @@ function require_role(array $roles): void
 {
     require_login();
     if (!in_array(user_role(), $roles, true)) {
-        http_response_code(403);
-        exit('Akses ditolak.');
+        render_access_denied('Anda login sebagai ' . user_role() . '. Halaman ini hanya untuk: ' . implode(', ', $roles) . '.');
     }
 }
 

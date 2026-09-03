@@ -388,6 +388,47 @@ function render_public_footer(): void
     <?php
 }
 
+function render_access_denied(string $message): void
+{
+    if (PHP_SAPI === 'cli') {
+        fwrite(STDERR, "ACCESS DENIED: $message\n");
+        throw new RuntimeException('ACCESS DENIED: ' . $message);
+    }
+
+    $user = current_user();
+    $title = 'Akses Ditolak';
+    http_response_code(403);
+    if ($user) {
+        render_header($title);
+        ?>
+        <section class="panel">
+            <div class="empty" style="padding:2rem 1rem;">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 1rem;display:block;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                </svg>
+                <h3 style="margin:0 0 .5rem;">Akses Ditolak</h3>
+                <p style="color:var(--text-muted);font-size:.95rem;margin-bottom:1rem;"><?= e($message) ?></p>
+                <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:1.5rem;">Halaman ini tidak tersedia untuk peran akun Anda. Hubungi admin jika merasa ini keliru.</p>
+                <a class="button primary" href="<?= e(route_url('dashboard')) ?>">Kembali ke Dashboard</a>
+            </div>
+        </section>
+        <?php
+        render_footer();
+    } else {
+        render_public_header($title);
+        ?>
+        <section class="panel" style="max-width:480px;margin:3rem auto;text-align:center;">
+            <h2>Akses Ditolak</h2>
+            <p style="color:var(--text-muted);"><?= e($message) ?></p>
+            <a class="button primary" href="<?= e(route_url('login')) ?>">Login</a>
+        </section>
+        <?php
+        render_public_footer();
+    }
+    exit;
+}
+
 function get_school_profile(): array
 {
     if (!table_exists('school_profile')) {

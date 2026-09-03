@@ -124,16 +124,20 @@ function log_exception(Throwable $exception): void
 function friendly_error(Throwable $exception, string $fallback = 'Terjadi kesalahan internal. Silakan coba lagi atau hubungi admin.'): string
 {
     log_exception($exception);
+    $class = $exception::class;
+    $pos = strrpos($class, '\\');
+    $shortClass = $pos === false ? $class : substr($class, $pos + 1);
+    $origin = $exception->getFile() . ':' . $exception->getLine();
     if (app_debug()) {
-        return $exception->getMessage();
+        return $exception->getMessage() . ' [' . $shortClass . ' di ' . $origin . ']';
     }
     if ($exception instanceof InvalidArgumentException) {
         return $exception->getMessage();
     }
     if ($exception instanceof RuntimeException && !$exception instanceof PDOException) {
-        return $exception->getMessage();
+        return $exception->getMessage() . ' [' . $shortClass . ']';
     }
-    return $fallback;
+    return $fallback . ' [' . $shortClass . ' di ' . $origin . ']';
 }
 
 function client_ip(): string

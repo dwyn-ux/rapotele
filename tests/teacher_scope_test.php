@@ -257,7 +257,7 @@ try {
         . "echo '__EXIT__=0';\n",
         ['USER_ID' => (string)$userA, 'SUBJECT_DENY' => (string)$subjBHS, 'CLASS_ID' => (string)$class7A]
     );
-    ok('guru A ditolak akses BHS di 7A (helper)', str_contains($r['output'], 'Akses mapel di kelas ini ditolak'), 'out=' . substr(preg_replace('/\s+/', ' ', $r['output']), 0, 200));
+    ok('guru A ditolak akses BHS di 7A (helper)', str_contains($r['output'], 'ACCESS DENIED') || str_contains($r['output'], 'tidak mengajar'), 'out=' . substr(preg_replace('/\s+/', ' ', $r['output']), 0, 200));
 
     section('Helper: subjects_for_current_user_in_class');
     $subjects = run_as($userA, fn() => subjects_for_current_user_in_class($class7A));
@@ -311,20 +311,21 @@ try {
     ok('TP BHS tidak terbuat', $tpCountForBhs === 0, "got count=$tpCountForBhs");
 
     section('action_save_deskripsi_nilai: guru A tidak bisa isi deskripsi BHS');
+    $descMarker = 'deskripsi liar marker ' . bin2hex(random_bytes(4));
     $r = run_subprocess(
         "\$_SESSION['user_id'] = (int)getenv('USER_ID');\n"
-        . "\$_POST = ['student_id'=>getenv('STUDENT'), 'class_id'=>getenv('CLASS'), 'grade'=>'7', 'desc'=>[getenv('SUBJECT_DENY')=>'deskripsi liar']];\n"
+        . "\$_POST = ['student_id'=>getenv('STUDENT'), 'class_id'=>getenv('CLASS'), 'grade'=>'7', 'desc'=>[getenv('SUBJECT_DENY')=>getenv('MARKER')]];\n"
         . "ob_start();\n"
         . "try { action_save_deskripsi_nilai(); echo 'NOT_DENIED'; }\n"
         . "catch (Throwable \$e) { echo 'DENIED:'.\$e->getMessage(); }\n"
         . "ob_end_clean();\n"
         . "echo '__EXIT__=0';\n",
-        ['USER_ID' => (string)$userA, 'STUDENT' => (string)$student1, 'CLASS' => (string)$class7A, 'SUBJECT_DENY' => (string)$subjBHS]
+        ['USER_ID' => (string)$userA, 'STUDENT' => (string)$student1, 'CLASS' => (string)$class7A, 'SUBJECT_DENY' => (string)$subjBHS, 'MARKER' => $descMarker]
     );
-    ok('action deskripsi ditolak', str_contains($r['output'], 'Akses mapel di kelas ini ditolak'), 'out=' . substr(preg_replace('/\s+/', ' ', $r['output']), 0, 200));
+    ok('action deskripsi ditolak (marker ' . $descMarker . ')', str_contains($r['output'], 'ACCESS DENIED') || str_contains($r['output'], 'tidak mengajar'), 'out=' . substr(preg_replace('/\s+/', ' ', $r['output']), 0, 200));
 
-    $descCount = (int)fetch_one('SELECT COUNT(*) AS c FROM student_descriptions WHERE student_id = ? AND subject_id = ?', [$student1, $subjBHS])['c'];
-    ok('deskripsi BHS tidak terbuat', $descCount === 0, "got count=$descCount");
+    $descCount = (int)fetch_one('SELECT COUNT(*) AS c FROM student_descriptions WHERE student_id = ? AND subject_id = ? AND description = ?', [$student1, $subjBHS, $descMarker])['c'];
+    ok('deskripsi BHS tidak terbuat (marker spesifik)', $descCount === 0, "got count=$descCount");
 
     section('action_save_extracurricular_scores: guru A tidak bisa isi nilai PMR');
     $r = run_subprocess(
