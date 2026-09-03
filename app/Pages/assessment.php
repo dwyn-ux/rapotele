@@ -63,6 +63,69 @@ function require_class_access(int $classId): void
     }
 }
 
+function require_subject_access(int $subjectId, int $classId): void
+{
+    if (is_admin()) {
+        return;
+    }
+
+    $teacherId = (int)(current_user()['teacher_id'] ?? 0);
+    if ($subjectId <= 0 || $classId <= 0 || $teacherId <= 0
+        || !fetch_one('SELECT id FROM teaching_assignments WHERE subject_id = ? AND class_id = ? AND teacher_id = ? AND active = 1 LIMIT 1', [$subjectId, $classId, $teacherId])) {
+        http_response_code(403);
+        exit('Akses mapel di kelas ini ditolak.');
+    }
+}
+
+function subjects_for_current_user_in_class(int $classId): array
+{
+    if (is_admin()) {
+        return fetch_all(
+            'SELECT DISTINCT s.id, s.name
+             FROM subjects s
+             JOIN teaching_assignments ta ON ta.subject_id = s.id
+             WHERE ta.class_id = ? AND ta.active = 1 AND s.active = 1
+             ORDER BY s.name',
+            [$classId]
+        );
+    }
+
+    $teacherId = (int)(current_user()['teacher_id'] ?? 0);
+    if ($teacherId <= 0) {
+        return [];
+    }
+
+    return fetch_all(
+        'SELECT DISTINCT s.id, s.name
+         FROM subjects s
+         JOIN teaching_assignments ta ON ta.subject_id = s.id
+         WHERE ta.class_id = ? AND ta.teacher_id = ? AND ta.active = 1 AND s.active = 1
+         ORDER BY s.name',
+        [$classId, $teacherId]
+    );
+}
+
+function subjects_for_current_user(): array
+{
+    if (is_admin()) {
+        return fetch_all('SELECT id, name FROM subjects WHERE active = 1 ORDER BY name');
+    }
+
+    $teacherId = (int)(current_user()['teacher_id'] ?? 0);
+    if ($teacherId <= 0) {
+        return [];
+    }
+
+    return fetch_all(
+        'SELECT DISTINCT s.id, s.name
+         FROM subjects s
+         JOIN teaching_assignments ta ON ta.subject_id = s.id
+         WHERE ta.teacher_id = ? AND ta.active = 1 AND s.active = 1
+         ORDER BY s.name',
+        [$teacherId]
+    );
+}
+
 function allowed_teacher_ids_for_attendance(): array
 {
     if (is_admin()) {
@@ -566,14 +629,19 @@ function page_deskripsi_nilai(): void
 
     $subjects = [];
     if ($classId) {
-        $subjects = fetch_all(
-            'SELECT DISTINCT s.id, s.name
-             FROM subjects s
-             JOIN teaching_assignments ta ON ta.subject_id = s.id AND ta.class_id = ?
-             WHERE s.active = 1 AND ta.active = 1
-             ORDER BY s.name',
-            [$classId]
-        );
+        $subjects = subjects_for_current_user_in_class($classId);
+        if (!is_admin() && $subjectId > 0) {
+            $allowed = false;
+            foreach ($subjects as $s) {
+                if ((int)$s['id'] === $subjectId) {
+                    $allowed = true;
+                    break;
+                }
+            }
+            if (!$allowed) {
+                $subjectId = 0;
+            }
+        }
     }
 
     render_header('Deskripsi Nilai');

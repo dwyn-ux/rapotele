@@ -326,9 +326,23 @@ function page_data_tp(): void
 {
     require_role(['admin', 'guru']);
     $edit = ext_edit_row('learning_objectives');
-    $subjects = map_options('subjects', 'name');
+    $subjects = array_column_map(subjects_for_current_user(), 'id', 'name');
     $classes = learning_objective_class_options();
-    $rows = fetch_all('SELECT lo.*, s.name AS subject_name FROM learning_objectives lo JOIN subjects s ON s.id = lo.subject_id ORDER BY lo.grade, s.name, lo.id DESC');
+    $rowsScope = '';
+    $rowsParams = [];
+    if (!is_admin()) {
+        $teacherId = (int)(current_user()['teacher_id'] ?? 0);
+        $rowsScope = ' JOIN teaching_assignments ta ON ta.subject_id = lo.subject_id AND ta.teacher_id = ? AND ta.active = 1';
+        $rowsParams = [$teacherId];
+    }
+    $rows = fetch_all(
+        "SELECT lo.*, s.name AS subject_name
+         FROM learning_objectives lo
+         JOIN subjects s ON s.id = lo.subject_id
+         $rowsScope
+         ORDER BY lo.grade, s.name, lo.id DESC",
+        $rowsParams
+    );
     render_header('Tujuan Pembelajaran');
     ext_simple_form_start('save_learning_objective', $edit, 'Tujuan Pembelajaran', 'grid two');
     ?>
@@ -353,13 +367,19 @@ function page_status_penilaian(): void
     if ($classId > 0) {
         require_class_access($classId);
     }
+    $rowParams = [$classId];
+    $rowWhere = 'ta.class_id = ?';
+    if (!is_admin()) {
+        $rowWhere .= ' AND ta.teacher_id = ?';
+        $rowParams[] = (int)(current_user()['teacher_id'] ?? 0);
+    }
     $rows = $classId ? fetch_all(
-        'SELECT ta.*, t.name AS teacher_name, s.name AS subject_name, c.name AS class_name
+        "SELECT ta.*, t.name AS teacher_name, s.name AS subject_name, c.name AS class_name
          FROM teaching_assignments ta JOIN teachers t ON t.id = ta.teacher_id JOIN subjects s ON s.id = ta.subject_id JOIN classes c ON c.id = ta.class_id
-         WHERE ta.class_id = ? ORDER BY s.name',
-        [$classId]
+         WHERE $rowWhere ORDER BY s.name",
+        $rowParams
     ) : [];
-    render_header('Status Penilaian');
+    render_header(is_admin() ? 'Status Penilaian' : 'Status Penilaian — Mapel Anda');
     echo '<section class="panel"><form method="get" class="grid four"><input type="hidden" name="page" value="status-penilaian"><label>Kelas <select name="class_id">' . options(array_column_map($classes, 'id', 'name'), $classId) . '</select></label><div class="actions"><button class="button">Tampilkan</button></div></form></section>';
     table_panel('Status Nilai Guru Mapel', ['Kelas', 'Mapel', 'Guru', 'Siswa', 'Nilai Masuk', 'Progress'], $rows, function ($row) {
         $studentCount = (int)fetch_one('SELECT COUNT(*) AS c FROM students WHERE class_id = ? AND active = 1', [(int)$row['class_id']])['c'];
@@ -384,7 +404,13 @@ function page_input_nilai_ekskul(): void
     }
     $class = $classId ? fetch_one('SELECT * FROM classes WHERE id = ?', [$classId]) : null;
     $className = $class ? (string)$class['name'] : '';
-    $ekskuls = fetch_all('SELECT * FROM extracurriculars WHERE active = 1 ORDER BY name');
+    $ekskulWhere = 'active = 1';
+    $ekskulParams = [];
+    if (!is_admin()) {
+        $ekskulWhere .= ' AND teacher_id = ?';
+        $ekskulParams[] = (int)(current_user()['teacher_id'] ?? 0);
+    }
+    $ekskuls = fetch_all("SELECT * FROM extracurriculars WHERE $ekskulWhere ORDER BY name", $ekskulParams);
     // Filter siswa: tampilkan hanya yang punya minimal 1 ekskul (ada di extracurricular_members)
     $hasMembers = table_exists('extracurricular_members');
     if ($classId && $hasMembers) {

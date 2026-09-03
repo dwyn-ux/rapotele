@@ -135,12 +135,19 @@ function action_save_extracurricular_scores(): void
     require_role(['admin', 'guru']);
     $classId = (int)($_POST['class_id'] ?? 0);
     $scores = $_POST['scores'] ?? [];
+    $teacherId = (int)(current_user()['teacher_id'] ?? 0);
     foreach ($scores as $studentId => $ekskulScores) {
         foreach ($ekskulScores as $ekskulId => $score) {
             $studentId = (int)$studentId;
             $ekskulId = (int)$ekskulId;
             $scoreVal = trim((string)$score);
             if ($studentId > 0 && $ekskulId > 0) {
+                if (!is_admin()) {
+                    $ok = fetch_one('SELECT id FROM extracurriculars WHERE id = ? AND teacher_id = ? LIMIT 1', [$ekskulId, $teacherId]);
+                    if (!$ok) {
+                        throw new RuntimeException('Anda tidak berhak memberi nilai untuk ekskul ini.');
+                    }
+                }
                 $existing = fetch_one('SELECT id FROM extracurricular_scores WHERE student_id = ? AND extracurricular_id = ?', [$studentId, $ekskulId]);
                 if ($existing) {
                     execute_sql('UPDATE extracurricular_scores SET score = ?, updated_at = ? WHERE id = ?', [$scoreVal, now_string(), (int)$existing['id']]);
@@ -461,10 +468,35 @@ function action_save_learning_objective(): void
     require_role(['admin', 'guru']);
     $id = (int)($_POST['id'] ?? 0);
     $className = trim((string)($_POST['grade'] ?? ''));
+    $subjectId = (int)($_POST['subject_id'] ?? 0);
     if ($className === '' || !array_key_exists($className, learning_objective_class_options())) {
         throw new RuntimeException('Kelas tidak valid.');
     }
-    $data = [(int)$_POST['subject_id'], $className, trim((string)$_POST['description']), isset($_POST['active']) ? 1 : 0, now_string()];
+    if ($subjectId <= 0) {
+        throw new RuntimeException('Mapel tidak valid.');
+    }
+    $classRow = fetch_one('SELECT id FROM classes WHERE name = ? LIMIT 1', [$className]);
+    $classId = $classRow ? (int)$classRow['id'] : 0;
+    if (!is_admin()) {
+        require_subject_access($subjectId, $classId);
+        if ($id > 0) {
+            $existing = fetch_one('SELECT subject_id FROM learning_objectives WHERE id = ?', [$id]);
+            if (!$existing) {
+                throw new RuntimeException('Tujuan pembelajaran tidak ditemukan.');
+            }
+            $existingClassName = '';
+            $existingRow = fetch_one('SELECT lo.subject_id, c.name AS class_name FROM learning_objectives lo LEFT JOIN classes c ON c.name = lo.grade WHERE lo.id = ?', [$id]);
+            if ($existingRow) {
+                $existingClassId = fetch_one('SELECT id FROM classes WHERE name = ? LIMIT 1', [(string)$existingRow['class_name']]);
+                $existingClassName = (string)$existingRow['class_name'];
+                $existingClassIdVal = $existingClassId ? (int)$existingClassId['id'] : 0;
+                if ($existingClassIdVal > 0) {
+                    require_subject_access((int)$existingRow['subject_id'], $existingClassIdVal);
+                }
+            }
+        }
+    }
+    $data = [$subjectId, $className, trim((string)$_POST['description']), isset($_POST['active']) ? 1 : 0, now_string()];
     if ($id > 0) {
         execute_sql('UPDATE learning_objectives SET subject_id = ?, grade = ?, description = ?, active = ?, updated_at = ? WHERE id = ?', array_merge($data, [$id]));
     } else {
@@ -611,6 +643,9 @@ function action_save_deskripsi_nilai(): void
         if ($subjectId <= 0 || $desc === '') {
             continue;
         }
+        if (!is_admin()) {
+            require_subject_access($subjectId, $classId);
+        }
         $existing = fetch_one(
             'SELECT id FROM student_descriptions WHERE student_id = ? AND subject_id = ? AND grade_val = ?',
             [$studentId, $subjectId, $grade]
@@ -655,9 +690,7 @@ function action_generate_deskripsi_nilai(): void
         $objectivesBySubject[(int)$lo['subject_id']][] = $lo['description'];
     }
 
-    $subjects = fetch_all(
-        'SELECT s.id, s.name FROM subjects s WHERE s.active = 1 ORDER BY s.name'
-    );
+    $subjects = subjects_for_current_user_in_class($classId);
 
     foreach ($students as $student) {
         $studentId = (int)$student['id'];
