@@ -100,7 +100,7 @@ function render_header(string $title): void
             'tema-kokurikuler', 'kegiatan-kokurikuler', 'kelompok-kokurikuler', 'input-kelulusan',
             'import-nomor-ijazah', 'setting-transkrip', 'setting-skl', 'mapping-mapel-skl',
             'input-nilai-skl', 'kirim-data-dapodik', 'backup-restore', 'whatsapp', 'users',
-            'import-bulk', 'bulk-delete', 'violation-rules', 'teacher-attendance',
+            'import-bulk', 'bulk-delete', 'violation-rules', 'teacher-attendance', 'assignments',
         ] as $adminPage) {
             foreach ($menuGroups as &$groupItems) {
                 unset($groupItems[$adminPage]);
