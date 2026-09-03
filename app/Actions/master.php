@@ -291,13 +291,24 @@ function action_save_assignment(): void
 {
     require_role(['admin']);
     $id = (int)($_POST['id'] ?? 0);
-    $teacherId = (int)$_POST['teacher_id'];
-    $classId = (int)$_POST['class_id'];
-    $subjectId = (int)$_POST['subject_id'];
+    $teacherId = (int)($_POST['teacher_id'] ?? 0);
+    $classId = (int)($_POST['class_id'] ?? 0);
+    $subjectId = (int)($_POST['subject_id'] ?? 0);
+    if ($teacherId <= 0 || $classId <= 0 || $subjectId <= 0) {
+        flash('danger', 'Guru, kelas, dan mapel wajib dipilih.');
+        redirect_to('assignments');
+    }
+    $academicYear = trim((string)($_POST['academic_year'] ?? ''));
+    $semester = trim((string)($_POST['semester'] ?? ''));
+    if ($academicYear === '' || $semester === '') {
+        flash('danger', 'Tahun ajaran dan semester wajib diisi.');
+        redirect_to('assignments');
+    }
     $classRow = fetch_one('SELECT name, level FROM classes WHERE id = ?', [$classId]);
     $subjectRow = fetch_one('SELECT name, level FROM subjects WHERE id = ?', [$subjectId]);
-    if (!$classRow || !$subjectRow) {
-        flash('danger', 'Kelas atau mapel tidak valid.');
+    $teacherRow = fetch_one('SELECT id FROM teachers WHERE id = ?', [$teacherId]);
+    if (!$classRow || !$subjectRow || !$teacherRow) {
+        flash('danger', 'Guru, kelas, atau mapel tidak ditemukan.');
         redirect_to('assignments');
     }
     if (!subject_has_level($subjectRow['level'] ?? null, (string)($classRow['level'] ?? ''))) {
@@ -308,8 +319,8 @@ function action_save_assignment(): void
         $teacherId,
         $classId,
         $subjectId,
-        trim((string)$_POST['academic_year']),
-        trim((string)$_POST['semester']),
+        $academicYear,
+        $semester,
         isset($_POST['active']) ? 1 : 0,
         now_string(),
     ];
