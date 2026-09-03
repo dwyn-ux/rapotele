@@ -470,10 +470,16 @@ function action_save_learning_objective(): void
     $className = trim((string)($_POST['grade'] ?? ''));
     $subjectId = (int)($_POST['subject_id'] ?? 0);
     if ($className === '' || !array_key_exists($className, learning_objective_class_options())) {
-        throw new RuntimeException('Kelas tidak valid.');
+        flash('danger', 'Kelas tidak valid.');
+        redirect_to('data-tp');
     }
     if ($subjectId <= 0) {
-        throw new RuntimeException('Mapel tidak valid.');
+        flash('danger', 'Mapel wajib dipilih.');
+        redirect_to('data-tp');
+    }
+    if (!fetch_one('SELECT id FROM subjects WHERE id = ?', [$subjectId])) {
+        flash('danger', 'Mapel tidak ditemukan.');
+        redirect_to('data-tp');
     }
     $classRow = fetch_one('SELECT id FROM classes WHERE name = ? LIMIT 1', [$className]);
     $classId = $classRow ? (int)$classRow['id'] : 0;
@@ -482,7 +488,8 @@ function action_save_learning_objective(): void
         if ($id > 0) {
             $existing = fetch_one('SELECT subject_id FROM learning_objectives WHERE id = ?', [$id]);
             if (!$existing) {
-                throw new RuntimeException('Tujuan pembelajaran tidak ditemukan.');
+                flash('danger', 'Tujuan pembelajaran tidak ditemukan.');
+                redirect_to('data-tp');
             }
             $existingClassName = '';
             $existingRow = fetch_one('SELECT lo.subject_id, c.name AS class_name FROM learning_objectives lo LEFT JOIN classes c ON c.name = lo.grade WHERE lo.id = ?', [$id]);
