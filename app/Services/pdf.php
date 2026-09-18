@@ -1289,11 +1289,15 @@ function draw_report_learning_table_header(SimplePdf $pdf, bool $sma = false): f
     // Column header row: only "No" and "Mata Pelajaran" get the light-blue fill.
     $headerRowHeight = 22.68;
     $pdf->setFont('Helvetica', 10, true);
-    $labelY = $y - ($headerRowHeight / 2) - 3.5;
     foreach (report_learning_table_columns($sma) as $col) {
         $style = $col['fill'] ? 'B' : 'S';
         $pdf->rect($col['x'], $y, $col['w'], -$headerRowHeight, $style, [0.973, 0.973, 1.000]);
-        $pdf->centerText($col['x'], $labelY, $col['w'], $col['label'], 10, true);
+        $headerFontSize = 10.0;
+        while ($headerFontSize > 7.5 && $pdf->stringWidth($col['label'], $headerFontSize, true) > $col['w'] - 4.0) {
+            $headerFontSize -= 0.5;
+        }
+        $labelY = $y - ($headerRowHeight / 2) - ($headerFontSize * 0.35);
+        $pdf->centerText($col['x'], $labelY, $col['w'], $col['label'], $headerFontSize, true);
     }
     return $y - $headerRowHeight;
 }
