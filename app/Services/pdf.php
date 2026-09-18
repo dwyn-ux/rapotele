@@ -47,7 +47,9 @@ final class SimplePdf
         foreach ($this->images as $name => &$image) {
             $imageObject = $next++;
             $image['object'] = $imageObject;
-            $objects[$imageObject] = "<< /Type /XObject /Subtype /Image /Width {$image['width']} /Height {$image['height']} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " . strlen($image['data']) . " >>\nstream\n" . $image['data'] . "\nendstream";
+            $colorSpace = (string)($image['color_space'] ?? '/DeviceRGB');
+            $filter = (string)($image['filter'] ?? '/DCTDecode');
+            $objects[$imageObject] = "<< /Type /XObject /Subtype /Image /Width {$image['width']} /Height {$image['height']} /ColorSpace {$colorSpace} /BitsPerComponent 8 /Filter {$filter} /Length " . strlen($image['data']) . " >>\nstream\n" . $image['data'] . "\nendstream";
             $imageResources .= ' /' . $name . ' ' . $imageObject . ' 0 R';
         }
         unset($image);
@@ -181,6 +183,30 @@ final class SimplePdf
         }
     }
 
+    public function wrappedText(float $x, float $y, float $w, string $text, float $size = 9, ?int $maxLines = null, bool $bold = false, float $lineHeight = 11.34): array
+    {
+        $lines = $this->wrapText($text, $w, $size);
+        if ($maxLines !== null) {
+            $lines = array_slice($lines, 0, $maxLines);
+        }
+        foreach ($lines as $idx => $line) {
+            $this->text($x, $y - ($idx * $lineHeight), $line, $size, $bold);
+        }
+        return $lines;
+    }
+
+    public function centeredWrappedText(float $x, float $y, float $w, string $text, float $size = 9, ?int $maxLines = null, bool $bold = false, float $lineHeight = 11.34): array
+    {
+        $lines = $this->wrapText($text, $w, $size);
+        if ($maxLines !== null) {
+            $lines = array_slice($lines, 0, $maxLines);
+        }
+        foreach ($lines as $idx => $line) {
+            $this->centerText($x, $y - ($idx * $lineHeight), $w, $line, $size, $bold);
+        }
+        return $lines;
+    }
+
     public function line(float $x1, float $y1, float $x2, float $y2): void
     {
         $this->content .= sprintf("%.2F %.2F m %.2F %.2F l S\n", $x1, $y1, $x2, $y2);
@@ -192,6 +218,23 @@ final class SimplePdf
             $this->content .= sprintf("%.3F %.3F %.3F rg\n", $fill[0], $fill[1], $fill[2]);
         }
         $this->content .= sprintf("%.2F %.2F %.2F %.2F re %s\n", $x, $y, $w, $h, $style);
+    }
+
+    public function circle(float $cx, float $cy, float $radius, string $style = 'S', array $fill = [1, 1, 1]): void
+    {
+        $c = $radius * 0.5522847498;
+        if ($style === 'F' || $style === 'B') {
+            $this->content .= sprintf("%.3F %.3F %.3F rg\n", $fill[0], $fill[1], $fill[2]);
+        }
+        $this->content .= sprintf(
+            "%.2F %.2F m %.2F %.2F %.2F %.2F %.2F %.2F c %.2F %.2F %.2F %.2F %.2F %.2F c %.2F %.2F %.2F %.2F %.2F %.2F c %.2F %.2F %.2F %.2F %.2F %.2F c %s\n",
+            $cx + $radius, $cy,
+            $cx + $radius, $cy + $c, $cx + $c, $cy + $radius, $cx, $cy + $radius,
+            $cx - $c, $cy + $radius, $cx - $radius, $cy + $c, $cx - $radius, $cy,
+            $cx - $radius, $cy - $c, $cx - $c, $cy - $radius, $cx, $cy - $radius,
+            $cx + $c, $cy - $radius, $cx + $radius, $cy - $c, $cx + $radius, $cy,
+            $style
+        );
     }
 
     public function image(string $path, float $x, float $topY, float $w, float $h): bool
@@ -239,7 +282,7 @@ final class SimplePdf
 
     private function registerImage(string $path): ?string
     {
-        if (!is_file($path) || !function_exists('imagecreatetruecolor')) {
+        if (!is_file($path)) {
             return null;
         }
 
@@ -252,6 +295,35 @@ final class SimplePdf
 
         $info = @getimagesize($path);
         if (!is_array($info)) {
+            return null;
+        }
+
+        if ((int)($info[2] ?? 0) === IMAGETYPE_JPEG) {
+            $data = (string)@file_get_contents($path);
+            if ($data === '') {
+                return null;
+            }
+            $name = 'Im' . $this->imageSeq++;
+            $channels = (int)($info['channels'] ?? 3);
+            $this->images[$name] = [
+                'path' => $key,
+                'width' => (int)$info[0],
+                'height' => (int)$info[1],
+                'color_space' => $channels === 1 ? '/DeviceGray' : ($channels === 4 ? '/DeviceCMYK' : '/DeviceRGB'),
+                'filter' => '/DCTDecode',
+                'data' => $data,
+            ];
+            return $name;
+        }
+
+        if ((int)($info[2] ?? 0) === IMAGETYPE_PNG) {
+            $name = $this->registerPngDirect($path, $key);
+            if ($name !== null) {
+                return $name;
+            }
+        }
+
+        if (!function_exists('imagecreatetruecolor')) {
             return null;
         }
 
@@ -287,10 +359,159 @@ final class SimplePdf
             'path' => $key,
             'width' => $width,
             'height' => $height,
+            'color_space' => '/DeviceRGB',
+            'filter' => '/DCTDecode',
             'data' => $data,
         ];
 
         return $name;
+    }
+
+    private function registerPngDirect(string $path, string $key): ?string
+    {
+        $png = (string)@file_get_contents($path);
+        if ($png === '' || substr($png, 0, 8) !== "\x89PNG\r\n\x1a\n") {
+            return null;
+        }
+
+        $offset = 8;
+        $idat = '';
+        $palette = '';
+        $transparency = '';
+        $width = 0;
+        $height = 0;
+        $bitDepth = 0;
+        $colorType = -1;
+        $interlace = 0;
+        $length = strlen($png);
+        while ($offset + 12 <= $length) {
+            $chunkLength = unpack('N', substr($png, $offset, 4))[1] ?? 0;
+            $type = substr($png, $offset + 4, 4);
+            $chunk = substr($png, $offset + 8, $chunkLength);
+            if ($type === 'IHDR' && strlen($chunk) >= 13) {
+                $header = unpack('Nwidth/Nheight/Cbit/Ccolor/Ccompression/Cfilter/Cinterlace', $chunk);
+                $width = (int)($header['width'] ?? 0);
+                $height = (int)($header['height'] ?? 0);
+                $bitDepth = (int)($header['bit'] ?? 0);
+                $colorType = (int)($header['color'] ?? -1);
+                $interlace = (int)($header['interlace'] ?? 0);
+            } elseif ($type === 'IDAT') {
+                $idat .= $chunk;
+            } elseif ($type === 'PLTE') {
+                $palette .= $chunk;
+            } elseif ($type === 'tRNS') {
+                $transparency .= $chunk;
+            } elseif ($type === 'IEND') {
+                break;
+            }
+            $offset += 12 + $chunkLength;
+        }
+
+        $channels = match ($colorType) {
+            0, 3 => 1,
+            2 => 3,
+            4 => 2,
+            6 => 4,
+            default => 0,
+        };
+        if ($width < 1 || $height < 1 || $bitDepth !== 8 || $interlace !== 0 || $channels === 0 || $idat === '') {
+            return null;
+        }
+
+        $raw = @gzuncompress($idat);
+        if (!is_string($raw)) {
+            return null;
+        }
+        $rowBytes = $width * $channels;
+        $expected = ($rowBytes + 1) * $height;
+        if (strlen($raw) < $expected) {
+            return null;
+        }
+
+        $pixels = '';
+        $previous = array_fill(0, $rowBytes, 0);
+        $cursor = 0;
+        for ($row = 0; $row < $height; $row++) {
+            $filter = ord($raw[$cursor++]);
+            $scanline = substr($raw, $cursor, $rowBytes);
+            $cursor += $rowBytes;
+            $decoded = [];
+            for ($i = 0; $i < $rowBytes; $i++) {
+                $value = ord($scanline[$i]);
+                $left = $i >= $channels ? $decoded[$i - $channels] : 0;
+                $up = $previous[$i] ?? 0;
+                $upLeft = $i >= $channels ? ($previous[$i - $channels] ?? 0) : 0;
+                $value = match ($filter) {
+                    0 => $value,
+                    1 => ($value + $left) & 0xFF,
+                    2 => ($value + $up) & 0xFF,
+                    3 => ($value + intdiv($left + $up, 2)) & 0xFF,
+                    4 => ($value + self::pngPaeth($left, $up, $upLeft)) & 0xFF,
+                    default => -1,
+                };
+                if ($value < 0) {
+                    return null;
+                }
+                $decoded[$i] = $value;
+            }
+            $previous = $decoded;
+
+            for ($x = 0; $x < $width; $x++) {
+                $base = $x * $channels;
+                if ($colorType === 0) {
+                    $pixels .= chr($decoded[$base]);
+                } elseif ($colorType === 2) {
+                    $pixels .= chr($decoded[$base]) . chr($decoded[$base + 1]) . chr($decoded[$base + 2]);
+                } elseif ($colorType === 3) {
+                    $index = $decoded[$base];
+                    $paletteOffset = $index * 3;
+                    if ($paletteOffset + 2 >= strlen($palette)) {
+                        return null;
+                    }
+                    $alpha = $index < strlen($transparency) ? ord($transparency[$index]) : 255;
+                    for ($channel = 0; $channel < 3; $channel++) {
+                        $component = ord($palette[$paletteOffset + $channel]);
+                        $pixels .= chr((int)round(($component * $alpha + 255 * (255 - $alpha)) / 255));
+                    }
+                } else {
+                    $alphaOffset = $colorType === 4 ? 1 : 3;
+                    $alpha = $decoded[$base + $alphaOffset];
+                    $colorChannels = $colorType === 4 ? 1 : 3;
+                    for ($channel = 0; $channel < $colorChannels; $channel++) {
+                        $component = $decoded[$base + $channel];
+                        $pixels .= chr((int)round(($component * $alpha + 255 * (255 - $alpha)) / 255));
+                    }
+                }
+            }
+        }
+
+        $compressed = gzcompress($pixels, 6);
+        if (!is_string($compressed)) {
+            return null;
+        }
+        $name = 'Im' . $this->imageSeq++;
+        $gray = in_array($colorType, [0, 4], true);
+        $this->images[$name] = [
+            'path' => $key,
+            'width' => $width,
+            'height' => $height,
+            'color_space' => $gray ? '/DeviceGray' : '/DeviceRGB',
+            'filter' => '/FlateDecode',
+            'data' => $compressed,
+        ];
+        return $name;
+    }
+
+    private static function pngPaeth(int $left, int $up, int $upLeft): int
+    {
+        $estimate = $left + $up - $upLeft;
+        $leftDistance = abs($estimate - $left);
+        $upDistance = abs($estimate - $up);
+        $diagonalDistance = abs($estimate - $upLeft);
+        if ($leftDistance <= $upDistance && $leftDistance <= $diagonalDistance) {
+            return $left;
+        }
+        return $upDistance <= $diagonalDistance ? $up : $upLeft;
     }
 }
 
@@ -434,7 +655,16 @@ function report_competency_description(string $subjectName, ?int $score, int $kk
 
 function semester_number(): string
 {
-    return current_semester_number();
+    $semester = strtolower(trim(current_semester()));
+    if ($semester === '2' || str_contains($semester, 'genap')) {
+        return '2';
+    }
+    return '1';
+}
+
+function report_semester_label(): string
+{
+    return semester_number() === '2' ? 'Genap' : 'Ganjil';
 }
 
 function report_student_payload(int $studentId): array
@@ -938,59 +1168,61 @@ function draw_report_identity(SimplePdf $pdf, array $payload, int $pageNo): void
     $school = $payload['school'];
     $class = $student['class_name'] ?: '-';
 
-    $pdf->setFont('Helvetica', 10);
-    $pdf->text(59.53, 775.11, 'Nama Murid');
-    $pdf->text(161.58, 775.11, ':');
-    $pdf->text(170.08, 775.11, (string)$student['name']);
-    $pdf->text(391.18, 775.11, 'Kelas');
-    $pdf->text(476.22, 775.11, ':');
-    $pdf->text(484.72, 775.11, $class);
+    $leftLabelX = 56.69;
+    $leftColonX = 163.00;
+    $leftValueX = 172.00;
+    $rightLabelX = 389.00;
+    $rightColonX = 476.00;
+    $rightValueX = 485.00;
+    $rows = [789.00, 773.50, 758.00, 742.50];
+    $phase = class_phase((string)($student['grade'] ?? ''), (string)($student['class_level'] ?? $school['level'] ?? ''));
 
-    $pdf->text(59.53, 760.94, 'NIS/NISN');
-    $pdf->text(161.58, 760.94, ':');
-    $pdf->text(170.08, 760.94, trim(($student['nis'] ?: '-') . ' / ' . ($student['nisn'] ?: '-')));
-    $pdf->text(391.18, 760.94, 'Semester');
-    $pdf->text(476.22, 760.94, ':');
-    $pdf->text(484.72, 760.94, semester_number());
-
-    $pdf->text(59.53, 746.76, 'Sekolah');
-    $pdf->text(161.58, 746.76, ':');
-    $schoolNameWidth = 391.18 - 170.08 - 10.0; // ruang sebelum label "Tahun Ajaran"
-
-// stringWidth() meremehkan lebar huruf KAPITAL (~0.52/char vs realita ~0.70/char
-// untuk Helvetica all-caps). Nama sekolah selalu huruf besar, jadi pakai font
-// size "fiktif" 14pt khusus untuk HITUNG titik wrap-nya saja (bukan buat render) —
-// ini bikin estimasi lebar (14 * 0.52 ≈ 7.28/char) mendekati lebar asli huruf kapital.
-    $schoolNameLines = array_slice($pdf->wrapText((string)$school['name'], $schoolNameWidth, 14), 0, 2);
-    $pdf->text(170.08, 746.76, $schoolNameLines[0] ?? '', 10);
-    if (isset($schoolNameLines[1])) {
-    $pdf->text(170.08, 746.76 - 11.34, $schoolNameLines[1], 10);
+    $pdf->setFont('Helvetica', 9.5);
+    $leftFields = [
+        ['Nama Sekolah', (string)$school['name']],
+        ['Alamat', (string)($school['address'] ?? '-')],
+        ['Nama Peserta Didik', (string)$student['name']],
+        ['Nomor Induk / NISN', trim(($student['nis'] ?: '-') . ' / ' . ($student['nisn'] ?: '-'))],
+    ];
+    foreach ($leftFields as $idx => [$label, $value]) {
+        $pdf->text($leftLabelX, $rows[$idx], $label, 9.5);
+        $pdf->text($leftColonX, $rows[$idx], ':', 9.5);
+        $pdf->text($leftValueX, $rows[$idx], $value, 9.5);
     }
-    $pdf->text(391.18, 746.76, 'Tahun Ajaran');
-    $pdf->text(476.22, 746.76, ':');
-    $pdf->text(484.72, 746.76, (string)$school['academic_year']);
-    $pdf->line(56.69, 722.83, 538.58, 722.83);
+
+    $rightFields = [
+        ['Kelas', $class . ($phase !== '' ? ' / Fase ' . $phase : '')],
+        ['Semester', semester_number() . ' / ' . report_semester_label()],
+        ['Tahun Pelajaran', (string)$school['academic_year']],
+    ];
+    foreach ($rightFields as $idx => [$label, $value]) {
+        $pdf->text($rightLabelX, $rows[$idx], $label, 9.5);
+        $pdf->text($rightColonX, $rows[$idx], ':', 9.5);
+        $pdf->text($rightValueX, $rows[$idx], $value, 9.5);
+    }
+    $pdf->line(56.69, 724.00, 538.58, 724.00);
 
     $pdf->line(56.69, 36.85, 538.58, 36.85);
-    $pdf->italicText(59.53, 20.43, $class . '  | ' . $student['name'] . ' | ' . $student['nis'], 7.5);
+    $pdf->italicText(59.53, 20.43, $class . ' / ' . $student['name'] . ' / ' . ($student['nis'] ?: '-'), 7.5);
     $pdf->italicText(489.08, 20.43, 'Halaman : ' . $pageNo, 7.5);
 }
 
 function draw_report_asset_badge(SimplePdf $pdf, float $x, float $topY, float $w, float $h, string $label, string $filePath = ''): void
 {
-    $pdf->rect($x, $topY, $w, -$h, 'B', [1.000, 1.000, 1.000]);
     $assetPath = report_asset_path($filePath);
-    if ($assetPath !== '' && $pdf->image($assetPath, $x + 2.00, $topY - 2.00, max(1, $w - 4.00), max(1, $h - 4.00))) {
+    if ($assetPath !== '' && $pdf->image($assetPath, $x, $topY, $w, $h)) {
         return;
     }
 
-    $pdf->rect($x, $topY, $w, -$h, 'B', [0.949, 0.973, 1.000]);
-    $pdf->setFont('Helvetica', 6.5, true);
-    $pdf->centerText($x, $topY - ($h / 2) - 2.5, $w, $label, 6.5, true);
-    if ($filePath !== '') {
-        $pdf->setFont('Helvetica', 4.5);
-        $pdf->centerText($x, $topY - $h + 4.5, $w, 'data', 4.5);
-    }
+    $radius = max(8.0, (min($w, $h) / 2) - 1.5);
+    $cx = $x + ($w / 2);
+    $cy = $topY - ($h / 2);
+    $pdf->circle($cx, $cy, $radius, 'B', [0.965, 0.973, 0.984]);
+    $pdf->circle($cx, $cy, max(5.0, $radius - 5.0), 'S');
+    $mark = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $label), 0, 3));
+    $mark = $mark !== '' ? $mark : 'ER';
+    $fontSize = min(12.0, max(7.0, $radius * 0.42));
+    $pdf->centerText($x, $cy - ($fontSize * 0.32), $w, $mark, $fontSize, true);
 }
 
 function report_student_initials(string $name): string
@@ -1047,7 +1279,11 @@ function draw_report_learning_table_header(SimplePdf $pdf, bool $sma = false): f
     // Title band: plain text, no fill and no border.
     $pdf->setFont('Helvetica', 12, true);
     $title = $sma ? 'B. PENGETAHUAN' : 'LAPORAN HASIL BELAJAR';
-    $pdf->centerText(56.69, $y - 11.50, 481.89, $title, 12, true);
+    if ($sma) {
+        $pdf->text(56.69, $y - 11.50, $title, 12, true);
+    } else {
+        $pdf->centerText(56.69, $y - 11.50, 481.89, $title, 12, true);
+    }
     $y -= $titleHeight;
 
     // Column header row: only "No" and "Mata Pelajaran" get the light-blue fill.
@@ -1072,7 +1308,9 @@ function draw_report_page_one(SimplePdf $pdf, array $payload, bool $sma = false)
     $pageBottomLimit = 70.0;
     $currentGroup = '';
     $no = 1;
-    foreach ($payload['subjects'] as $subject) {
+    $subjects = array_values($payload['subjects']);
+    $subjectCount = count($subjects);
+    foreach ($subjects as $subjectIndex => $subject) {
         $group = $subject['group_name'] ?: 'Kelompok A';
         $description = trim((string)($subject['description'] ?? ''));
         if ($description === '') {
@@ -1080,14 +1318,14 @@ function draw_report_page_one(SimplePdf $pdf, array $payload, bool $sma = false)
         }
         $cols = report_learning_table_columns($sma);
         $capaianTextWidth = $cols['capaian']['w'] - 10.78;
-        $capaianLines = min(4, count($pdf->wrapText($description, $capaianTextWidth, 9)));
-        $mapelLines = min(2, count($pdf->wrapText((string)$subject['name'], $cols['mapel']['w'] - 11.34, 9)));
-        $height = 28.35 + ($capaianLines - 1) * 11.34;
-        if ($mapelLines > 1) {
-            $height = max($height, 28.35 + 11.34);
-        }
+        $capaianLines = max(1, count($pdf->wrapText($description, $capaianTextWidth, 9)));
+        $mapelLines = max(1, count($pdf->wrapText((string)$subject['name'], $cols['mapel']['w'] - 11.34, 9)));
+        $height = max(31.18, 12.00 + (max($capaianLines, $mapelLines) * 11.34));
         $needsGroupHeader = $group !== $currentGroup;
         $neededHeight = $height + ($needsGroupHeader ? 17.01 : 0);
+        if ($sma && $subjectIndex === $subjectCount - 1) {
+            $neededHeight += 62.00;
+        }
         if ($y - $neededHeight < $pageBottomLimit) {
             $pageNo++;
             $pdf->addPage();
@@ -1108,12 +1346,9 @@ function draw_report_page_one(SimplePdf $pdf, array $payload, bool $sma = false)
         $pdf->centerText($cols['no']['x'], $y - ($height / 2) - 3, $cols['no']['w'], (string)$no, 9);
         $pdf->rect($cols['mapel']['x'], $y, $cols['mapel']['w'], -$height, 'S');
         $mapelLines = $pdf->wrapText((string)$subject['name'], $cols['mapel']['w'] - 11.34, 9);
-        $mapelLines = array_slice($mapelLines, 0, 2);
         $mapelLineCount = count($mapelLines);
-        $mapelStartY = $y - ($height / 2) - 3;
-        if ($mapelLineCount === 2) {
-            $mapelStartY = $y - ($height / 2) + 2;
-        }
+        $mapelBlockHeight = ($mapelLineCount - 1) * 11.34;
+        $mapelStartY = $y - (($height - $mapelBlockHeight) / 2) - 3.00;
         foreach ($mapelLines as $mlIdx => $ml) {
             $pdf->text($cols['mapel']['x'] + 5.67, $mapelStartY - ($mlIdx * 11.34), $ml, 9);
         }
@@ -1131,13 +1366,13 @@ function draw_report_page_one(SimplePdf $pdf, array $payload, bool $sma = false)
             $pdf->centerText($cols['predikat']['x'], $y - ($height / 2) - 3, $cols['predikat']['w'], $predikat, 9, true);
         }
         $pdf->rect($cols['capaian']['x'], $y, $cols['capaian']['w'], -$height, 'S');
-        $pdf->justifyTextClamped($cols['capaian']['x'] + 5.67, $y - 11.55, $capaianTextWidth, $description, 9, 4);
+        $pdf->wrappedText($cols['capaian']['x'] + 5.67, $y - 11.55, $capaianTextWidth, $description, 9);
         $y -= $height;
         $no++;
     }
 
     if ($sma) {
-        $intervalH = 73.00;
+        $intervalH = 58.00;
         if ($y - $intervalH < $pageBottomLimit) {
             $pageNo++;
             $pdf->addPage();
@@ -1159,35 +1394,40 @@ function draw_sma_predicate_interval(SimplePdf $pdf, int $kkm, float $topY): voi
     $pdf->setFont('Helvetica', 9, true);
     $pdf->text(56.69, $topY, 'Tabel Interval predikat berdasarkan KKM', 9, true);
     $y = $topY - 12.00;
-    $col1X = 56.69;
-    $col1W = 70.00;
-    $col2X = $col1X + $col1W;
-    $col2W = 170.00;
-    $rowH = 14.17;
-    $pdf->rect($col1X, $y, $col1W, -$rowH, 'B', [0.973, 0.973, 1.000]);
-    $pdf->rect($col2X, $y, $col2W, -$rowH, 'B', [0.973, 0.973, 1.000]);
-    $pdf->centerText($col1X, $y - 9.70, $col1W, 'KKM', 8.5, true);
-    $pdf->centerText($col2X, $y - 9.70, $col2W, 'Predikat', 8.5, true);
-    $y -= $rowH;
-
     $cUpper = min(80, $kkm + 5);
     if ($cUpper < $kkm) {
         $cUpper = $kkm;
     }
-    $bLower = max(81, $cUpper + 1);
-    $rows = [
-        ['< ' . $kkm, 'D = Kurang'],
-        [$kkm . ' - ' . $cUpper, 'C = Cukup'],
-        [$bLower <= 89 ? $bLower . ' - 89' : '-', 'B = Baik'],
-        ['90 - 100', 'A = Sangat Baik'],
+    $bLower = $cUpper + 1;
+    $predicates = [
+        ['D = Kurang', '< ' . $kkm],
+        ['C = Cukup', $kkm . ' - ' . $cUpper],
+        ['B = Baik', $bLower <= 89 ? $bLower . ' - 89' : '-'],
+        ['A = Sangat Baik', '90 - 100'],
     ];
-    $pdf->setFont('Helvetica', 8.5);
-    foreach ($rows as [$range, $label]) {
-        $pdf->rect($col1X, $y, $col1W, -$rowH, 'S');
-        $pdf->centerText($col1X, $y - 9.70, $col1W, $range, 8.5);
-        $pdf->rect($col2X, $y, $col2W, -$rowH, 'S');
-        $pdf->text($col2X + 5.00, $y - 9.70, $label, 8.5);
-        $y -= $rowH;
+
+    $tableW = 481.89;
+    $kkmW = 80.00;
+    $predW = ($tableW - $kkmW) / 4;
+    $rowH = 14.00;
+    $pdf->rect(56.69, $y, $kkmW, -($rowH * 2), 'B', [0.973, 0.973, 1.000]);
+    $pdf->centerText(56.69, $y - 17.00, $kkmW, 'KKM', 8.5, true);
+    $pdf->rect(56.69 + $kkmW, $y, $tableW - $kkmW, -$rowH, 'B', [0.973, 0.973, 1.000]);
+    $pdf->centerText(56.69 + $kkmW, $y - 9.70, $tableW - $kkmW, 'Predikat', 8.5, true);
+
+    foreach ($predicates as $idx => [$label]) {
+        $x = 56.69 + $kkmW + ($idx * $predW);
+        $pdf->rect($x, $y - $rowH, $predW, -$rowH, 'S');
+        $pdf->centerText($x, $y - $rowH - 9.70, $predW, $label, 8, false);
+    }
+
+    $valueY = $y - ($rowH * 2);
+    $pdf->rect(56.69, $valueY, $kkmW, -$rowH, 'S');
+    $pdf->centerText(56.69, $valueY - 9.70, $kkmW, (string)$kkm, 8.5);
+    foreach ($predicates as $idx => [, $range]) {
+        $x = 56.69 + $kkmW + ($idx * $predW);
+        $pdf->rect($x, $valueY, $predW, -$rowH, 'S');
+        $pdf->centerText($x, $valueY - 9.70, $predW, $range, 8.5);
     }
 }
 
@@ -1201,7 +1441,7 @@ function draw_kokurikuler_section(SimplePdf $pdf, array $payload, float $topY = 
     $pdf->rect(56.69, $topY, 481.89, -$headerHeight, 'B', [0.973, 0.973, 1.000]);
     $pdf->centerText(56.69, $topY - 14.34, 481.89, 'Kokurikuler', 10, true);
     $pdf->setFont('Helvetica', 9);
-    $pdf->justifyTextClamped(62.36, $topY - 33.88, 460.00, $text, 9, 5);
+    $pdf->wrappedText(62.36, $topY - 33.88, 460.00, $text, 9, 5);
     $pdf->rect(56.69, $bodyTop, 481.89, -$bodyHeight, 'S');
 
     return $bodyTop - $bodyHeight;
@@ -1271,10 +1511,10 @@ function draw_attendance_note_section(SimplePdf $pdf, array $payload, float $top
         $pdf->rect(56.69, $y, 90.71, -$rowHeight, 'S');
         $pdf->text(59.53, $y - 12.62, $label, 9);
         $pdf->rect(147.40, $y, 59.53, -$rowHeight, 'S');
-        $pdf->text(150.24, $y - 12.62, ' : ' . ($count ?: '') . ' hari', 9);
+        $pdf->text(150.24, $y - 12.62, ': ' . (int)$count . ' hari', 9);
     }
     $pdf->rect(221.10, $noteTop, 317.48, -59.53, 'S');
-    $pdf->justifyTextClamped(226.77, $noteTop - 12.62, 300.00, (string)($payload['homeroom_note'] ?? ''), 9, 4);
+    $pdf->wrappedText(226.77, $noteTop - 12.62, 300.00, (string)($payload['homeroom_note'] ?? ''), 9, 4);
     $pdf->setFont('Helvetica', 10, true);
     $pdf->rect(56.69, $parentHeaderTop, 481.89, -$headerHeight, 'B', [0.973, 0.973, 1.000]);
     $pdf->centerText(56.69, $parentHeaderTop - 14.34, 481.89, 'Tanggapan Orang Tua/Wali Murid', 10, true);
@@ -1334,21 +1574,26 @@ function draw_report_page_two(SimplePdf $pdf, array $payload, int $pageNo = 2, b
     $pdf->centerText(56.69, $promotionTop - 17.18, 481.89, $statusLabel . '  :  ' . $status . $nextGrade, 10, true);
 
     $sigTop = $promotionTop - 28.35 - $gap;
+    $sigColumns = [
+        ['x' => 56.69, 'w' => 145.00],
+        ['x' => 225.14, 'w' => 145.00],
+        ['x' => 393.58, 'w' => 145.00],
+    ];
     $pdf->setFont('Helvetica', 10);
-    $pdf->text(390.11, $sigTop, $dateText, 10);
-    $pdf->text(81.30, $sigTop - 11.34, 'Orang Tua Murid,', 10);
-    $pdf->text(237.51, $sigTop - 11.34, 'Kepala Sekolah,', 10);
-    $pdf->text(427.49, $sigTop - 11.34, ' Wali Kelas', 10);
+    $pdf->centerText($sigColumns[2]['x'], $sigTop, $sigColumns[2]['w'], $dateText, 9.5);
+    $pdf->centerText($sigColumns[0]['x'], $sigTop - 14.00, $sigColumns[0]['w'], 'Orang Tua/Wali,', 10);
+    $pdf->centerText($sigColumns[1]['x'], $sigTop - 14.00, $sigColumns[1]['w'], 'Kepala Sekolah,', 10);
+    $pdf->centerText($sigColumns[2]['x'], $sigTop - 14.00, $sigColumns[2]['w'], 'Wali Kelas,', 10);
     if ($showSignature) {
-        draw_report_signature_marker($pdf, 230.00, $sigTop - 32.34, 'TTD Digital', (string)($principalSignature['file_path'] ?? ''));
-        draw_report_signature_marker($pdf, 418.00, $sigTop - 32.34, 'TTD Digital', (string)($homeroomSignature['file_path'] ?? ''));
+        draw_report_signature_marker($pdf, $sigColumns[1]['x'] + 31.50, $sigTop - 25.00, 'TTD Digital', (string)($principalSignature['file_path'] ?? ''));
+        draw_report_signature_marker($pdf, $sigColumns[2]['x'] + 31.50, $sigTop - 25.00, 'TTD Digital', (string)($homeroomSignature['file_path'] ?? ''));
     }
-    $pdf->text(80.43, $sigTop - 73.73, '............................', 10);
-    $pdf->text(234.28, $sigTop - 73.73, $principalName, 10, true);
-    $pdf->text(419.02, $sigTop - 73.73, $homeroomName, 10, true);
-    $pdf->setFont('Helvetica', 10);
-    $pdf->text(211.80, $sigTop - 85.07, 'NIP. ' . $principalNip, 10);
-    $pdf->text(410.67, $sigTop - 85.07, 'NIP. ' . $homeroomNip, 10);
+    $nameY = $sigTop - 76.00;
+    $pdf->centerText($sigColumns[0]['x'], $nameY, $sigColumns[0]['w'], '............................', 10);
+    $pdf->centeredWrappedText($sigColumns[1]['x'], $nameY, $sigColumns[1]['w'], $principalName, 9, 2, true, 10.50);
+    $pdf->centeredWrappedText($sigColumns[2]['x'], $nameY, $sigColumns[2]['w'], $homeroomName, 9, 2, true, 10.50);
+    $pdf->centerText($sigColumns[1]['x'], $nameY - 24.00, $sigColumns[1]['w'], 'NIP. ' . ($principalNip ?: '-'), 8.5);
+    $pdf->centerText($sigColumns[2]['x'], $nameY - 24.00, $sigColumns[2]['w'], 'NIP. ' . ($homeroomNip ?: '-'), 8.5);
 }
 
 function draw_report_signature_marker(SimplePdf $pdf, float $x, float $topY, string $label, string $filePath = ''): void
@@ -1749,83 +1994,57 @@ function generate_student_biodata_pdf(int $studentId): string
     // ==========================================
     $pdf->addPage();
 
-    // Dua logo: Dinas/Kementerian dan logo sekolah.
-    // Ditampilkan sejajar agar sampul lebih rapi.
-    $coverLogoW = 62.00;
-    $coverLogoH = 62.00;
-    $coverLogoTopY = 760.00;
-    $leftLogoX = $centerX - 150.00;
-    $rightLogoX = $centerX + 88.00;
+    $agencyLogoSize = 82.00;
+    draw_report_asset_badge($pdf, $centerX - ($agencyLogoSize / 2), 790.00, $agencyLogoSize, $agencyLogoSize, 'KDM', (string)($agencyLogo['file_path'] ?? ''));
 
-    if ($agencyLogo && ($assetPath = report_asset_path((string)($agencyLogo['file_path'] ?? ''))) !== '') {
-        $pdf->image($assetPath, $leftLogoX, $coverLogoTopY, $coverLogoW, $coverLogoH);
-    } else {
-        $pdf->rect($leftLogoX, $coverLogoTopY, $coverLogoW, -$coverLogoH, 'S');
-        $pdf->centerText($leftLogoX, $coverLogoTopY - 33.00, $coverLogoW, 'DINAS', 8, true);
-    }
-
-    if ($schoolLogo && ($assetPath = report_asset_path((string)($schoolLogo['file_path'] ?? ''))) !== '') {
-        $pdf->image($assetPath, $rightLogoX, $coverLogoTopY, $coverLogoW, $coverLogoH);
-    } else {
-        $pdf->rect($rightLogoX, $coverLogoTopY, $coverLogoW, -$coverLogoH, 'S');
-        $pdf->centerText($rightLogoX, $coverLogoTopY - 33.00, $coverLogoW, 'SEKOLAH', 8, true);
-    }
-
-    // Judul mengikuti jenjang yang tersimpan di database.
     $pdf->setFont('Helvetica', 16, true);
-    $pdf->centerText($marginLeft, $coverLogoTopY - $coverLogoH - 38.00, $contentWidth, $schoolLevelTitle, 16, true);
+    $pdf->centerText($marginLeft, 664.00, $contentWidth, $schoolLevelTitle, 16, true);
     if ($schoolLevelAbbr !== '') {
-        $pdf->centerText($marginLeft, $coverLogoTopY - $coverLogoH - 58.00, $contentWidth, '( ' . $schoolLevelAbbr . ' )', 16, true);
+        $pdf->centerText($marginLeft, 640.00, $contentWidth, '( ' . $schoolLevelAbbr . ' )', 16, true);
     }
 
-    // Nama sekolah juga ditampilkan dari database.
-    $pdf->setFont('Helvetica', 14, true);
-    $pdf->centerText($marginLeft, $coverLogoTopY - $coverLogoH - 86.00, $contentWidth, $schoolName, 14, true);
+    $schoolLogoSize = 96.00;
+    draw_report_asset_badge($pdf, $centerX - ($schoolLogoSize / 2), 605.00, $schoolLogoSize, $schoolLogoSize, report_student_initials($schoolName), (string)($schoolLogo['file_path'] ?? ''));
+    $pdf->setFont('Helvetica', 13, true);
+    $pdf->centeredWrappedText($marginLeft + 25.00, 480.00, $contentWidth - 50.00, $schoolName, 13, 2, true, 15.00);
 
     $major = trim((string)($student['class_major'] ?? ''));
     if (in_array($schoolLevelCode, ['SMA', 'MA'], true) && $major !== '') {
-        $pdf->setFont('Helvetica', 12, true);
-        $pdf->centerText($marginLeft, $coverLogoTopY - $coverLogoH - 108.00, $contentWidth, 'Program: ' . $major, 12, true);
-        $boxTopY = $coverLogoTopY - $coverLogoH - 148.00;
-    } else {
-        $boxTopY = $coverLogoTopY - $coverLogoH - 125.00;
+        $pdf->centerText($marginLeft, 445.00, $contentWidth, 'Program/Jurusan: ' . $major, 11, true);
     }
+    $boxTopY = 402.00;
     $pdf->setFont('Helvetica', 12, true);
     $pdf->centerText($marginLeft, $boxTopY, $contentWidth, 'Nama Peserta Didik', 12, true);
-    $pdf->rect($centerX - 150.00, $boxTopY - 15.00, 300.00, -30.00, 'S');
-    $pdf->centerText($centerX - 150.00, $boxTopY - 35.00, 300.00, strtoupper((string)$student['name']), 12, true);
+    $pdf->rect($centerX - 160.00, $boxTopY - 15.00, 320.00, -31.00, 'S');
+    $pdf->centerText($centerX - 160.00, $boxTopY - 36.00, 320.00, strtoupper((string)$student['name']), 12, true);
 
-    // Box NISN / NIS
-    $box2TopY = $boxTopY - 70.00;
+    $box2TopY = 320.00;
     $pdf->centerText($marginLeft, $box2TopY, $contentWidth, 'NISN / NIS', 12, true);
-    $pdf->rect($centerX - 150.00, $box2TopY - 15.00, 300.00, -30.00, 'S');
+    $pdf->rect($centerX - 160.00, $box2TopY - 15.00, 320.00, -31.00, 'S');
     $nisnNis = trim((string)($student['nisn'] ?: '-')) . ' / ' . trim((string)($student['nis'] ?: '-'));
-    $pdf->centerText($centerX - 150.00, $box2TopY - 35.00, 300.00, $nisnNis, 12, true);
+    $pdf->centerText($centerX - 160.00, $box2TopY - 36.00, 320.00, $nisnNis, 12, true);
 
-    // Footer
     $pdf->setFont('Helvetica', 14, true);
-    $pdf->centerText($marginLeft, 100.00, $contentWidth, 'KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH', 14, true);
-    $pdf->centerText($marginLeft, 80.00, $contentWidth, 'REPUBLIK INDONESIA', 14, true);
+    $pdf->centerText($marginLeft, 110.00, $contentWidth, 'KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH', 14, true);
+    $pdf->centerText($marginLeft, 86.00, $contentWidth, 'REPUBLIK INDONESIA', 14, true);
 
 
     // ==========================================
-    // HALAMAN 2: IDENTITAS SEKOLAH & PESERTA DIDIK
+    // HALAMAN 2: IDENTITAS SEKOLAH
     // ==========================================
     $pdf->addPage();
 
-    $y = 780.00;
-    $pdf->setFont('Helvetica', 12, true);
-    $pdf->centerText($marginLeft, $y, $contentWidth, $schoolLevelTitle, 12, true);
+    $y = 790.00;
+    $pdf->setFont('Helvetica', 14, true);
+    $pdf->centerText($marginLeft, $y, $contentWidth, $schoolLevelTitle, 14, true);
     if ($schoolLevelAbbr !== '') {
-        $pdf->centerText($marginLeft, $y - 15.00, $contentWidth, '( ' . $schoolLevelAbbr . ' )', 12, true);
-        $y -= 36.00;
+        $pdf->centerText($marginLeft, $y - 20.00, $contentWidth, '( ' . $schoolLevelAbbr . ' )', 13, true);
+        $y -= 65.00;
     } else {
-        $y -= 24.00;
+        $y -= 45.00;
     }
 
-    // Profil sekolah: seluruh nilai berasal dari school_profile/database.
-    // Spasi antarbaris dipadatkan agar halaman lebih seimbang.
-    $pdf->setFont('Helvetica', 12);
+    $pdf->setFont('Helvetica', 11);
     $schoolFields = [
         'Nama Sekolah' => $schoolName,
         'NPSN' => $schoolNpsn,
@@ -1838,79 +2057,76 @@ function generate_student_biodata_pdf(int $studentId): string
         'Website' => $schoolWebsite,
         'E-mail' => $schoolEmail,
     ];
-    $fieldW = 120.00;
-    $schoolRowH = 12.20;
+    $profileLeft = 90.00;
+    $fieldW = 135.00;
+    $schoolRowH = 25.00;
     foreach ($schoolFields as $label => $value) {
-        $pdf->text($marginLeft, $y, $label, 9.5);
-        $pdf->text($marginLeft + $fieldW, $y, ': ' . $value, 9.5);
+        $pdf->text($profileLeft, $y, $label, 11);
+        $pdf->text($profileLeft + $fieldW - 10.00, $y, ':', 11);
+        $pdf->text($profileLeft + $fieldW, $y, $value, 11);
         $y -= $schoolRowH;
     }
 
     $pdf->addPage();
 
-    $y -= 10.00;
+    // HALAMAN 3: IDENTITAS PESERTA DIDIK
+    $y = 780.00;
     $pdf->setFont('Helvetica', 12, true);
     $pdf->centerText($marginLeft, $y, $contentWidth, 'IDENTITAS PESERTA DIDIK', 12, true);
     $y -= 22.00;
 
     $pdf->setFont('Helvetica', 9.5);
-    $numX = $marginLeft;
-    $labelX = $marginLeft + 15.00;
-    $valX = $marginLeft + 170.00;
-
+    $numX = 75.00;
+    $labelX = 99.00;
+    $valX = 315.00;
     $studentFields = [
-        ['Nama Lengkap Peserta Didik', strtoupper((string)$student['name'])],
-        ['Nomor Induk/NISN', $nisnNis],
-        ['Tempat, Tanggal Lahir', trim(($student['birth_place'] ?: '-') . ', ' . ($student['birth_date'] ? format_indonesian_date((string)$student['birth_date']) : '-'), ', ')],
-        ['Jenis Kelamin', (string)($student['gender'] === 'L' ? 'Laki-Laki' : ($student['gender'] === 'P' ? 'Perempuan' : '-'))],
-        ['Agama', (string)($student['religion'] ?: '-')],
-        ['Status dalam Keluarga', 'Anak Kandung'],
-        ['Anak ke', ''],
-        ['Alamat Peserta Didik', (string)($student['address'] ?: '-')],
-        ['Nomor Telepon Rumah', (string)($student['phone'] ?: '-')],
-        ['Sekolah Asal', ''],
-        ['Diterima di sekolah ini', ''],
-        ['Di kelas', (string)($student['class_name'] ?: '-')],
-        ['Fase', class_phase((string)($student['grade'] ?? ''), $schoolLevelCode)],
-        ...(in_array($schoolLevelCode, ['SMA', 'MA'], true) && $major !== '' ? [['Program/Jurusan', $major]] : []),
-        ['Pada tanggal', ''],
-        ['Nama Orang Tua', ''],
-        ['  a. Ayah', (string)($student['father_name'] ?: '-')],
-        ['  b. Ibu', (string)($student['mother_name'] ?: '-')],
-        ['Alamat Orang Tua', (string)($student['address'] ?: '-')],
-        ['Nomor Telepon Rumah', (string)($student['phone'] ?: '-')],
-        ['Pekerjaan Orang Tua', ''],
-        ['  a. Ayah', (string)($student['father_occupation'] ?: '-')],
-        ['  b. Ibu', (string)($student['mother_occupation'] ?: '-')],
-        ['Nama Wali Siswa', (string)($student['guardian_name'] ?: '-')],
-        ['Alamat Wali Peserta Didik', '-'],
-        ['Nomor Telepon Rumah', '-'],
-        ['Pekerjaan Wali Peserta Didik', '-'],
+        ['1', 'Nama Lengkap Peserta Didik', strtoupper((string)$student['name']), false],
+        ['2', 'Nomor Induk/NISN', $nisnNis, false],
+        ['3', 'Tempat, Tanggal Lahir', trim(($student['birth_place'] ?: '-') . ', ' . ($student['birth_date'] ? format_indonesian_date((string)$student['birth_date']) : '-'), ', '), false],
+        ['4', 'Jenis Kelamin', (string)($student['gender'] === 'L' ? 'Laki-Laki' : ($student['gender'] === 'P' ? 'Perempuan' : '-')), false],
+        ['5', 'Agama', (string)($student['religion'] ?: '-'), false],
+        ['6', 'Status dalam Keluarga', 'Anak Kandung', false],
+        ['7', 'Anak ke', '-', false],
+        ['8', 'Alamat Peserta Didik', (string)($student['address'] ?: '-'), false],
+        ['9', 'Nomor Telepon Rumah', (string)($student['phone'] ?: '-'), false],
+        ['10', 'Sekolah Asal', '-', false],
+        ['11', 'Diterima di sekolah ini', '', false],
+        [null, 'Di kelas', (string)($student['class_name'] ?: '-'), true],
+        [null, 'Fase', class_phase((string)($student['grade'] ?? ''), $schoolLevelCode), true],
+        ...(in_array($schoolLevelCode, ['SMA', 'MA'], true) && $major !== '' ? [[null, 'Program/Jurusan', $major, true]] : []),
+        [null, 'Pada tanggal', '-', true],
+        ['12', 'Nama Orang Tua', '', false],
+        [null, 'a. Ayah', (string)($student['father_name'] ?: '-'), true],
+        [null, 'b. Ibu', (string)($student['mother_name'] ?: '-'), true],
+        ['13', 'Alamat Orang Tua', (string)($student['address'] ?: '-'), false],
+        [null, 'Nomor Telepon Rumah', (string)($student['phone'] ?: '-'), true],
+        ['14', 'Pekerjaan Orang Tua', '', false],
+        [null, 'a. Ayah', (string)($student['father_occupation'] ?: '-'), true],
+        [null, 'b. Ibu', (string)($student['mother_occupation'] ?: '-'), true],
+        ['15', 'Nama Wali Siswa', (string)($student['guardian_name'] ?: '-'), false],
+        ['16', 'Alamat Wali Peserta Didik', '-', false],
+        [null, 'Nomor Telepon Rumah', '-', true],
+        ['17', 'Pekerjaan Wali Peserta Didik', '-', false],
     ];
 
-    $no = 1;
-    $studentRowH = 12.35;
-    foreach ($studentFields as $idx => [$label, $val]) {
-        if (
-            !str_starts_with($label, '  ')
-            && !in_array($label, ['Di kelas', 'Fase', 'Program/Jurusan', 'Pada tanggal'], true)
-        ) {
-            $pdf->text($numX, $y, $no . '.', 9.5);
-            $no++;
+    $studentRowH = in_array($schoolLevelCode, ['SMA', 'MA'], true) && $major !== '' ? 13.20 : 13.70;
+    foreach ($studentFields as [$number, $label, $val, $nested]) {
+        if ($number !== null) {
+            $pdf->text($numX, $y, $number . '.', 9.5);
         }
-        $pdf->text($labelX, $y, $label, 9.5);
+        $pdf->text($labelX + ($nested ? 14.00 : 0.00), $y, $label, 9.5);
+        $pdf->text($valX - 10.00, $y, ':', 9.5);
         if ($val !== '') {
-            $pdf->text($valX, $y, ': ' . $val, 9.5);
+            $pdf->text($valX, $y, $val, 9.5);
         }
         $y -= $studentRowH;
     }
 
-    $y -= 8.00;
+    $y -= 10.00;
 
-    // Foto 3x4 digeser ke kanan agar dekat dengan TTD Kepala Sekolah.
     $photoW = 85.04;
     $photoH = 113.39;
-    $photoX = 285.00;
+    $photoX = 245.00;
     if ($photo && ($photoPath = report_asset_path((string)($photo['file_path'] ?? ''))) !== '') {
         $pdf->image($photoPath, $photoX, $y, $photoW, $photoH);
     } else {
@@ -1919,23 +2135,23 @@ function generate_student_biodata_pdf(int $studentId): string
         $pdf->centerText($photoX, $y - ($photoH / 2) - 3, $photoW, 'Pas Foto 3x4', 8);
     }
 
-    // TTD Kepala Sekolah ditempatkan tepat di sebelah kanan foto.
-    $sigX = 390.00;
+    $sigX = 375.00;
+    $sigW = 160.00;
     $pdf->setFont('Helvetica', 10);
-    $pdf->text($sigX, $y - 10.00, '................, ....................', 10);
-    $pdf->text($sigX, $y - 25.00, 'Kepala Sekolah,', 10);
+    $pdf->centerText($sigX, $y - 10.00, $sigW, '................, ....................', 9.5);
+    $pdf->centerText($sigX, $y - 25.00, $sigW, 'Kepala Sekolah,', 10);
     
     if (($_GET['isittd'] ?? 'tanpa') === 'dengan') {
         $principalSignature = report_signature_by_type('ttd_kepsek');
-        draw_report_signature_marker($pdf, $sigX, $y - 35.00, 'TTD Digital', (string)($principalSignature['file_path'] ?? ''));
+        draw_report_signature_marker($pdf, $sigX + 39.00, $y - 35.00, 'TTD Digital', (string)($principalSignature['file_path'] ?? ''));
     }
-    
-    $pdf->text($sigX, $y - 95.00, (string)($school['principal_name'] ?: '............................'), 10, true);
-    $pdf->text($sigX, $y - 109.00, 'NIP. ' . (string)($school['principal_nip'] ?? ''), 10);
+
+    $pdf->centeredWrappedText($sigX, $y - 95.00, $sigW, (string)($school['principal_name'] ?: '............................'), 9, 2, true, 10.50);
+    $pdf->centerText($sigX, $y - 119.00, $sigW, 'NIP. ' . (string)($school['principal_nip'] ?: '-'), 8.5);
 
 
     // ==========================================
-    // HALAMAN 3: MUTASI KELUAR
+    // HALAMAN 4: MUTASI KELUAR
     // ==========================================
     $pdf->addPage();
     $pdf->setFont('Helvetica', 12, true);
@@ -1943,46 +2159,53 @@ function generate_student_biodata_pdf(int $studentId): string
     
     $pdf->setFont('Helvetica', 10);
     $pdf->text($marginLeft, 750.00, 'Nama Peserta Didik : ' . (string)$student['name'], 10);
-    $pdf->setFont('Helvetica', 10, true);
-    $pdf->text($marginLeft, 730.00, 'KELUAR', 10, true);
+    $y = 725.00;
+    $titleH = 24.00;
+    $headerH = 60.00;
+    $rowH = 142.00;
+    $widths = [72.00, 88.00, 145.00, $contentWidth - 305.00];
+    $xs = [$marginLeft];
+    foreach ($widths as $idx => $width) {
+        if ($idx < count($widths) - 1) {
+            $xs[] = $xs[$idx] + $width;
+        }
+    }
 
-    $y = 710.00;
+    $pdf->rect($marginLeft, $y, $contentWidth, -$titleH, 'B', [0.973, 0.973, 1.000]);
+    $pdf->centerText($marginLeft, $y - 16.00, $contentWidth, 'KELUAR', 11, true);
+    $y -= $titleH;
+
+    $headers = [
+        ['Tanggal'],
+        ['Kelas yang', 'ditinggalkan'],
+        ['Sebab-sebab Keluar', 'atau Atas Permintaan', '(Tertulis)'],
+        ['Tanda Tangan Kepala Sekolah,', 'Stempel Sekolah, dan Tanda', 'Tangan Orang Tua/Wali'],
+    ];
+    foreach ($headers as $idx => $lines) {
+        $pdf->rect($xs[$idx], $y, $widths[$idx], -$headerH, 'B', [0.973, 0.973, 1.000]);
+        $startY = $y - (($headerH - ((count($lines) - 1) * 12.00)) / 2) - 3.00;
+        foreach ($lines as $lineIdx => $line) {
+            $pdf->centerText($xs[$idx], $startY - ($lineIdx * 12.00), $widths[$idx], $line, 9, true);
+        }
+    }
+    $y -= $headerH;
+
     for ($i = 0; $i < 3; $i++) {
-        // Table Header
-        $pdf->setFont('Helvetica', 10, true);
-        $pdf->rect($marginLeft, $y, 80.00, -25.00, 'S');
-        $pdf->centerText($marginLeft, $y - 15.00, 80.00, 'Tanggal', 10, true);
-        
-        $pdf->rect($marginLeft + 80.00, $y, 100.00, -25.00, 'S');
-        $pdf->centerText($marginLeft + 80.00, $y - 10.00, 100.00, 'Kelas yang', 10, true);
-        $pdf->centerText($marginLeft + 80.00, $y - 20.00, 100.00, 'ditinggalkan', 10, true);
-        
-        $pdf->rect($marginLeft + 180.00, $y, $contentWidth - 180.00, -25.00, 'S');
-        $pdf->centerText($marginLeft + 180.00, $y - 15.00, $contentWidth - 180.00, 'Sebab-sebab Keluar atau Atas Permintaan (Tertulis)', 10, true);
-        
-        $y -= 25.00;
-        
-        // Table Body
-        $pdf->rect($marginLeft, $y, 80.00, -110.00, 'S');
-        $pdf->rect($marginLeft + 80.00, $y, 100.00, -110.00, 'S');
-        $pdf->rect($marginLeft + 180.00, $y, $contentWidth - 180.00, -110.00, 'S');
-        
-        $pdf->setFont('Helvetica', 10);
-        $sigRight = $marginLeft + 190.00;
-        $pdf->text($sigRight, $y - 15.00, '................, ....................', 10);
-        $pdf->text($sigRight, $y - 30.00, 'Kepala Sekolah,', 10);
-        $pdf->text($sigRight, $y - 80.00, '..............................................', 10);
-        $pdf->text($sigRight, $y - 95.00, 'NIP.', 10);
-        
-        $sigParent = $marginLeft + 360.00;
-        $pdf->text($sigParent, $y - 30.00, 'Orang Tua/Wali,', 10);
-        $pdf->text($sigParent, $y - 80.00, '..............................................', 10);
-
-        $y -= 130.00;
+        foreach ($widths as $idx => $width) {
+            $pdf->rect($xs[$idx], $y, $width, -$rowH, 'S');
+        }
+        $sigX = $xs[3] + 10.00;
+        $pdf->text($sigX, $y - 18.00, '................, ....................', 8.5);
+        $pdf->text($sigX, $y - 36.00, 'Kepala Sekolah,', 9);
+        $pdf->text($sigX, $y - 82.00, '........................................', 8.5);
+        $pdf->text($sigX, $y - 97.00, 'NIP.', 8.5);
+        $pdf->text($sigX, $y - 114.00, 'Orang Tua/Wali,', 9);
+        $pdf->text($sigX, $y - 132.00, '........................................', 8.5);
+        $y -= $rowH;
     }
 
     // ==========================================
-    // HALAMAN 4: MUTASI MASUK
+    // HALAMAN 5: MUTASI MASUK
     // ==========================================
     $pdf->addPage();
     $pdf->setFont('Helvetica', 12, true);
@@ -1990,52 +2213,52 @@ function generate_student_biodata_pdf(int $studentId): string
     
     $pdf->setFont('Helvetica', 10);
     $pdf->text($marginLeft, 750.00, 'Nama Peserta Didik : ' . (string)$student['name'], 10);
-    $pdf->setFont('Helvetica', 10, true);
-    $pdf->text($marginLeft, 730.00, 'MASUK', 10, true);
-
-    $y = 710.00;
-    $pdf->setFont('Helvetica', 10);
-    for ($i = 1; $i <= 3; $i++) {
-        $pdf->line($marginLeft, $y, $marginRight, $y);
-        $y -= 15.00;
-        
-        $pdf->text($marginLeft, $y, '1. Nama Siswa', 10);
-        $pdf->text($marginLeft + 100.00, $y, '________________________', 10);
-        
-        $pdf->text($marginLeft + 250.00, $y, '................, ....................', 10);
-        $y -= 15.00;
-        
-        $pdf->text($marginLeft, $y, '2. Nomor Induk', 10);
-        $pdf->text($marginLeft + 100.00, $y, '________________________', 10);
-        
-        $pdf->text($marginLeft + 250.00, $y, 'Kepala Sekolah,', 10);
-        $y -= 15.00;
-        
-        $pdf->text($marginLeft, $y, '3. Nama Sekolah', 10);
-        $pdf->text($marginLeft + 100.00, $y, '________________________', 10);
-        $y -= 15.00;
-        
-        $pdf->text($marginLeft, $y, '4. Masuk di Sekolah ini:', 10);
-        $y -= 15.00;
-        
-        $pdf->text($marginLeft, $y, '    a. Tanggal', 10);
-        $pdf->text($marginLeft + 100.00, $y, '________________________', 10);
-        
-        $pdf->text($marginLeft + 250.00, $y - 5.00, '..............................................', 10);
-        $y -= 15.00;
-        
-        $pdf->text($marginLeft, $y, '    b. Di Kelas', 10);
-        $pdf->text($marginLeft + 100.00, $y, '________________________', 10);
-        
-        $pdf->text($marginLeft + 250.00, $y - 5.00, 'NIP.', 10);
-        $y -= 15.00;
-        
-        $pdf->text($marginLeft, $y, '5. Tahun Pelajaran', 10);
-        $pdf->text($marginLeft + 100.00, $y, '________________________', 10);
-        
-        $y -= 25.00;
+    $y = 725.00;
+    $headerH = 24.00;
+    $rowH = 170.00;
+    $widths = [30.00, 155.00, 155.00, $contentWidth - 340.00];
+    $xs = [$marginLeft];
+    foreach ($widths as $idx => $width) {
+        if ($idx < count($widths) - 1) {
+            $xs[] = $xs[$idx] + $width;
+        }
     }
-    $pdf->line($marginLeft, $y + 15.00, $marginRight, $y + 15.00);
+
+    $pdf->rect($xs[0], $y, $widths[0], -$headerH, 'B', [0.973, 0.973, 1.000]);
+    $pdf->centerText($xs[0], $y - 16.00, $widths[0], 'NO', 10, true);
+    $pdf->rect($xs[1], $y, $contentWidth - $widths[0], -$headerH, 'B', [0.973, 0.973, 1.000]);
+    $pdf->centerText($xs[1], $y - 16.00, $contentWidth - $widths[0], 'MASUK', 11, true);
+    $y -= $headerH;
+
+    $labels = ['Nama Siswa', 'Nomor Induk', 'Nama Sekolah', 'Masuk di Sekolah ini:', 'a. Tanggal', 'b. Di Kelas', 'Tahun Pelajaran'];
+    for ($row = 1; $row <= 3; $row++) {
+        foreach ($widths as $idx => $width) {
+            $pdf->rect($xs[$idx], $y, $width, -$rowH, 'S');
+        }
+        $pdf->centerText($xs[0], $y - 22.00, $widths[0], $row . '.', 9.5);
+        $labelY = $y - 22.00;
+        foreach ($labels as $idx => $label) {
+            $prefix = match ($idx) {
+                0 => '1. ',
+                1 => '2. ',
+                2 => '3. ',
+                3 => '4. ',
+                6 => '5. ',
+                default => '   ',
+            };
+            $pdf->text($xs[1] + 7.00, $labelY - ($idx * 20.00), $prefix . $label, 9);
+            if ($idx !== 3) {
+                $lineY = $labelY - ($idx * 20.00) - 2.00;
+                $pdf->line($xs[2] + 8.00, $lineY, $xs[2] + $widths[2] - 8.00, $lineY);
+            }
+        }
+        $sigX = $xs[3] + 8.00;
+        $pdf->text($sigX, $y - 22.00, '................, ................', 8.5);
+        $pdf->text($sigX, $y - 43.00, 'Kepala Sekolah,', 9);
+        $pdf->line($sigX, $y - 115.00, $xs[3] + $widths[3] - 8.00, $y - 115.00);
+        $pdf->text($sigX, $y - 132.00, 'NIP.', 8.5);
+        $y -= $rowH;
+    }
 
     $path = biodata_file_path($studentId);
     file_put_contents($path, $pdf->output());
