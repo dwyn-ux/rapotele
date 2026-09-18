@@ -296,7 +296,7 @@ final class SimplePdf
 
 function report_storage_dir(): string
 {
-    $dir = dirname(__DIR__) . '/storage/reports';
+    $dir = dirname(__DIR__, 2) . '/storage/reports';
     if (!is_dir($dir)) {
         mkdir($dir, 0775, true);
     }
@@ -315,9 +315,38 @@ function report_file_name(array $student): string
     return 'Rapor_' . str_replace(' ', '_', $name) . '.pdf';
 }
 
-function class_phase(string $grade): string
+function report_request_option_params(array $extra = []): array
+{
+    $params = [];
+    foreach (['class_id', 'format', 'posisittdks', 'isittd', 'kertas', 'kiri', 'kanan', 'atas', 'bawah', 'regenerate'] as $key) {
+        if (isset($_GET[$key]) && trim((string)$_GET[$key]) !== '') {
+            $params[$key] = (string)$_GET[$key];
+        }
+    }
+    return array_merge($params, $extra);
+}
+
+function report_level_label(string $level): array
+{
+    $level = strtoupper(trim($level));
+    return match ($level) {
+        'SMP', 'MTS' => ['SEKOLAH MENENGAH PERTAMA', $level === 'MTS' ? 'MTs' : 'SMP'],
+        'SMA', 'MA' => ['SEKOLAH MENENGAH ATAS', $level === 'MA' ? 'MA' : 'SMA'],
+        'SD', 'MI' => ['SEKOLAH DASAR', $level === 'MI' ? 'MI' : 'SD'],
+        default => [$level !== '' ? $level : 'SEKOLAH', ''],
+    };
+}
+
+function class_phase(string $grade, string $level = ''): string
 {
     $number = (int)preg_replace('/\D+/', '', $grade);
+    $level = strtoupper(trim($level));
+    if (in_array($level, ['SMA', 'MA'], true) || $number >= 10) {
+        return $number <= 10 ? 'E' : 'F';
+    }
+    if (in_array($level, ['SMP', 'MTS'], true) || ($number >= 7 && $number <= 9)) {
+        return 'D';
+    }
     return match (true) {
         $number <= 2 => 'A',
         $number <= 4 => 'B',
@@ -353,14 +382,54 @@ function report_subject_visible_for_level(array $subject, string $classLevel): b
     return false;
 }
 
-function report_predikat_sma(int $score): string
+function report_predikat_sma(int $score, int $kkm = 75): string
 {
+    $kkm = max(1, $kkm);
+    $cUpper = min(80, $kkm + 5);
+    if ($cUpper < $kkm) {
+        $cUpper = $kkm;
+    }
     return match (true) {
         $score >= 90 => 'A',
-        $score >= 80 => 'B',
-        $score >= 70 => 'C',
+        $score > $cUpper => 'B',
+        $score >= $kkm => 'C',
         default => 'D',
     };
+}
+
+function report_competency_description(string $subjectName, ?int $score, int $kkm, array $objectives = []): string
+{
+    $subjectName = trim($subjectName) ?: 'mata pelajaran ini';
+    $objectives = array_values(array_filter(array_map(
+        static fn ($objective): string => trim((string)$objective),
+        $objectives
+    )));
+    $kkm = max(1, $kkm);
+
+    if ($score === null || $score <= 0) {
+        return 'Data nilai ' . $subjectName . ' belum lengkap. Peserta didik perlu melengkapi asesmen agar capaian dan kebutuhan perbaikan dapat dipetakan dengan tepat.';
+    }
+
+    $achievementSource = $objectives ?: [$subjectName];
+    $achievedCount = $score >= $kkm + 15 ? 3 : ($score >= $kkm ? 2 : 1);
+    $achieved = array_slice($achievementSource, 0, $achievedCount);
+    $remaining = array_values(array_diff($achievementSource, $achieved));
+    $improvement = $remaining ? array_slice($remaining, 0, 2) : array_slice($achievementSource, -1);
+
+    $parts = [];
+    if ($score >= $kkm) {
+        $parts[] = 'Telah mencapai kompetensi dalam ' . implode(', ', $achieved);
+        if ($score >= $kkm + 15) {
+            $parts[] = 'Perlu mempertahankan konsistensi belajar dan memperdalam penerapan ' . implode(', ', $improvement);
+        } else {
+            $parts[] = 'Perlu penguatan lanjutan pada ' . implode(', ', $improvement) . ' agar capaian lebih mantap';
+        }
+    } else {
+        $parts[] = 'Mulai menunjukkan capaian awal dalam ' . implode(', ', $achieved);
+        $parts[] = 'Belum optimal pada ' . implode(', ', $improvement) . ', sehingga perlu latihan terbimbing, pengulangan konsep, dan pendampingan belajar secara berkala';
+    }
+
+    return implode('. ', $parts) . '.';
 }
 
 function semester_number(): string
@@ -594,31 +663,12 @@ function report_subjects_for_student(array $student, int $studentId): array
 
         // Fallback: auto-generate from learning_objectives
         if ($desc === '') {
-            $objectives = $objectivesBySubject[$sid] ?? [];
-            if ($objectives) {
-                $achieved = [];
-                $needHelp = [];
-                foreach ($objectives as $obj) {
-                    if ($finalRounded >= $kkm) {
-                        $achieved[] = $obj;
-                    } else {
-                        $needHelp[] = $obj;
-                    }
-                }
-                $parts = [];
-                if ($achieved) {
-                    $parts[] = 'Mencapai kompetensi baik dalam ' . implode(', ', array_slice($achieved, 0, 3));
-                }
-                if ($needHelp) {
-                    $parts[] = 'Perlu peningkatan dalam memahami ' . implode(', ', array_slice($needHelp, 0, 2));
-                }
-                $desc = $parts ? implode('. ', $parts) . '.' : '';
-            }
-            if ($desc === '') {
-                $desc = $finalRounded >= $kkm
-                    ? 'Mencapai kompetensi dengan baik.'
-                    : 'Perlu peningkatan dalam memahami kompetensi dasar.';
-            }
+            $desc = report_competency_description(
+                (string)$r['name'],
+                $finalRounded > 0 ? $finalRounded : null,
+                $kkm,
+                $objectivesBySubject[$sid] ?? []
+            );
         }
 
         $subjects[] = [
@@ -627,7 +677,7 @@ function report_subjects_for_student(array $student, int $studentId): array
             'kkm' => $kkm,
             'score' => $finalRounded > 0 ? $finalRounded : null,
             'predikat' => $finalRounded > 0 ? predikat_from_score($finalRounded) : '-',
-            'predikat_sma' => $finalRounded > 0 ? report_predikat_sma($finalRounded) : '-',
+            'predikat_sma' => $finalRounded > 0 ? report_predikat_sma($finalRounded, $kkm) : '-',
             'description' => $desc,
         ];
     }
@@ -956,26 +1006,26 @@ function report_student_initials(string $name): string
 /**
  * Single source of truth for the learning-results table geometry, shared by
  * the header row and the per-subject body rows so they never drift apart.
- * SMA gets a 5-column layout (No | Mapel | Nilai | Predikat | Capaian) where
- * the Predikat column is its own cell; non-SMA keeps the 4-column layout.
- * 'Predikat' was widened (28.35 -> 53.00, taken from 'Nilai' and 'Capaian
- * Kompetensi') because the label "Predikat" in bold 10pt does not fit in
- * 28.35pt and was being sliced by the column border.
+ * SMA gets a 6-column layout (No | Mapel | KKM | Nilai | Predikat | Capaian)
+ * while non-SMA keeps the 4-column Kurikulum Merdeka layout.
  */
 function report_learning_table_columns(bool $sma = false): array
 {
     if ($sma) {
-        $mapelW = 138.58;
-        $nilaiW = 42.52;
-        $predW = 35.43;
-        $capaianW = 243.58;
+        $mapelW = 112.00;
+        $kkmW = 34.00;
+        $nilaiW = 36.00;
+        $predW = 43.00;
+        $capaianW = 481.89 - 22.68 - $mapelW - $kkmW - $nilaiW - $predW;
         $xMapel = 79.37;
-        $xNilai = $xMapel + $mapelW;
+        $xKkm = $xMapel + $mapelW;
+        $xNilai = $xKkm + $kkmW;
         $xPred = $xNilai + $nilaiW;
         $xCapaian = $xPred + $predW;
         return [
             'no'       => ['x' => 56.69,  'w' => 22.68,  'label' => 'No', 'fill' => true],
             'mapel'    => ['x' => $xMapel,    'w' => $mapelW,   'label' => 'Mata Pelajaran', 'fill' => true],
+            'kkm'      => ['x' => $xKkm,      'w' => $kkmW,     'label' => 'KKM', 'fill' => true],
             'nilai'    => ['x' => $xNilai,    'w' => $nilaiW,   'label' => 'Nilai', 'fill' => true],
             'predikat' => ['x' => $xPred,     'w' => $predW,    'label' => 'Predikat', 'fill' => true],
             'capaian'  => ['x' => $xCapaian,  'w' => $capaianW, 'label' => 'Capaian Kompetensi', 'fill' => true],
@@ -996,7 +1046,7 @@ function draw_report_learning_table_header(SimplePdf $pdf, bool $sma = false): f
     $titleHeight = 17.01;
     // Title band: plain text, no fill and no border.
     $pdf->setFont('Helvetica', 12, true);
-    $title = $sma ? 'LAPORAN PENILAIAN HASIL BELAJAR' : 'LAPORAN HASIL BELAJAR';
+    $title = $sma ? 'B. PENGETAHUAN' : 'LAPORAN HASIL BELAJAR';
     $pdf->centerText(56.69, $y - 11.50, 481.89, $title, 12, true);
     $y -= $titleHeight;
 
@@ -1070,18 +1120,75 @@ function draw_report_page_one(SimplePdf $pdf, array $payload, bool $sma = false)
         $pdf->rect($cols['nilai']['x'], $y, $cols['nilai']['w'], -$height, 'S');
         $score = $subject['score'] !== null ? (string)$subject['score'] : '';
         $pdf->centerText($cols['nilai']['x'], $y - ($height / 2) - 3, $cols['nilai']['w'], $score, 9);
+        if ($sma && isset($cols['kkm'])) {
+            $pdf->rect($cols['kkm']['x'], $y, $cols['kkm']['w'], -$height, 'S');
+            $kkmText = !empty($subject['kkm']) ? (string)$subject['kkm'] : '';
+            $pdf->centerText($cols['kkm']['x'], $y - ($height / 2) - 3, $cols['kkm']['w'], $kkmText, 9);
+        }
         if ($sma && isset($cols['predikat'])) {
             $pdf->rect($cols['predikat']['x'], $y, $cols['predikat']['w'], -$height, 'S');
             $predikat = (string)($subject['predikat_sma'] ?? '-');
             $pdf->centerText($cols['predikat']['x'], $y - ($height / 2) - 3, $cols['predikat']['w'], $predikat, 9, true);
         }
         $pdf->rect($cols['capaian']['x'], $y, $cols['capaian']['w'], -$height, 'S');
-        $pdf->justifyText($cols['capaian']['x'] + 5.67, $y - 11.55, $capaianTextWidth, $description, 9);
+        $pdf->justifyTextClamped($cols['capaian']['x'] + 5.67, $y - 11.55, $capaianTextWidth, $description, 9, 4);
         $y -= $height;
         $no++;
     }
 
+    if ($sma) {
+        $intervalH = 73.00;
+        if ($y - $intervalH < $pageBottomLimit) {
+            $pageNo++;
+            $pdf->addPage();
+            draw_report_identity($pdf, $payload, $pageNo);
+            $y = 700.00;
+        } else {
+            $y -= 17.01;
+        }
+        $kkm = (int)($payload['subjects'][0]['kkm'] ?? get_app_setting('grade.kkm', '75'));
+        draw_sma_predicate_interval($pdf, $kkm, $y);
+    }
+
     return $pageNo;
+}
+
+function draw_sma_predicate_interval(SimplePdf $pdf, int $kkm, float $topY): void
+{
+    $kkm = max(1, $kkm);
+    $pdf->setFont('Helvetica', 9, true);
+    $pdf->text(56.69, $topY, 'Tabel Interval predikat berdasarkan KKM', 9, true);
+    $y = $topY - 12.00;
+    $col1X = 56.69;
+    $col1W = 70.00;
+    $col2X = $col1X + $col1W;
+    $col2W = 170.00;
+    $rowH = 14.17;
+    $pdf->rect($col1X, $y, $col1W, -$rowH, 'B', [0.973, 0.973, 1.000]);
+    $pdf->rect($col2X, $y, $col2W, -$rowH, 'B', [0.973, 0.973, 1.000]);
+    $pdf->centerText($col1X, $y - 9.70, $col1W, 'KKM', 8.5, true);
+    $pdf->centerText($col2X, $y - 9.70, $col2W, 'Predikat', 8.5, true);
+    $y -= $rowH;
+
+    $cUpper = min(80, $kkm + 5);
+    if ($cUpper < $kkm) {
+        $cUpper = $kkm;
+    }
+    $bLower = max(81, $cUpper + 1);
+    $rows = [
+        ['< ' . $kkm, 'D = Kurang'],
+        [$kkm . ' - ' . $cUpper, 'C = Cukup'],
+        [$bLower <= 89 ? $bLower . ' - 89' : '-', 'B = Baik'],
+        ['90 - 100', 'A = Sangat Baik'],
+    ];
+    $pdf->setFont('Helvetica', 8.5);
+    foreach ($rows as [$range, $label]) {
+        $pdf->rect($col1X, $y, $col1W, -$rowH, 'S');
+        $pdf->centerText($col1X, $y - 9.70, $col1W, $range, 8.5);
+        $pdf->rect($col2X, $y, $col2W, -$rowH, 'S');
+        $pdf->text($col2X + 5.00, $y - 9.70, $label, 8.5);
+        $y -= $rowH;
+    }
 }
 
 function draw_kokurikuler_section(SimplePdf $pdf, array $payload, float $topY = 547.09): float
@@ -1416,8 +1523,8 @@ function page_cetak_nilai_rapor_pdf(): void
         </form>
     </section>
     <?php
-    $actions = '<a class="button warning" href="' . e(route_url('rapor-generate-class', ['class_id' => $classId])) . '">Generate Rapor Kelas Ini</a>'
-        . '<a class="button success" href="' . e(route_url('rapor-download-class', ['class_id' => $classId])) . '">Download Rapor Kelas Ini</a>';
+    $actions = '<a class="button warning" href="' . e(route_url('rapor-generate-class', report_request_option_params(['class_id' => $classId]))) . '">Generate Rapor Kelas Ini</a>'
+        . '<a class="button success" href="' . e(route_url('rapor-download-class', report_request_option_params(['class_id' => $classId, 'regenerate' => '1']))) . '">Download Rapor Kelas Ini</a>';
     table_panel('Cetak Nilai Rapor', ['No', 'Nama Siswa', 'NISN', 'NIS', 'Rombel', 'File Rapor', 'Aksi'], $students, function ($student) use ($class) {
         static $no = 1;
         $path = report_file_path((int)$student['id']);
@@ -1434,11 +1541,11 @@ function page_cetak_nilai_rapor_pdf(): void
                 <details class="action-menu">
                     <summary class="button small warning">Aksi</summary>
                     <div class="action-menu-list">
-                        <a href="<?= e(route_url('rapor-download-student', ['student_id' => (int)$student['id']])) ?>">Download File</a>
-                        <a href="<?= e(route_url('rapor-generate-student', ['student_id' => (int)$student['id'], 'class_id' => (int)($student['class_id'] ?? 0)])) ?>">Generate Ulang</a>
+                        <a href="<?= e(route_url('rapor-download-student', report_request_option_params(['student_id' => (int)$student['id'], 'class_id' => (int)($student['class_id'] ?? 0), 'regenerate' => '1']))) ?>">Download File</a>
+                        <a href="<?= e(route_url('rapor-generate-student', report_request_option_params(['student_id' => (int)$student['id'], 'class_id' => (int)($student['class_id'] ?? 0)]))) ?>">Generate Ulang</a>
                     </div>
                 </details>
-                <a class="button small primary" target="_blank" href="<?= e(route_url('rapor-download-student', ['student_id' => (int)$student['id'], 'inline' => 1])) ?>">Tampilkan pada Siswa</a>
+                <a class="button small primary" target="_blank" href="<?= e(route_url('rapor-download-student', report_request_option_params(['student_id' => (int)$student['id'], 'class_id' => (int)($student['class_id'] ?? 0), 'inline' => 1, 'regenerate' => '1']))) ?>">Tampilkan pada Siswa</a>
             </div>
         </td>
         <?php
@@ -1481,7 +1588,7 @@ function page_rapor_generate_class(): void
     } else {
         flash('success', 'PDF rapor kelas berhasil digenerate (' . $success . ' siswa).');
     }
-    redirect_to('cetak-nilai-rapor', ['class_id' => $classId]);
+    redirect_to('cetak-nilai-rapor', report_request_option_params(['class_id' => $classId]));
 }
 
 function page_rapor_generate_student(): void
@@ -1508,7 +1615,7 @@ function page_rapor_generate_student(): void
         );
         flash('danger', 'Gagal generate rapor siswa: ' . $e->getMessage());
     }
-    redirect_to('cetak-nilai-rapor', ['class_id' => (int)($_GET['class_id'] ?? 0)]);
+    redirect_to('cetak-nilai-rapor', report_request_option_params(['class_id' => (int)($_GET['class_id'] ?? 0)]));
 }
 
 function page_rapor_download_student(): void
@@ -1533,7 +1640,7 @@ function page_rapor_download_student(): void
         require_class_access((int)$student['class_id']);
     }
     $path = report_file_path($studentId);
-    if (!is_file($path)) {
+    if (!is_file($path) || !empty($_GET['regenerate'])) {
         $path = generate_student_report_pdf($studentId);
     }
     header('Content-Type: application/pdf');
@@ -1562,7 +1669,7 @@ function page_rapor_download_class(): void
     }
     foreach ($students as $student) {
         $pdfPath = report_file_path((int)$student['id']);
-        if (!is_file($pdfPath)) {
+        if (!is_file($pdfPath) || !empty($_GET['regenerate'])) {
             $pdfPath = generate_student_report_pdf((int)$student['id']);
         }
         $zip->addFile($pdfPath, report_file_name($student));
@@ -1613,13 +1720,14 @@ function generate_student_biodata_pdf(int $studentId): string
 
     $schoolName = $schoolValue($school, ['name', 'school_name'], config('school.name'));
     $classLevel = strtoupper((string)($student['class_level'] ?? ''));
-    $schoolLevel = $classLevel !== ''
+    $schoolLevelCode = $classLevel !== ''
         ? $classLevel
         : strtoupper($schoolValue(
             $school,
             ['level', 'school_level', 'jenjang', 'school_type'],
-            'SEKOLAH DASAR'
+            'SD'
         ));
+    [$schoolLevelTitle, $schoolLevelAbbr] = report_level_label($schoolLevelCode);
     $schoolNpsn = $schoolValue($school, ['npsn']);
     $schoolNisNssNds = $schoolValue($school, ['nis_nss_nds', 'nis_nss', 'nss', 'nds']);
     $schoolAddress = $schoolValue($school, ['address', 'alamat']);
@@ -1665,9 +1773,9 @@ function generate_student_biodata_pdf(int $studentId): string
 
     // Judul mengikuti jenjang yang tersimpan di database.
     $pdf->setFont('Helvetica', 16, true);
-    $pdf->centerText($marginLeft, $coverLogoTopY - $coverLogoH - 38.00, $contentWidth, $schoolLevel, 16, true);
-    if ($schoolLevel === '') {
-        $pdf->centerText($marginLeft, $coverLogoTopY - $coverLogoH - 58.00, $contentWidth, '', 16, true);
+    $pdf->centerText($marginLeft, $coverLogoTopY - $coverLogoH - 38.00, $contentWidth, $schoolLevelTitle, 16, true);
+    if ($schoolLevelAbbr !== '') {
+        $pdf->centerText($marginLeft, $coverLogoTopY - $coverLogoH - 58.00, $contentWidth, '( ' . $schoolLevelAbbr . ' )', 16, true);
     }
 
     // Nama sekolah juga ditampilkan dari database.
@@ -1675,7 +1783,7 @@ function generate_student_biodata_pdf(int $studentId): string
     $pdf->centerText($marginLeft, $coverLogoTopY - $coverLogoH - 86.00, $contentWidth, $schoolName, 14, true);
 
     $major = trim((string)($student['class_major'] ?? ''));
-    if ($schoolLevel === 'SMA' && $major !== '') {
+    if (in_array($schoolLevelCode, ['SMA', 'MA'], true) && $major !== '') {
         $pdf->setFont('Helvetica', 12, true);
         $pdf->centerText($marginLeft, $coverLogoTopY - $coverLogoH - 108.00, $contentWidth, 'Program: ' . $major, 12, true);
         $boxTopY = $coverLogoTopY - $coverLogoH - 148.00;
@@ -1707,9 +1815,9 @@ function generate_student_biodata_pdf(int $studentId): string
 
     $y = 780.00;
     $pdf->setFont('Helvetica', 12, true);
-    $pdf->centerText($marginLeft, $y, $contentWidth, $schoolLevel, 12, true);
-    if ($schoolLevel === 'SEKOLAH DASAR') {
-        $pdf->centerText($marginLeft, $y - 15.00, $contentWidth, '( SD )', 12, true);
+    $pdf->centerText($marginLeft, $y, $contentWidth, $schoolLevelTitle, 12, true);
+    if ($schoolLevelAbbr !== '') {
+        $pdf->centerText($marginLeft, $y - 15.00, $contentWidth, '( ' . $schoolLevelAbbr . ' )', 12, true);
         $y -= 36.00;
     } else {
         $y -= 24.00;
@@ -1763,6 +1871,8 @@ function generate_student_biodata_pdf(int $studentId): string
         ['Sekolah Asal', ''],
         ['Diterima di sekolah ini', ''],
         ['Di kelas', (string)($student['class_name'] ?: '-')],
+        ['Fase', class_phase((string)($student['grade'] ?? ''), $schoolLevelCode)],
+        ...(in_array($schoolLevelCode, ['SMA', 'MA'], true) && $major !== '' ? [['Program/Jurusan', $major]] : []),
         ['Pada tanggal', ''],
         ['Nama Orang Tua', ''],
         ['  a. Ayah', (string)($student['father_name'] ?: '-')],
@@ -1781,7 +1891,10 @@ function generate_student_biodata_pdf(int $studentId): string
     $no = 1;
     $studentRowH = 12.35;
     foreach ($studentFields as $idx => [$label, $val]) {
-        if (!str_starts_with($label, '  ') && !str_starts_with($label, 'Di kelas') && !str_starts_with($label, 'Pada tanggal')) {
+        if (
+            !str_starts_with($label, '  ')
+            && !in_array($label, ['Di kelas', 'Fase', 'Program/Jurusan', 'Pada tanggal'], true)
+        ) {
             $pdf->text($numX, $y, $no . '.', 9.5);
             $no++;
         }
@@ -2267,7 +2380,7 @@ function generate_laporan_belajar_pdf(array $student): string
     ];
     $identityRight = [
         ['Kelas', (string)($student['class_name'] ?? '...........')],
-        ['Fase', class_phase((string)($student['grade'] ?? '')) ?: '...........'],
+        ['Fase', class_phase((string)($student['grade'] ?? ''), (string)($student['class_level'] ?? '')) ?: '...........'],
         ['Semester', current_semester()],
         ['Tahun Ajaran', current_academic_year()],
     ];

@@ -652,7 +652,9 @@ function page_deskripsi_nilai(): void
     <section class="panel no-print">
         <?php panel_title('Deskripsi Nilai per Siswa per Mapel'); ?>
         <form method="get" class="grid four">
+            <?= csrf_field() ?>
             <input type="hidden" name="page" value="deskripsi-nilai">
+            <input type="hidden" name="grade" value="<?= e($grade) ?>">
             <label>Pilih Kelas <select name="class_id" onchange="this.form.submit()"><?= options(array_column_map($classes, 'id', 'name'), $classId) ?></select></label>
             <label>Pilih Mapel <select name="subject_id" onchange="this.form.submit()">
                 <option value="">-- Semua Mapel --</option>
@@ -662,7 +664,7 @@ function page_deskripsi_nilai(): void
             </select></label>
             <div class="actions"><button type="submit" class="button">Tampilkan</button>
             <?php if ($classId): ?>
-                <a class="button warning" href="<?= e(route_url('deskripsi-nilai', ['class_id' => $classId, 'subject_id' => $subjectId, 'generate_all' => 1])) ?>" onclick="return confirm('Generate ulang deskripsi otomatis untuk semua siswa? Deskripsi yang sudah diedit akan ditimpa.')">Generate Ulang Semua</a>
+                <button class="button warning" type="submit" name="action" value="generate_deskripsi_nilai" formmethod="post" onclick="return confirm('Generate ulang deskripsi otomatis untuk semua siswa? Deskripsi yang sudah diedit akan ditimpa.')">Generate Ulang Semua</button>
             <?php endif; ?>
             </div>
         </form>
@@ -743,32 +745,13 @@ function page_deskripsi_nilai(): void
                                 [$studentId, $sid, $grade]
                             );
 
-                            $autoDesc = '';
-                            $objectives = $objectivesBySubject[$sid] ?? [];
-                            if ($objectives) {
-                                $achieved = [];
-                                $needHelp = [];
-                                foreach ($objectives as $obj) {
-                                    if ($finalRounded >= $kkm) {
-                                        $achieved[] = $obj;
-                                    } else {
-                                        $needHelp[] = $obj;
-                                    }
-                                }
-                                $parts = [];
-                                if ($achieved) {
-                                    $parts[] = 'Mencapai kompetensi baik dalam ' . implode(', ', array_slice($achieved, 0, 3));
-                                }
-                                if ($needHelp) {
-                                    $parts[] = 'Perlu peningkatan dalam memahami ' . implode(', ', array_slice($needHelp, 0, 2));
-                                }
-                                $autoDesc = $parts ? implode('. ', $parts) . '.' : '';
-                            }
-                            if ($autoDesc === '') {
-                                $autoDesc = $finalRounded >= $kkm
-                                    ? 'Mencapai kompetensi dengan baik.'
-                                    : 'Perlu peningkatan dalam memahami kompetensi dasar.';
-                            }
+                            $subjectKkm = (int)($subject['kkm'] ?? 0) > 0 ? (int)$subject['kkm'] : $kkm;
+                            $autoDesc = report_competency_description(
+                                (string)$subject['name'],
+                                $finalRounded > 0 ? $finalRounded : null,
+                                $subjectKkm,
+                                $objectivesBySubject[$sid] ?? []
+                            );
 
                             $savedDesc = $existing ? (string)$existing['description'] : $autoDesc;
                             ?>
@@ -793,5 +776,4 @@ function page_deskripsi_nilai(): void
     <?php endforeach;
     render_footer();
 }
-
 

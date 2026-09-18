@@ -729,32 +729,13 @@ function action_generate_deskripsi_nilai(): void
             }
             $finalRounded = $finalScore > 0 ? (int)round($finalScore) : 0;
 
-            $autoDesc = '';
-            $objectives = $objectivesBySubject[$sid] ?? [];
-            if ($objectives) {
-                $achieved = [];
-                $needHelp = [];
-                foreach ($objectives as $obj) {
-                    if ($finalRounded >= $kkm) {
-                        $achieved[] = $obj;
-                    } else {
-                        $needHelp[] = $obj;
-                    }
-                }
-                $parts = [];
-                if ($achieved) {
-                    $parts[] = 'Mencapai kompetensi baik dalam ' . implode(', ', array_slice($achieved, 0, 3));
-                }
-                if ($needHelp) {
-                    $parts[] = 'Perlu peningkatan dalam memahami ' . implode(', ', array_slice($needHelp, 0, 2));
-                }
-                $autoDesc = $parts ? implode('. ', $parts) . '.' : '';
-            }
-            if ($autoDesc === '') {
-                $autoDesc = $finalRounded >= $kkm
-                    ? 'Mencapai kompetensi dengan baik.'
-                    : 'Perlu peningkatan dalam memahami kompetensi dasar.';
-            }
+            $subjectKkm = (int)($subject['kkm'] ?? 0) > 0 ? (int)$subject['kkm'] : $kkm;
+            $autoDesc = report_competency_description(
+                (string)$subject['name'],
+                $finalRounded > 0 ? $finalRounded : null,
+                $subjectKkm,
+                $objectivesBySubject[$sid] ?? []
+            );
 
             $existing = fetch_one(
                 'SELECT id FROM student_descriptions WHERE student_id = ? AND subject_id = ? AND grade_val = ?',
