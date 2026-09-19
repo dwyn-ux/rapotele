@@ -62,7 +62,7 @@ function action_save_school(): void
     if ($id > 0) {
         execute_sql(
             'UPDATE school_profile SET name = ?, npsn = ?, address = ?, principal_name = ?, principal_nip = ?, academic_year = ?, semester = ?, location_lat = ?, location_lng = ?, attendance_radius_meters = ?, regular_period_minutes = ?, short_period_minutes = ?, short_days = ?, max_periods = ?, start_time = ?, break1_after = ?, break1_minutes = ?, break2_after = ?, break2_minutes = ?, village = ?, district = ?, regency = ?, province = ?, updated_at = ? WHERE id = ?',
-            array_slice($data, 0, 24, true) + [$id]
+            array_merge(array_slice($data, 0, 24), [$id])
         );
     } else {
         $sql = 'INSERT INTO school_profile (name, npsn, address, principal_name, principal_nip, academic_year, semester, location_lat, location_lng, attendance_radius_meters, regular_period_minutes, short_period_minutes, short_days, max_periods, start_time, break1_after, break1_minutes, break2_after, break2_minutes, village, district, regency, province, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
