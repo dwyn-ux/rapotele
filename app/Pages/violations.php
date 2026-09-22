@@ -282,7 +282,7 @@ function page_violations(): void
         <td>
             <div class="row-actions">
                 <a class="button small" href="<?= e(route_url('violations', ['edit_reward' => $row['id']])) ?>">Edit</a>
-                <form method="post" onsubmit="return confirm('Hapus reward ini?')">
+                <form method="post" data-confirm="Hapus reward ini? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus reward?" data-confirm-label="Ya, hapus" data-confirm-tone="danger">
                     <?= csrf_field() ?>
                     <input type="hidden" name="action" value="delete_reward">
                     <input type="hidden" name="id" value="<?= e($row['id']) ?>">

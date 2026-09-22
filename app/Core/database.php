@@ -199,6 +199,16 @@ function execute_sql(string $sql, array $params = []): bool
     return $stmt->execute($params);
 }
 
+function is_unknown_column_error(Throwable $exception, string $column = ''): bool
+{
+    if ($exception instanceof PDOException && (string)$exception->getCode() === '42S22') {
+        return true;
+    }
+    $message = strtolower($exception->getMessage());
+    $missing = str_contains($message, 'unknown column') || str_contains($message, 'no such column');
+    return $missing && ($column === '' || str_contains($message, strtolower($column)));
+}
+
 function app_installed(): bool
 {
     try {

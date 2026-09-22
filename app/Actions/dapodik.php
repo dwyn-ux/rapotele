@@ -661,19 +661,31 @@ function dapodik_import_subject(array $row, bool $requireTeacher = true): ?int
     $level = dapodik_limit(dapodik_row_value($row, ['jenjang', 'jenjang_pendidikan', 'level', 'bentuk_pendidikan']), 64);
     $existingId = dapodik_subject_id_from_row($row);
 
-    if ($existingId) {
-        execute_sql(
-            'UPDATE subjects SET dapodik_id = COALESCE(NULLIF(?, \'\'), dapodik_id), name = ?, short_name = ?, group_name = COALESCE(NULLIF(?, \'\'), group_name), level = COALESCE(NULLIF(?, \'\'), level), active = 1, updated_at = ? WHERE id = ?',
-            [$dapodikId, $name, $short, $group, $level, now_string(), $existingId]
-        );
-        return $existingId;
+    $current = $existingId ? fetch_one('SELECT * FROM subjects WHERE id = ?', [$existingId]) : null;
+    $values = [
+        'name' => $name,
+        'short_name' => $short,
+        'active' => 1,
+        'updated_at' => now_string(),
+    ];
+    if ($dapodikId !== '' && ($current['dapodik_id'] ?? '') === '') {
+        $values['dapodik_id'] = $dapodikId;
     }
-
-    execute_sql(
-        'INSERT INTO subjects (dapodik_id, name, short_name, group_name, level, active, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?)',
-        [$dapodikId, $name, $short, $group, $level, now_string()]
-    );
-    return (int)db()->lastInsertId();
+    if ($group !== '' && ($current['group_name'] ?? '') === '') {
+        $values['group_name'] = $group;
+    }
+    if ($level !== '' && ($current['level'] ?? '') === '') {
+        $values['level'] = $level;
+    }
+    try {
+        return subject_persist($values, (int)($existingId ?? 0));
+    } catch (Throwable $e) {
+        if (!is_unknown_column_error($e)) {
+            throw $e;
+        }
+        subject_level_column(true);
+        return subject_persist($values, (int)($existingId ?? 0));
+    }
 }
 
 function dapodik_student_id_from_row(array $row): ?int

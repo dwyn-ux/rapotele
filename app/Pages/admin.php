@@ -40,7 +40,7 @@ function page_bulk_delete(): void
             <?php panel_title('Data Siswa', ''); ?>
             <p>Total: <strong><?= $counts['students'] ?> siswa</strong></p>
             <p style="color:var(--muted,#64748b);font-size:.875rem;margin:.5rem 0 1rem;">Menghapus semua siswa beserta nilai, absensi, pelanggaran, foto, kelulusan, dan akun login siswa.</p>
-            <form method="post" onsubmit="return confirm('Yakin hapus SEMUA data siswa (<?= $counts['students'] ?> siswa)?\nTindakan ini tidak dapat dibatalkan!')">
+            <form method="post" data-confirm="Yakin hapus semua data siswa (<?= $counts['students'] ?> siswa)? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus semua siswa?" data-confirm-label="Ya, hapus semua" data-confirm-tone="danger">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="bulk_delete">
                 <input type="hidden" name="target" value="students">
@@ -52,7 +52,7 @@ function page_bulk_delete(): void
             <?php panel_title('Data Guru', ''); ?>
             <p>Total: <strong><?= $counts['teachers'] ?> guru</strong></p>
             <p style="color:var(--muted,#64748b);font-size:.875rem;margin:.5rem 0 1rem;">Menghapus semua guru beserta data absensi dan akun login guru (non-admin).</p>
-            <form method="post" onsubmit="return confirm('Yakin hapus SEMUA data guru (<?= $counts['teachers'] ?> guru)?\nTindakan ini tidak dapat dibatalkan!')">
+            <form method="post" data-confirm="Yakin hapus semua data guru (<?= $counts['teachers'] ?> guru)? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus semua guru?" data-confirm-label="Ya, hapus semua" data-confirm-tone="danger">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="bulk_delete">
                 <input type="hidden" name="target" value="teachers">
@@ -64,7 +64,7 @@ function page_bulk_delete(): void
             <?php panel_title('Data Kelas', ''); ?>
             <p>Total: <strong><?= $counts['classes'] ?> kelas</strong></p>
             <p style="color:var(--muted,#64748b);font-size:.875rem;margin:.5rem 0 1rem;">Menghapus semua data kelas.</p>
-            <form method="post" onsubmit="return confirm('Yakin hapus SEMUA data kelas?\nTindakan ini tidak dapat dibatalkan!')">
+            <form method="post" data-confirm="Yakin hapus semua data kelas? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus semua kelas?" data-confirm-label="Ya, hapus semua" data-confirm-tone="danger">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="bulk_delete">
                 <input type="hidden" name="target" value="classes">
@@ -76,7 +76,7 @@ function page_bulk_delete(): void
             <?php panel_title('Data Mapel', ''); ?>
             <p>Total: <strong><?= $counts['subjects'] ?> mata pelajaran</strong></p>
             <p style="color:var(--muted,#64748b);font-size:.875rem;margin:.5rem 0 1rem;">Menghapus semua mapel beserta mapping rapor dan gabungan mapel.</p>
-            <form method="post" onsubmit="return confirm('Yakin hapus SEMUA data mapel (<?= $counts['subjects'] ?> mapel)?\nTindakan ini tidak dapat dibatalkan!')">
+            <form method="post" data-confirm="Yakin hapus semua data mapel (<?= $counts['subjects'] ?> mapel)? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus semua mapel?" data-confirm-label="Ya, hapus semua" data-confirm-tone="danger">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="bulk_delete">
                 <input type="hidden" name="target" value="subjects">
@@ -88,7 +88,7 @@ function page_bulk_delete(): void
             <?php panel_title('Data Pembelajaran', ''); ?>
             <p>Total: <strong><?= $counts['assignments'] ?> pembelajaran</strong></p>
             <p style="color:var(--muted,#64748b);font-size:.875rem;margin:.5rem 0 1rem;">Menghapus semua pembelajaran beserta jadwal, jurnal, absensi, dan nilai terkait.</p>
-            <form method="post" onsubmit="return confirm('Yakin hapus SEMUA data pembelajaran (<?= $counts['assignments'] ?>)?\nTindakan ini tidak dapat dibatalkan!')">
+            <form method="post" data-confirm="Yakin hapus semua data pembelajaran (<?= $counts['assignments'] ?>)? Jadwal, jurnal, absensi, dan nilai terkait juga akan dihapus." data-confirm-title="Hapus semua pembelajaran?" data-confirm-label="Ya, hapus semua" data-confirm-tone="danger">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="bulk_delete">
                 <input type="hidden" name="target" value="assignments">
@@ -104,7 +104,7 @@ function page_bulk_delete(): void
                     <span style="padding:.2rem .45rem;border-radius:4px;background:var(--surface-secondary,#f1f5f9);font-size:.8rem;"><?= e($dayNames[$d]) ?>: <strong><?= $scheduleByDay[$d] ?></strong></span>
                 <?php endfor; ?>
             </div>
-            <form method="post" id="form-del-schedule" onsubmit="return confirmSchedDelete(this)">
+            <form method="post" id="form-del-schedule" data-confirm="Yakin hapus semua jadwal? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus jadwal?" data-confirm-label="Ya, hapus" data-confirm-tone="danger">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="bulk_delete">
                 <input type="hidden" name="target" value="schedules">
@@ -121,12 +121,10 @@ function page_bulk_delete(): void
             <script>
             function updateSchedBtn(sel) {
                 var b = document.getElementById('btn-del-sched');
-                b.textContent = sel.value === 'all' ? 'Hapus Semua Jadwal' : 'Hapus Jadwal ' + sel.options[sel.selectedIndex].text.split(' (')[0];
-            }
-            function confirmSchedDelete() {
-                var sel = document.getElementById('sched-day');
+                var form = document.getElementById('form-del-schedule');
                 var label = sel.value === 'all' ? 'SEMUA jadwal' : 'jadwal hari ' + sel.options[sel.selectedIndex].text.split(' (')[0];
-                return confirm('Yakin hapus ' + label + '?\nTindakan ini tidak dapat dibatalkan!');
+                b.textContent = sel.value === 'all' ? 'Hapus Semua Jadwal' : 'Hapus Jadwal ' + sel.options[sel.selectedIndex].text.split(' (')[0];
+                form.dataset.confirm = 'Yakin hapus ' + label + '? Tindakan ini tidak dapat dibatalkan.';
             }
             </script>
         </section>
@@ -136,13 +134,13 @@ function page_bulk_delete(): void
             <p>Nilai mapel: <strong><?= $counts['grades'] ?></strong></p>
             <p>Nilai akhir (SKL): <strong><?= $counts['final_scores'] ?></strong></p>
             <div style="margin-top:1rem;display:flex;gap:.5rem;flex-wrap:wrap;">
-                <form method="post" onsubmit="return confirm('Yakin hapus SEMUA nilai mapel?\nTindakan ini tidak dapat dibatalkan!')">
+                <form method="post" data-confirm="Yakin hapus semua nilai mapel? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus nilai mapel?" data-confirm-label="Ya, hapus semua" data-confirm-tone="danger">
                     <?= csrf_field() ?>
                     <input type="hidden" name="action" value="bulk_delete">
                     <input type="hidden" name="target" value="grades">
                     <button type="submit" class="button danger" <?= $counts['grades'] === 0 ? 'disabled' : '' ?>>Hapus Nilai Mapel</button>
                 </form>
-                <form method="post" onsubmit="return confirm('Yakin hapus SEMUA nilai akhir (SKL)?\nTindakan ini tidak dapat dibatalkan!')">
+                <form method="post" data-confirm="Yakin hapus semua nilai akhir (SKL)? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus nilai akhir?" data-confirm-label="Ya, hapus semua" data-confirm-tone="danger">
                     <?= csrf_field() ?>
                     <input type="hidden" name="action" value="bulk_delete">
                     <input type="hidden" name="target" value="final_scores">
@@ -156,13 +154,13 @@ function page_bulk_delete(): void
             <p>Absensi siswa: <strong><?= $counts['attendance_student'] ?></strong></p>
             <p>Absensi guru: <strong><?= $counts['attendance_teacher'] ?></strong></p>
             <div style="margin-top:1rem;display:flex;gap:.5rem;flex-wrap:wrap;">
-                <form method="post" onsubmit="return confirm('Yakin hapus SEMUA absensi siswa?\nTindakan ini tidak dapat dibatalkan!')">
+                <form method="post" data-confirm="Yakin hapus semua absensi siswa? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus absensi siswa?" data-confirm-label="Ya, hapus semua" data-confirm-tone="danger">
                     <?= csrf_field() ?>
                     <input type="hidden" name="action" value="bulk_delete">
                     <input type="hidden" name="target" value="attendance_student">
                     <button type="submit" class="button danger" <?= $counts['attendance_student'] === 0 ? 'disabled' : '' ?>>Hapus Absensi Siswa</button>
                 </form>
-                <form method="post" onsubmit="return confirm('Yakin hapus SEMUA absensi guru?\nTindakan ini tidak dapat dibatalkan!')">
+                <form method="post" data-confirm="Yakin hapus semua absensi guru? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus absensi guru?" data-confirm-label="Ya, hapus semua" data-confirm-tone="danger">
                     <?= csrf_field() ?>
                     <input type="hidden" name="action" value="bulk_delete">
                     <input type="hidden" name="target" value="attendance_teacher">
@@ -175,7 +173,7 @@ function page_bulk_delete(): void
             <?php panel_title('Pelanggaran Siswa', ''); ?>
             <p>Total: <strong><?= $counts['violations'] ?> pelanggaran</strong></p>
             <div style="margin-top:1rem;">
-                <form method="post" onsubmit="return confirm('Yakin hapus SEMUA pelanggaran siswa?\nTindakan ini tidak dapat dibatalkan!')">
+                <form method="post" data-confirm="Yakin hapus semua pelanggaran siswa? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus semua pelanggaran?" data-confirm-label="Ya, hapus semua" data-confirm-tone="danger">
                     <?= csrf_field() ?>
                     <input type="hidden" name="action" value="bulk_delete">
                     <input type="hidden" name="target" value="violations">
@@ -188,7 +186,7 @@ function page_bulk_delete(): void
             <?php panel_title('Jurnal Harian', ''); ?>
             <p>Total: <strong><?= $counts['journals'] ?> jurnal</strong></p>
             <div style="margin-top:1rem;">
-                <form method="post" onsubmit="return confirm('Yakin hapus SEMUA jurnal harian?\nTindakan ini tidak dapat dibatalkan!')">
+                <form method="post" data-confirm="Yakin hapus semua jurnal harian? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus semua jurnal?" data-confirm-label="Ya, hapus semua" data-confirm-tone="danger">
                     <?= csrf_field() ?>
                     <input type="hidden" name="action" value="bulk_delete">
                     <input type="hidden" name="target" value="journals">
@@ -201,7 +199,7 @@ function page_bulk_delete(): void
             <?php panel_title('Ekstrakurikuler', ''); ?>
             <p>Total: <strong><?= $counts['extracurriculars'] ?> ekskul</strong></p>
             <p style="color:var(--muted,#64748b);font-size:.875rem;margin:.5rem 0 1rem;">Menghapus semua ekskul beserta anggota dan nilai ekskul.</p>
-            <form method="post" onsubmit="return confirm('Yakin hapus SEMUA data ekstrakurikuler?\nTindakan ini tidak dapat dibatalkan!')">
+            <form method="post" data-confirm="Yakin hapus semua data ekstrakurikuler? Anggota dan nilai ekskul juga akan dihapus." data-confirm-title="Hapus semua ekstrakurikuler?" data-confirm-label="Ya, hapus semua" data-confirm-tone="danger">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="bulk_delete">
                 <input type="hidden" name="target" value="extracurriculars">
@@ -213,7 +211,7 @@ function page_bulk_delete(): void
             <?php panel_title('Akun Pengguna (non-Admin)', ''); ?>
             <p>Total: <strong><?= $counts['users'] ?> pengguna</strong></p>
             <p style="color:var(--muted,#64748b);font-size:.875rem;margin:.5rem 0 1rem;">Menghapus semua akun kecuali admin. Guru/siswa tidak akan bisa login.</p>
-            <form method="post" onsubmit="return confirm('Yakin hapus SEMUA akun pengguna (kecuali admin)?\nGuru dan siswa tidak akan bisa login setelah ini!')">
+            <form method="post" data-confirm="Yakin hapus semua akun pengguna selain admin? Guru dan siswa tidak akan bisa login setelah ini." data-confirm-title="Hapus semua akun?" data-confirm-label="Ya, hapus semua" data-confirm-tone="danger">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="bulk_delete">
                 <input type="hidden" name="target" value="users">

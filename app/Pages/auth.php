@@ -197,13 +197,13 @@ function page_telegram_register(): void
     }
 
     $subjects = array_column_map(
-        fetch_all('SELECT id, name, level FROM subjects WHERE active = 1 ORDER BY group_name, name'),
+        subject_rows_with_optional_level('group_name, name'),
         'id',
         'name'
     );
     $subjectLabels = [];
     foreach ($subjects as $sid => $sname) {
-        $lv = fetch_one('SELECT level FROM subjects WHERE id = ?', [(int)$sid]);
+        $lv = subject_name_level((int)$sid);
         $lvs = trim((string)($lv['level'] ?? ''));
         $subjectLabels[$sid] = $sname . ($lvs !== '' ? ' [' . $lvs . ']' : '');
     }
@@ -272,7 +272,7 @@ function page_telegram_register(): void
             <select name="subject_id" id="tg-subject">
                 <option value="">Pilih mapel</option>
                 <?php foreach ($subjects as $sid => $sname): ?>
-                    <?php $lv = fetch_one('SELECT level FROM subjects WHERE id = ?', [(int)$sid]); $lvs = trim((string)($lv['level'] ?? '')); ?>
+                    <?php $lv = subject_name_level((int)$sid); $lvs = trim((string)($lv['level'] ?? '')); ?>
                     <option value="<?= e((string)$sid) ?>" data-level="<?= e($lvs) ?>"<?= (string)($values['subject_id'] ?? '') === (string)$sid ? ' selected' : '' ?>><?= e($sname) . ($lvs !== '' ? ' [' . $lvs . ']' : '') ?></option>
                 <?php endforeach; ?>
             </select>

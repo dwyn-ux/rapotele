@@ -1305,7 +1305,7 @@ function schedule_lock_badge(int $locked): string
 function lesson_schedule_actions(int $id): string
 {
     return '<div class="row-actions"><a class="button small" href="' . e(route_url('lesson-schedule', ['edit_schedule' => $id])) . '">Edit</a>'
-        . '<form method="post" onsubmit="return confirm(\'Hapus jadwal ini?\')">' . csrf_field()
+        . '<form method="post" data-confirm="Hapus jadwal ini? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus jadwal?" data-confirm-label="Ya, hapus" data-confirm-tone="danger">' . csrf_field()
         . '<input type="hidden" name="action" value="delete_lesson_schedule"><input type="hidden" name="id" value="' . e($id) . '">'
         . '<button class="button small danger">Hapus</button></form></div>';
 }
@@ -1313,7 +1313,7 @@ function lesson_schedule_actions(int $id): string
 function schedule_request_actions(int $id): string
 {
     return '<div class="row-actions"><a class="button small" href="' . e(route_url('lesson-schedule', ['edit_request' => $id])) . '">Edit</a>'
-        . '<form method="post" onsubmit="return confirm(\'Hapus request ini?\')">' . csrf_field()
+        . '<form method="post" data-confirm="Hapus permintaan jadwal ini? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus permintaan?" data-confirm-label="Ya, hapus" data-confirm-tone="danger">' . csrf_field()
         . '<input type="hidden" name="action" value="delete_schedule_request"><input type="hidden" name="id" value="' . e($id) . '">'
         . '<button class="button small danger">Hapus</button></form></div>';
 }

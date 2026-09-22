@@ -94,6 +94,9 @@ require_once __DIR__ . '/Core/security.php';
 require_once __DIR__ . '/Core/database.php';
 require_once __DIR__ . '/Core/http.php';
 require_once __DIR__ . '/migrations.php';
+if (PHP_SAPI !== 'cli') {
+    run_migrations();
+}
 require_once __DIR__ . '/Services/telegram.php';
 
 send_security_headers();

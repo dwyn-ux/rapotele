@@ -9,7 +9,7 @@ function page_backup_restore(): void
     <section class="panel">
         <div class="grid two">
             <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="create_backup"><button class="button primary">Backup Data</button></form>
-            <form method="post" enctype="multipart/form-data" onsubmit="return confirm('Restore akan mengganti data saat ini. Lanjut?')">
+            <form method="post" enctype="multipart/form-data" data-confirm="Restore akan mengganti data yang digunakan saat ini. Pastikan file backup sudah benar sebelum melanjutkan." data-confirm-title="Restore data?" data-confirm-label="Ya, restore" data-confirm-tone="warning">
                 <?= csrf_field() ?><input type="hidden" name="action" value="restore_backup">
                 <?php render_file_upload('userfile', '.json,application/json', 'File Backup JSON', true, 'Pilih file backup .json untuk direstore.') ?>
                 <div class="actions"><button class="button danger">Restore Data</button></div>

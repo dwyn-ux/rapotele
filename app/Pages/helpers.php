@@ -101,7 +101,7 @@ function row_actions(string $page, int $id, string $deleteAction): string
     return '<div class="row-actions">'
         . '<a class="button small" href="' . e(route_url($page, ['edit' => $id])) . '">'
         . '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit</a>'
-        . '<form method="post" onsubmit="return confirm(\'Hapus data ini? Aksi ini tidak dapat dibatalkan.\')">' . csrf_field()
+        . '<form method="post" data-confirm="Hapus data ini? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus data?" data-confirm-label="Ya, hapus" data-confirm-tone="danger">' . csrf_field()
         . '<input type="hidden" name="action" value="' . e($deleteAction) . '"><input type="hidden" name="id" value="' . e($id) . '">'
         . '<button class="button small danger"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Hapus</button></form></div>';
 }
@@ -152,6 +152,71 @@ function subjects_with_level(): array
     }
 }
 
+function subject_level_column(bool $refresh = false): bool
+{
+    static $has = null;
+    if ($has !== null && !$refresh) {
+        return $has;
+    }
+    try {
+        $has = table_column_exists('subjects', 'level');
+        if (!$has) {
+            try {
+                migration_add_column('subjects', 'level', 'VARCHAR(64) NULL');
+            } catch (Throwable) {
+            }
+            $has = table_column_exists('subjects', 'level');
+        }
+    } catch (Throwable) {
+        $has = false;
+    }
+    return $has;
+}
+
+function subject_persist(array $values, int $id = 0): int
+{
+    subject_level_column();
+    $allowed = ['name', 'short_name', 'group_name', 'level', 'dapodik_id', 'active', 'updated_at'];
+    try {
+        $cols = table_columns('subjects');
+    } catch (Throwable) {
+        $cols = $allowed;
+    }
+    $write = [];
+    foreach ($allowed as $c) {
+        if (in_array($c, $cols, true) && array_key_exists($c, $values)) {
+            $write[$c] = $values[$c];
+        }
+    }
+    if (!$write) {
+        throw new RuntimeException('Tidak ada kolom subjects yang bisa ditulis.');
+    }
+    if ($id > 0) {
+        $set = implode(', ', array_map(fn ($c): string => db_identifier($c) . ' = ?', array_keys($write)));
+        execute_sql('UPDATE subjects SET ' . $set . ' WHERE id = ?', [...array_values($write), $id]);
+        return $id;
+    }
+    $list = implode(', ', array_map('db_identifier', array_keys($write)));
+    execute_sql('INSERT INTO subjects (' . $list . ') VALUES (' . implode(', ', array_fill(0, count($write), '?')) . ')', array_values($write));
+    return (int)db()->lastInsertId();
+}
+
+function subject_name_level(int $subjectId): ?array
+{
+    if (subject_level_column()) {
+        try {
+            return fetch_one('SELECT name, level FROM subjects WHERE id = ?', [$subjectId]);
+        } catch (Throwable) {
+            subject_level_column(true);
+        }
+    }
+    $row = fetch_one('SELECT name FROM subjects WHERE id = ?', [$subjectId]);
+    if ($row !== null) {
+        $row['level'] = null;
+    }
+    return $row;
+}
+
 function classes_with_level(): array
 {
     try {
@@ -165,18 +230,35 @@ function classes_with_level(): array
 
 function subject_options_for_level(?string $classLevel): array
 {
-    $rows = fetch_all('SELECT id, name FROM subjects WHERE active = 1 ORDER BY name');
+    $rows = subject_rows_with_optional_level('name');
     if ($classLevel === null || $classLevel === '') {
         return array_column_map($rows, 'id', 'name');
     }
     $out = [];
     foreach ($rows as $r) {
-        $rowLevel = fetch_one('SELECT level FROM subjects WHERE id = ?', [(int)$r['id']]);
-        if (subject_has_level($rowLevel['level'] ?? null, $classLevel)) {
+        if (subject_has_level($r['level'] ?? null, $classLevel)) {
             $out[(string)$r['id']] = (string)$r['name'];
         }
     }
     return $out;
+}
+
+function subject_rows_with_optional_level(string $orderBy = 'name'): array
+{
+    if (!preg_match('/^[A-Za-z0-9_,\s]+$/', $orderBy)) {
+        $orderBy = 'name';
+    }
+    if (subject_level_column()) {
+        try {
+            return fetch_all('SELECT id, name, level FROM subjects WHERE active = 1 ORDER BY ' . $orderBy);
+        } catch (Throwable) {
+            subject_level_column(true);
+        }
+    }
+    $rows = fetch_all('SELECT id, name FROM subjects WHERE active = 1 ORDER BY ' . $orderBy);
+    return array_map(function ($r) {
+        return ['id' => (int)$r['id'], 'name' => (string)$r['name'], 'level' => null];
+    }, $rows);
 }
 
 function array_column_map(array $rows, string $key, string $value): array

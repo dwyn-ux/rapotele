@@ -264,27 +264,52 @@ function action_save_subject(): void
         flash('danger', 'Nama mapel wajib diisi.');
         redirect_to('subjects');
     }
-    $levels = array_values(array_intersect((array)($_POST['levels'] ?? []), school_levels()));
-    if (!$levels) {
+    $levels = array_values(array_intersect(array_map('trim', (array)($_POST['levels'] ?? [])), SUBJECT_LEVELS));
+    $levelCsv = implode(',', $levels);
+    $hasLevel = subject_level_column();
+    if ($id <= 0 && $levelCsv === '' && $hasLevel) {
         flash('danger', 'Pilih minimal 1 jenjang untuk mapel (sesuai jenjang kelas yang ada).');
         redirect_to('subjects');
     }
-    $levelCsv = implode(',', $levels);
-    $data = [
-        $name,
-        trim((string)($_POST['short_name'] ?? '')),
-        trim((string)($_POST['group_name'] ?? '')),
-        $levelCsv,
-        isset($_POST['active']) ? 1 : 0,
-        now_string(),
+    if ($id > 0 && $levelCsv === '' && $hasLevel) {
+        $cur = fetch_one('SELECT level FROM subjects WHERE id = ?', [$id]);
+        if ($cur !== null && trim((string)($cur['level'] ?? '')) !== '') {
+            flash('danger', 'Pilih minimal 1 jenjang untuk mapel (sesuai jenjang kelas yang ada).');
+            redirect_to('subjects');
+        }
+    }
+    $values = [
+        'name' => $name,
+        'short_name' => trim((string)($_POST['short_name'] ?? '')),
+        'group_name' => trim((string)($_POST['group_name'] ?? '')),
+        'level' => $levelCsv,
+        'active' => isset($_POST['active']) ? 1 : 0,
+        'updated_at' => now_string(),
     ];
-    if ($id > 0) {
-        execute_sql('UPDATE subjects SET name = ?, short_name = ?, group_name = ?, level = ?, active = ?, updated_at = ? WHERE id = ?', array_merge($data, [$id]));
-    } else {
-        execute_sql('INSERT INTO subjects (name, short_name, group_name, level, active, updated_at) VALUES (?, ?, ?, ?, ?, ?)', $data);
+    try {
+        subject_persist($values, $id);
+    } catch (Throwable $e) {
+        if (!is_unknown_column_error($e)) {
+            throw $e;
+        }
+        subject_level_column(true);
+        subject_persist($values, $id);
+    }
+    if (!$hasLevel && $levelCsv !== '') {
+        flash('warning', 'Kolom jenjang belum ada di database, mapel tersimpan tanpa jenjang. Tambahkan kolom level lalu simpan ulang bila perlu filter jenjang.');
+        redirect_to('subjects');
     }
     flash('success', 'Data mapel tersimpan.');
     redirect_to('subjects');
+}
+
+function assignment_subject_row(int $subjectId): ?array
+{
+    $row = subject_name_level($subjectId);
+    if ($row !== null) {
+        return $row;
+    }
+    return fetch_one('SELECT name FROM subjects WHERE id = ?', [$subjectId]);
 }
 
 function action_save_assignment(): void
@@ -305,7 +330,7 @@ function action_save_assignment(): void
         redirect_to('assignments');
     }
     $classRow = fetch_one('SELECT name, level FROM classes WHERE id = ?', [$classId]);
-    $subjectRow = fetch_one('SELECT name, level FROM subjects WHERE id = ?', [$subjectId]);
+    $subjectRow = assignment_subject_row($subjectId);
     $teacherRow = fetch_one('SELECT id FROM teachers WHERE id = ?', [$teacherId]);
     if (!$classRow || !$subjectRow || !$teacherRow) {
         flash('danger', 'Guru, kelas, atau mapel tidak ditemukan.');
@@ -547,7 +572,7 @@ function action_import_bulk(): void
             }
             // Validate subject level matches class level
             $classRow = fetch_one('SELECT name, level FROM classes WHERE id = ?', [$classId]);
-            $subjectRow = fetch_one('SELECT name, level FROM subjects WHERE id = ?', [$subjectId]);
+            $subjectRow = assignment_subject_row($subjectId);
             if (!subject_has_level($subjectRow['level'] ?? null, (string)($classRow['level'] ?? ''))) {
                 $errors[] = "Baris $rowNum: mapel '{$subjectRow['name']}' tidak berlaku untuk jenjang kelas '{$classRow['name']}', dilewati.";
                 $skipped++; continue;
@@ -778,7 +803,7 @@ function action_import_bulk_validate(): void
         $r['subject_id'] = $subjectId;
 
         $classRow = fetch_one('SELECT name, level FROM classes WHERE id = ?', [$classId]);
-        $subjectRow = fetch_one('SELECT name, level FROM subjects WHERE id = ?', [$subjectId]);
+        $subjectRow = assignment_subject_row($subjectId);
         if (!subject_has_level($subjectRow['level'] ?? null, (string)($classRow['level'] ?? ''))) {
             $r['error'] = 'Mapel "' . $subjectRow['name'] . '" tidak berlaku untuk jenjang kelas "' . $classRow['name'] . '"';
             $rows[] = $r; continue;

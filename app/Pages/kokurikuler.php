@@ -242,7 +242,7 @@ function page_foto_siswa(): void
             <?= csrf_field() ?><input type="hidden" name="action" value="bulk_student_photo">
             <?php render_file_upload('zip_file', '.zip,application/zip', 'File ZIP Foto', true, 'Nama file gambar harus sesuai NISN siswa. Contoh: 0081234001.jpg') ?>
             <div class="actions" style="margin-top:10px;">
-                <button class="button primary" onclick="return confirm('Upload foto bulk dari file ZIP ini? Nama file gambar akan dicocokkan dengan NISN siswa.')">
+                <button class="button primary" data-confirm="Upload foto dari file ZIP ini? Nama file gambar akan dicocokkan dengan NISN siswa." data-confirm-title="Upload foto siswa?" data-confirm-label="Ya, upload" data-confirm-tone="primary">
                     Upload Bulk Foto
                 </button>
             </div>

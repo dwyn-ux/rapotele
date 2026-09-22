@@ -28,7 +28,7 @@ function ext_delete_button(string $table, string $page, int $id): string
         return '<span class="hint">-</span>';
     }
     return '<div class="row-actions"><a class="button small" href="' . e(route_url($page, ['edit' => $id])) . '">Edit</a>'
-        . '<form method="post" onsubmit="return confirm(\'Hapus data ini?\')">' . csrf_field()
+        . '<form method="post" data-confirm="Hapus data ini? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus data?" data-confirm-label="Ya, hapus" data-confirm-tone="danger">' . csrf_field()
         . '<input type="hidden" name="action" value="delete_extended">'
         . '<input type="hidden" name="table" value="' . e($table) . '">'
         . '<input type="hidden" name="return_page" value="' . e($page) . '">'

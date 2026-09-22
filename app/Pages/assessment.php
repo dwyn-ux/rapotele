@@ -664,7 +664,7 @@ function page_deskripsi_nilai(): void
             </select></label>
             <div class="actions"><button type="submit" class="button">Tampilkan</button>
             <?php if ($classId): ?>
-                <button class="button warning" type="submit" name="action" value="generate_deskripsi_nilai" formmethod="post" onclick="return confirm('Generate ulang deskripsi otomatis untuk semua siswa? Deskripsi yang sudah diedit akan ditimpa.')">Generate Ulang Semua</button>
+                <button class="button warning" type="submit" name="action" value="generate_deskripsi_nilai" formmethod="post" data-confirm="Deskripsi otomatis akan dibuat ulang untuk semua siswa. Deskripsi yang sudah diedit akan ditimpa." data-confirm-title="Generate ulang deskripsi?" data-confirm-label="Ya, generate ulang" data-confirm-tone="warning">Generate Ulang Semua</button>
             <?php endif; ?>
             </div>
         </form>
@@ -776,4 +776,3 @@ function page_deskripsi_nilai(): void
     <?php endforeach;
     render_footer();
 }
-

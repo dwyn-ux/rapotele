@@ -295,7 +295,7 @@ function page_schools(): void
                     <?= csrf_field() ?>
                     <input type="hidden" name="action" value="delete_school">
                     <input type="hidden" name="id" value="<?= (int)$row['id'] ?>">
-                    <button class="button small danger" type="submit" onclick="return confirm('Hapus sekolah ini?')">Hapus</button>
+                    <button class="button small danger" type="submit" data-confirm="Hapus data sekolah ini? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus sekolah?" data-confirm-label="Ya, hapus" data-confirm-tone="danger">Hapus</button>
                 </form>
             <?php else: ?>
                 <button class="button small danger" disabled title="Sekolah masih dipakai <?= (int)$row['class_count'] ?> kelas">Hapus</button>
@@ -658,11 +658,15 @@ function page_subjects(): void
 {
     require_role(['admin']);
     $edit = edit_row('subjects') ?: [];
+    $hasLevel = subject_level_column();
     $rows = fetch_all('SELECT * FROM subjects ORDER BY group_name, name');
+    foreach ($rows as &$rl) { if (!array_key_exists('level', $rl)) { $rl['level'] = null; } }
+    unset($rl);
     $selectedLevels = [];
-    if (!empty($edit['level'])) {
-        $selectedLevels = array_values(array_intersect(explode(',', (string)$edit['level']), school_levels()));
+    if ($hasLevel && !empty($edit['level'])) {
+        $selectedLevels = array_values(array_filter(array_map('trim', explode(',', (string)$edit['level']))));
     }
+    $levelOptions = array_values(array_unique(array_merge(school_levels(), $selectedLevels)));
     $levelFilter = (string)($_GET['level'] ?? '');
     if ($levelFilter !== '') {
         $rows = array_values(array_filter($rows, function ($r) use ($levelFilter) {
@@ -695,8 +699,12 @@ function page_subjects(): void
             <?= csrf_field() ?><input type="hidden" name="action" value="save_subject"><input type="hidden" name="id" value="<?= e($edit['id'] ?? 0) ?>">
             <label class="span-2">Nama Mapel <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
             <label>Nama Singkat <input type="text" name="short_name" value="<?= e($edit['short_name'] ?? '') ?>"></label>
-            <label>Kelompok <input type="text" name="group_name" value="<?= e($row['group_name'] ?? '') ?>"></label>
-            <?= subject_levels_input($selectedLevels) ?>
+            <label>Kelompok <input type="text" name="group_name" value="<?= e($edit['group_name'] ?? '') ?>"></label>
+            <?php if ($hasLevel): ?>
+            <?= subject_levels_input($selectedLevels, $levelOptions) ?>
+            <?php else: ?>
+            <p class="hint" style="grid-column:1/-1">Kolom jenjang belum ada di database — mapel tersimpan tanpa jenjang. Tambahkan kolom <code>subjects.level VARCHAR(64) NULL</code> bila perlu filter jenjang.</p>
+            <?php endif; ?>
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
             <div class="actions span-2"><button class="button primary">Simpan</button><a class="button" href="<?= e(route_url('subjects')) ?>">Reset</a></div>
         </form>
