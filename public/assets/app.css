@@ -581,10 +581,10 @@ img { max-width: 100%; height: auto; }
   flex: 0 1 360px;
 }
 
-.topbar-search input {
+.topbar-search input[type="text"] {
   width: 100%;
   height: var(--input-height-small);
-  padding: 0 var(--space-4) 0 40px;
+  padding: 0 72px 0 40px;
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
   background: var(--surface-secondary);
@@ -594,13 +594,13 @@ img { max-width: 100%; height: auto; }
   transition: all var(--transition-fast);
 }
 
-.topbar-search input:focus {
+.topbar-search input[type="text"]:focus {
   border-color: var(--primary);
   background: #fff;
   box-shadow: 0 0 0 3px var(--primary-lighter);
 }
 
-.topbar-search input::placeholder {
+.topbar-search input[type="text"]::placeholder {
   color: var(--text-muted);
 }
 
