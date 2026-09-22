@@ -1316,3 +1316,434 @@ function dapodik_post_payload(string $baseUrl, string $kind, array $payload): st
 
     return 'Pengiriman ' . $kind . ' belum diterima Dapodik. Percobaan: ' . implode('; ', $attempts) . '. Cek endpoint write Dapodik/e-Rapor pada instalasi lokal.';
 }
+
+// ── Import siswa dari file export Dapodik (.xlsx "Daftar Peserta Didik") ──
+// Format: 4 baris kop, baris header (No, Nama, NIPD, JK, NISN, ..., Rombel
+// Saat Ini, ...), 1 baris sub-header (Data Ayah/Ibu/Wali), lalu data.
+// Tanpa library tambahan: baca via ZipArchive + SimpleXML (bawaan PHP).
+
+function dapodik_is_xlsx(string $path): bool
+{
+    $fh = @fopen($path, 'rb');
+    if (!$fh) {
+        return false;
+    }
+    $magic = fread($fh, 4);
+    fclose($fh);
+    return $magic === "PK\x03\x04";
+}
+
+function dapodik_export_col_index(string $ref): int
+{
+    if (!preg_match('/^([A-Z]+)(\d+)$/', strtoupper(trim($ref)), $m)) {
+        return -1;
+    }
+    $col = 0;
+    foreach (str_split($m[1]) as $ch) {
+        $col = $col * 26 + (ord($ch) - 65) + 1;
+    }
+    return $col - 1;
+}
+
+function dapodik_export_worksheet_file(ZipArchive $zip): string
+{
+    $relsNs = 'http://schemas.openxmlformats.org/package/2006/relationships';
+    $targets = [];
+    $rels = $zip->getFromName('xl/_rels/workbook.xml.rels');
+    if ($rels !== false) {
+        $rx = @simplexml_load_string($rels);
+        if ($rx) {
+            foreach ($rx->children($relsNs)->Relationship as $rel) {
+                $a = $rel->attributes();
+                $targets[(string)($a['Id'] ?? '')] = (string)($a['Target'] ?? '');
+            }
+        }
+    }
+    $wb = $zip->getFromName('xl/workbook.xml');
+    if ($wb !== false) {
+        $wx = @simplexml_load_string($wb);
+        if ($wx) {
+            foreach ($wx->xpath('//*[local-name()="sheet"]') ?: [] as $sheet) {
+                $attrs = $sheet->attributes('http://schemas.openxmlformats.org/officeDocument/2006/relationships');
+                $rid = (string)($attrs['id'] ?? '');
+                if ($rid === '') {
+                    foreach ($sheet->attributes() as $k => $v) {
+                        if ((string)$k === 'id' || str_ends_with((string)$k, ':id')) {
+                            $rid = (string)$v;
+                            break;
+                        }
+                    }
+                }
+                $target = $targets[$rid] ?? '';
+                if ($target !== '') {
+                    return str_starts_with($target, 'xl/') ? $target : 'xl/' . ltrim($target, '/');
+                }
+            }
+        }
+    }
+    return 'xl/worksheets/sheet1.xml';
+}
+
+function dapodik_export_read_xlsx(string $path): array
+{
+    if (!class_exists('ZipArchive')) {
+        throw new RuntimeException('Ekstensi PHP ZIP belum aktif.');
+    }
+    $zip = new ZipArchive();
+    if ($zip->open($path) !== true) {
+        throw new RuntimeException('File .xlsx tidak valid atau rusak.');
+    }
+    try {
+        $ns = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+        $strings = [];
+        $ssXml = $zip->getFromName('xl/sharedStrings.xml');
+        if ($ssXml !== false) {
+            $ss = @simplexml_load_string($ssXml);
+            if ($ss) {
+                foreach ($ss->children($ns)->si as $si) {
+                    $text = '';
+                    foreach ($si->children($ns)->t as $t) {
+                        $text .= (string)$t;
+                    }
+                    foreach ($si->children($ns)->r as $r) {
+                        foreach ($r->children($ns)->t as $t) {
+                            $text .= (string)$t;
+                        }
+                    }
+                    $strings[] = $text;
+                }
+            }
+        }
+        $sheetXml = $zip->getFromName(dapodik_export_worksheet_file($zip));
+        if ($sheetXml === false) {
+            throw new RuntimeException('Sheet data tidak ditemukan di file .xlsx.');
+        }
+        $ws = @simplexml_load_string($sheetXml);
+        if (!$ws) {
+            throw new RuntimeException('Sheet .xlsx tidak bisa dibaca.');
+        }
+        $grid = [];
+        $maxCol = 0;
+        foreach ($ws->children($ns)->sheetData->row as $row) {
+            $rowAttr = $row->attributes();
+            $rowNum = (int)($rowAttr['r'] ?? 0);
+            if ($rowNum <= 0) {
+                continue;
+            }
+            foreach ($row->children($ns)->c as $c) {
+                $cAttr = $c->attributes();
+                $col = dapodik_export_col_index((string)($cAttr['r'] ?? ''));
+                if ($col < 0) {
+                    continue;
+                }
+                $type = (string)($cAttr['t'] ?? '');
+                $value = '';
+                if ($type === 's') {
+                    $value = $strings[(int)(string)$c->children($ns)->v] ?? '';
+                } elseif ($type === 'inlineStr') {
+                    $is = $c->children($ns)->is;
+                    foreach ($is->children($ns)->t as $t) {
+                        $value .= (string)$t;
+                    }
+                    foreach ($is->children($ns)->r as $r) {
+                        foreach ($r->children($ns)->t as $t) {
+                            $value .= (string)$t;
+                        }
+                    }
+                } else {
+                    $v = $c->children($ns)->v;
+                    $value = isset($v[0]) ? (string)$v : '';
+                }
+                $grid[$rowNum][$col] = $value;
+                $maxCol = max($maxCol, $col);
+            }
+        }
+        return [$grid, $maxCol];
+    } finally {
+        $zip->close();
+    }
+}
+
+function dapodik_export_norm(string $v): string
+{
+    return (string)preg_replace('/\s+/', ' ', strtolower(trim($v)));
+}
+
+function dapodik_export_header_row(array $grid): ?int
+{
+    for ($r = 1; $r <= 15; $r++) {
+        if (!isset($grid[$r])) {
+            continue;
+        }
+        $joined = ' ' . implode(' ', array_map('dapodik_export_norm', $grid[$r])) . ' ';
+        if (str_contains($joined, ' nisn ') && str_contains($joined, 'rombel')) {
+            return $r;
+        }
+    }
+    return null;
+}
+
+function dapodik_export_colmap(array $grid, int $headerRow, int $maxCol): array
+{
+    $map = [];
+    $group = '';
+    for ($c = 0; $c <= $maxCol; $c++) {
+        $top = dapodik_export_norm((string)($grid[$headerRow][$c] ?? ''));
+        $sub = dapodik_export_norm((string)($grid[$headerRow + 1][$c] ?? ''));
+        if ($top !== '' && $sub !== '') {
+            $group = $top;
+            $key = $top . ' ' . $sub;
+        } elseif ($top !== '') {
+            $group = '';
+            $key = $top;
+        } elseif ($sub !== '' && $group !== '') {
+            $key = $group . ' ' . $sub;
+        } elseif ($sub !== '') {
+            $key = $sub;
+        } else {
+            continue;
+        }
+        $field = match ($key) {
+            'nama' => 'name',
+            'nipd' => 'nis',
+            'jk', 'jenis kelamin', 'l/p' => 'gender',
+            'nisn' => 'nisn',
+            'tempat lahir' => 'birth_place',
+            'tanggal lahir', 'tgl lahir', 'tgl. lahir' => 'birth_date',
+            'agama' => 'religion',
+            'alamat' => 'address',
+            'rt' => 'rt', 'rw' => 'rw', 'dusun' => 'dusun',
+            'kelurahan', 'desa/kel.', 'desa/kel' => 'kelurahan',
+            'kecamatan' => 'kecamatan', 'kode pos' => 'kodepos',
+            'telepon', 'telp', 'no. telepon' => 'phone_telp',
+            'hp', 'no. hp', 'no hp', 'handphone' => 'phone_hp',
+            'e-mail', 'email' => 'email',
+            'data ayah nama', 'nama ayah' => 'father_name',
+            'data ayah pekerjaan' => 'father_occupation',
+            'data ibu nama', 'nama ibu' => 'mother_name',
+            'data ibu pekerjaan' => 'mother_occupation',
+            'data wali nama', 'nama wali' => 'guardian_name',
+            'rombel saat ini', 'rombel', 'rombongan belajar' => 'rombel',
+            default => null,
+        };
+        if ($field !== null && !isset($map[$field])) {
+            $map[$field] = $c;
+        }
+    }
+    if (!isset($map['name']) || !isset($map['nisn']) || !isset($map['rombel'])) {
+        foreach (['name' => 1, 'nis' => 2, 'gender' => 3, 'nisn' => 4, 'birth_place' => 5, 'birth_date' => 6, 'religion' => 8, 'address' => 9, 'rt' => 10, 'rw' => 11, 'dusun' => 12, 'kelurahan' => 13, 'kecamatan' => 14, 'kodepos' => 15, 'phone_telp' => 18, 'phone_hp' => 19, 'email' => 20, 'father_name' => 24, 'father_occupation' => 27, 'mother_name' => 30, 'mother_occupation' => 33, 'guardian_name' => 36, 'rombel' => 42] as $field => $col) {
+            if (!isset($map[$field])) {
+                $map[$field] = $col;
+            }
+        }
+    }
+    return $map;
+}
+
+function dapodik_export_gender(string $v): string
+{
+    $v = strtolower(trim($v));
+    if (in_array($v, ['l', 'laki', 'laki-laki', 'laki laki', '1'], true)) {
+        return 'L';
+    }
+    if (in_array($v, ['p', 'perempuan', 'pr', '2'], true)) {
+        return 'P';
+    }
+    return mb_strimwidth(trim($v), 0, 16, '');
+}
+
+function dapodik_export_date(mixed $v): ?string
+{
+    $v = trim((string)$v);
+    if ($v === '') {
+        return null;
+    }
+    if (preg_match('/^\d{4}-\d{2}-\d{2}/', $v)) {
+        return substr($v, 0, 10);
+    }
+    if (is_numeric($v) && (float)$v > 20000 && (float)$v < 80000) {
+        return gmdate('Y-m-d', (int)(((float)$v - 25569) * 86400));
+    }
+    foreach (['d/m/Y', 'd-m-Y', 'd.m.Y'] as $f) {
+        $dt = DateTime::createFromFormat($f, $v);
+        if ($dt) {
+            return $dt->format('Y-m-d');
+        }
+    }
+    $ts = strtotime($v);
+    return $ts ? date('Y-m-d', $ts) : null;
+}
+
+function dapodik_export_records(array $grid, int $headerRow, int $maxCol): array
+{
+    $map = dapodik_export_colmap($grid, $headerRow, $maxCol);
+    $records = [];
+    foreach (array_keys($grid) as $r) {
+        if ($r < $headerRow + 2) {
+            continue;
+        }
+        $row = $grid[$r];
+        $cell = fn (string $field): string => isset($map[$field]) ? trim((string)($row[$map[$field]] ?? '')) : '';
+        $name = $cell('name');
+        if ($name === '' || dapodik_export_norm($name) === 'nama') {
+            continue;
+        }
+        $nisnRaw = $cell('nisn');
+        if ($nisnRaw !== '' && ctype_digit($nisnRaw) && strlen($nisnRaw) < 10) {
+            $nisnRaw = str_pad($nisnRaw, 10, '0', STR_PAD_LEFT);
+        }
+        $rt = $cell('rt');
+        $rw = $cell('rw');
+        $rtrw = trim(($rt !== '' ? 'RT ' . $rt : '') . ($rw !== '' ? ' RW ' . $rw : ''));
+        $address = implode(', ', array_filter([$cell('address'), $rtrw, $cell('dusun'), $cell('kelurahan'), $cell('kecamatan'), $cell('kodepos')]));
+        $phone = $cell('phone_hp') !== '' ? $cell('phone_hp') : $cell('phone_telp');
+        $records[] = [
+            '_row' => $r,
+            'name' => mb_strimwidth($name, 0, 160, ''),
+            'nis' => mb_strimwidth($cell('nis'), 0, 64, ''),
+            'nisn' => mb_strimwidth($nisnRaw, 0, 64, ''),
+            'gender' => dapodik_export_gender($cell('gender')),
+            'birth_place' => mb_strimwidth($cell('birth_place'), 0, 80, ''),
+            'birth_date' => dapodik_export_date($cell('birth_date')),
+            'religion' => mb_strimwidth($cell('religion'), 0, 64, ''),
+            'address' => $address,
+            'phone' => mb_strimwidth($phone, 0, 32, ''),
+            'email' => mb_strimwidth($cell('email'), 0, 160, ''),
+            'father_name' => mb_strimwidth($cell('father_name'), 0, 160, ''),
+            'father_occupation' => mb_strimwidth($cell('father_occupation'), 0, 120, ''),
+            'mother_name' => mb_strimwidth($cell('mother_name'), 0, 160, ''),
+            'mother_occupation' => mb_strimwidth($cell('mother_occupation'), 0, 120, ''),
+            'guardian_name' => mb_strimwidth($cell('guardian_name'), 0, 160, ''),
+            'rombel' => $cell('rombel'),
+        ];
+    }
+    return $records;
+}
+
+function dapodik_export_resolve_class(string $rombel, bool $create, array &$createdNames): ?int
+{
+    $name = trim($rombel);
+    if ($name === '') {
+        return null;
+    }
+    $short = trim((string)preg_replace('/^kelas\s+/i', '', $name));
+    if ($short === '') {
+        $short = $name;
+    }
+    foreach (array_unique([$name, $short]) as $cand) {
+        $cls = fetch_one('SELECT id FROM classes WHERE name = ? ORDER BY id LIMIT 1', [$cand])
+            ?: fetch_one('SELECT id FROM classes WHERE LOWER(name) = LOWER(?) ORDER BY id LIMIT 1', [$cand]);
+        if ($cls) {
+            return (int)$cls['id'];
+        }
+    }
+    if (!$create) {
+        return null;
+    }
+    if (!preg_match('/\d+/', $short, $m)) {
+        return null;
+    }
+    $grade = (int)$m[0] >= 1 && (int)$m[0] <= 13 ? $m[0] : '';
+    if ($grade === '') {
+        return null;
+    }
+    $level = (int)$grade <= 6 ? 'SD' : ((int)$grade <= 9 ? 'SMP' : 'SMA');
+    $schoolId = null;
+    $s = fetch_one('SELECT school_id FROM classes WHERE level = ? AND school_id IS NOT NULL GROUP BY school_id ORDER BY COUNT(*) DESC LIMIT 1', [$level]);
+    if ($s) {
+        $schoolId = (int)$s['school_id'];
+    }
+    if (!$schoolId) {
+        $s = fetch_one('SELECT id FROM school_profile ORDER BY id LIMIT 1');
+        $schoolId = $s ? (int)$s['id'] : null;
+    }
+    execute_sql(
+        'INSERT INTO classes (name, grade, level, school_id, academic_year, active, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?)',
+        [$short, $grade, $level, $schoolId, current_academic_year(), now_string()]
+    );
+    $createdNames[] = $short;
+    return (int)db()->lastInsertId();
+}
+
+function dapodik_export_find_student(string $nisn, string $nis, string $name): ?int
+{
+    if ($nisn !== '') {
+        $s = fetch_one('SELECT id FROM students WHERE nisn = ? ORDER BY id LIMIT 1', [$nisn]);
+        if ($s) {
+            return (int)$s['id'];
+        }
+    }
+    if ($nis !== '') {
+        $s = fetch_one('SELECT id FROM students WHERE nis = ? ORDER BY id LIMIT 1', [$nis]);
+        if ($s) {
+            return (int)$s['id'];
+        }
+    }
+    if ($name !== '') {
+        $m = fetch_all('SELECT id FROM students WHERE name = ? ORDER BY id', [$name]);
+        if (count($m) === 1) {
+            return (int)$m[0]['id'];
+        }
+    }
+    return null;
+}
+
+function dapodik_import_siswa_export(array $records, bool $updateExisting, bool $createClasses, bool $createUsers): array
+{
+    $stats = ['baru' => 0, 'diupdate' => 0, 'dilewati' => 0, 'akun' => 0, 'kelas_baru' => [], 'errors' => []];
+    $classCache = [];
+    $defaultPassword = (string)config('default_student_password', 'siswa123');
+    foreach ($records as $d) {
+        $rowNo = (int)($d['_row'] ?? 0);
+        try {
+            $classId = null;
+            if ($d['rombel'] !== '') {
+                $key = strtolower($d['rombel']);
+                if (!array_key_exists($key, $classCache)) {
+                    $classCache[$key] = dapodik_export_resolve_class($d['rombel'], $createClasses, $stats['kelas_baru']);
+                }
+                $classId = $classCache[$key];
+            }
+            $existing = dapodik_export_find_student($d['nisn'], $d['nis'], $d['name']);
+            if ($existing && !$updateExisting) {
+                $stats['dilewati']++;
+                continue;
+            }
+            $params = [$d['nis'], $d['nisn'], $d['name'], $d['gender'], $d['birth_place'], $d['birth_date'], $d['religion'], $d['address'], $d['phone'], $d['father_name'], $d['father_occupation'], $d['mother_name'], $d['mother_occupation'], $d['guardian_name'], $classId];
+            if ($existing) {
+                execute_sql(
+                    "UPDATE students SET nis = ?, nisn = ?, name = ?, gender = ?, birth_place = ?, birth_date = ?, religion = ?, address = NULLIF(?, ''), phone = NULLIF(?, ''), father_name = NULLIF(?, ''), father_occupation = NULLIF(?, ''), mother_name = NULLIF(?, ''), mother_occupation = NULLIF(?, ''), guardian_name = NULLIF(?, ''), class_id = COALESCE(?, class_id), active = 1, updated_at = ? WHERE id = ?",
+                    [...$params, now_string(), $existing]
+                );
+                $studentId = $existing;
+                $stats['diupdate']++;
+            } else {
+                execute_sql(
+                    "INSERT INTO students (nis, nisn, name, gender, birth_place, birth_date, religion, address, phone, father_name, father_occupation, mother_name, mother_occupation, guardian_name, class_id, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, 1, ?)",
+                    [...$params, now_string()]
+                );
+                $studentId = (int)db()->lastInsertId();
+                $stats['baru']++;
+            }
+            if ($createUsers && !fetch_one('SELECT id FROM users WHERE student_id = ?', [$studentId])) {
+                $username = $d['nisn'] !== '' ? $d['nisn'] : $d['nis'];
+                if ($username === '') {
+                    $stats['errors'][] = 'Baris ' . $rowNo . ' (' . $d['name'] . '): tanpa NISN/NIS, akun login dilewati.';
+                } elseif (fetch_one('SELECT id FROM users WHERE username = ?', [$username])) {
+                    $stats['errors'][] = 'Baris ' . $rowNo . ': username ' . $username . ' sudah dipakai, akun dilewati.';
+                } else {
+                    $email = filter_var($d['email'], FILTER_VALIDATE_EMAIL) ? $d['email'] : null;
+                    execute_sql(
+                        "INSERT INTO users (username, password_hash, name, email, role, student_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, 'siswa', ?, 1, ?, ?)",
+                        [$username, password_hash($defaultPassword, PASSWORD_DEFAULT), $d['name'], $email, $studentId, now_string(), now_string()]
+                    );
+                    $stats['akun']++;
+                }
+            }
+        } catch (Throwable $e) {
+            $stats['dilewati']++;
+            $stats['errors'][] = 'Baris ' . $rowNo . ': ' . $e->getMessage();
+        }
+    }
+    return $stats;
+}

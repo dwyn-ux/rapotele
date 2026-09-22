@@ -10,6 +10,62 @@ function page_import_bulk(): void
     }
 
     // ── Show validation table if pending ──
+    if (!empty($_GET['batal'])) {
+        unset($_SESSION['import_dapodik_pending'], $_SESSION['import_dapodik_preview'], $_SESSION['import_bulk_pending']);
+        redirect_to('import-bulk');
+    }
+    $preview = $_SESSION['import_dapodik_preview'] ?? null;
+    if ($preview) {
+        render_header('Import Dapodik — Validasi');
+        $rows = $preview['rows'];
+        $file = $preview['file'] ?? '';
+        $newCount = 0;
+        $existCount = 0;
+        $noClassCount = 0;
+        foreach ($rows as $r) {
+            if ($r['existing']) { $existCount++; } else { $newCount++; }
+            if (!$r['rombel'] || !$r['class_id']) { $noClassCount++; }
+        }
+        ?>
+        <section class="panel">
+            <h3>📋 Preview File Dapodik</h3>
+            <p>File: <strong><?= e($file) ?></strong> — <strong><?= count($rows) ?></strong> siswa terbaca
+                (<strong><?= $newCount ?></strong> baru, <strong><?= $existCount ?></strong> sudah ada<?= $preview['opts']['update'] ? ' — akan diupdate' : ' — dilewati' ?>).
+                <?php if ($noClassCount > 0): ?>⚠️ <?= $noClassCount ?> baris <?= $preview['opts']['create_classes'] ? 'rombelnya belum ada — kelas otomatis dibuat' : 'rombelnya belum ada di aplikasi' ?>.<?php endif; ?>
+            </p>
+            <form method="post" style="display:inline;">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="import_siswa_dapodik_confirm">
+                <button class="button primary" data-confirm="Import <?= count($rows) ?> siswa dari file Dapodik?" data-confirm-title="Import siswa?" data-confirm-label="Ya, import" data-confirm-tone="primary">✅ Import <?= count($rows) ?> Siswa</button>
+            </form>
+            <a href="<?= e(route_url('import-bulk', ['batal' => '1'])) ?>" class="button">⬅ Kembali</a>
+        </section>
+        <section class="panel">
+            <h3>Preview Data (10 pertama)</h3>
+            <div style="overflow-x:auto;">
+            <table>
+                <thead><tr><th>#</th><th>Nama</th><th>NIS / NISN</th><th>JK</th><th>TTL</th><th>Rombel</th><th>Status</th></tr></thead>
+                <tbody>
+                <?php foreach (array_slice($rows, 0, 10) as $i => $r): ?>
+                    <tr>
+                        <td><?= $i + 1 ?></td>
+                        <td><?= e($r['name']) ?></td>
+                        <td><?= e($r['nis'] ?: '-') ?> / <?= e($r['nisn'] ?: '-') ?></td>
+                        <td><?= e($r['gender'] ?: '-') ?></td>
+                        <td><?= e($r['birth']) ?></td>
+                        <td><?= e($r['rombel'] ?: '-') ?><?= $r['class_id'] ? '' : ' ⚠️' ?></td>
+                        <td><?= $r['existing'] ? '<span style="color:var(--text-muted)">sudah ada (id:' . (int)$r['existing'] . ')</span>' : '<span style="color:var(--color-success,#16a34a)">baru</span>' ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php if (count($rows) > 10): ?><p>... dan <?= count($rows) - 10 ?> baris lainnya.</p><?php endif; ?>
+            </div>
+        </section>
+        <?php
+        render_footer();
+        return;
+    }
     $pending = $_SESSION['import_bulk_pending'] ?? null;
     if ($pending && $pending['type'] === 'jadwal') {
         render_header('Import Jadwal — Validasi');
@@ -27,7 +83,7 @@ function page_import_bulk(): void
             <form method="post" style="display:inline;">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="import_bulk_confirm">
-                <button class="button primary" onclick="return confirm('Import <?= $validCount ?> jadwal valid ini?')">✅ Import <?= $validCount ?> Jadwal</button>
+                <button class="button primary" data-confirm="Import <?= $validCount ?> jadwal yang sudah valid?" data-confirm-title="Import jadwal?" data-confirm-label="Ya, import" data-confirm-tone="primary">✅ Import <?= $validCount ?> Jadwal</button>
             </form>
             <?php endif; ?>
             <a href="<?= e(route_url('import-bulk')) ?>" class="button">⬅ Kembali</a>
@@ -86,7 +142,7 @@ function page_import_bulk(): void
             </select></label>
             <?php render_file_upload('csv_file', '.csv,text/csv', 'File CSV', true, 'Format: username, password, name, gender, nip, dst.') ?>
             <div class="wide actions">
-                <button class="button primary" id="importBtn" onclick="return confirm(this.dataset.msg)">Import Sekarang</button>
+                <button class="button primary" id="importBtn" data-confirm="Import data ini?" data-confirm-title="Import data?" data-confirm-label="Lanjutkan" data-confirm-tone="primary">Import Sekarang</button>
             </div>
         </form>
         <script>
@@ -96,16 +152,36 @@ function page_import_bulk(): void
             function updateBtn(){
                 if(sel.value === 'jadwal'){
                     btn.textContent = '📋 Validasi Jadwal';
-                    btn.dataset.msg = 'Validasi data jadwal ini?';
+                    btn.dataset.confirm = 'Validasi data jadwal ini sebelum diimpor?';
+                    btn.dataset.confirmTitle = 'Validasi jadwal?';
+                    btn.dataset.confirmLabel = 'Ya, validasi';
                 } else {
                     btn.textContent = 'Import Sekarang';
-                    btn.dataset.msg = 'Import data ini?';
+                    btn.dataset.confirm = 'Import data dari file CSV yang dipilih?';
+                    btn.dataset.confirmTitle = 'Import data?';
+                    btn.dataset.confirmLabel = 'Ya, import';
                 }
             }
             sel.addEventListener('change', updateBtn);
             updateBtn();
         })();
         </script>
+    </section>
+    <section class="panel">
+        <h3>📥 Import Siswa dari File Export Dapodik</h3>
+        <p>Langsung upload file <strong>daftar_pd-NAMA SEKOLAH-tanggal.xlsx</strong> hasil unduhan Dapodik — tanpa template khusus. Header & kolom terdeteksi otomatis (Nama, NIPD→NIS, JK, NISN, TTL, alamat, ortu, Rombel Saat Ini).</p>
+        <form method="post" enctype="multipart/form-data" class="grid two">
+            <?= csrf_field() ?><input type="hidden" name="action" value="import_siswa_dapodik_validate">
+            <?php render_file_upload('xlsx_file', '.xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'File Export Dapodik (.xlsx)', true, 'Contoh: daftar_pd-SMP MUHAMMADIYAH ... .xlsx') ?>
+            <div>
+                <label class="check"><input type="checkbox" name="opt_update" checked> Update data siswa yang sudah ada (cocok NISN/NIS/nama)</label>
+                <label class="check"><input type="checkbox" name="opt_create_classes" checked> Buatkan kelas otomatis bila rombel belum ada</label>
+                <label class="check"><input type="checkbox" name="opt_create_users" checked> Buatkan akun login siswa (username NISN, password default)</label>
+            </div>
+            <div class="wide actions">
+                <button class="button primary" data-confirm="Validasi file Dapodik ini sebelum diimpor?" data-confirm-title="Validasi Dapodik?" data-confirm-label="Ya, validasi" data-confirm-tone="primary">📋 Validasi File Dapodik</button>
+            </div>
+        </form>
     </section>
     <?php
     render_footer();

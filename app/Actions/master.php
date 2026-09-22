@@ -867,3 +867,73 @@ function action_import_bulk_confirm(): void
     flash($imported > 0 ? 'success' : 'warning', $msg);
     redirect_to('import-bulk');
 }
+
+function action_import_siswa_dapodik_validate(): void
+{
+    require_role(['admin']);
+    $file = uploaded_file('xlsx_file', true, max_upload_bytes());
+    $tmp = (string)$file['tmp_name'];
+    $ext = strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, ['xlsx', 'xlsm'], true) || !dapodik_is_xlsx($tmp)) {
+        flash('danger', 'File harus hasil export Dapodik (.xlsx). Contoh: daftar_pd-NAMA SEKOLAH-tanggal.xlsx.');
+        redirect_to('import-bulk');
+    }
+    [$grid, $maxCol] = dapodik_export_read_xlsx($tmp);
+    $headerRow = dapodik_export_header_row($grid);
+    if ($headerRow === null) {
+        flash('danger', 'Header "NISN" dan "Rombel" tidak ditemukan. Pastikan file adalah export Daftar Peserta Didik Dapodik.');
+        redirect_to('import-bulk');
+    }
+    $records = dapodik_export_records($grid, $headerRow, $maxCol);
+    if (!$records) {
+        flash('danger', 'Tidak ada baris siswa yang terbaca dari file.');
+        redirect_to('import-bulk');
+    }
+    $rows = [];
+    $dummy = [];
+    foreach ($records as $d) {
+        $classId = $d['rombel'] !== '' ? dapodik_export_resolve_class($d['rombel'], false, $dummy) : null;
+        $existing = dapodik_export_find_student($d['nisn'], $d['nis'], $d['name']);
+        $rows[] = [
+            'name' => $d['name'], 'nis' => $d['nis'], 'nisn' => $d['nisn'],
+            'gender' => $d['gender'], 'birth' => trim(($d['birth_place'] ?: '-') . ', ' . ($d['birth_date'] ?: '-')),
+            'rombel' => $d['rombel'], 'class_id' => $classId,
+            'existing' => $existing, 'record' => $d,
+        ];
+    }
+    $opts = [
+        'update' => !empty($_POST['opt_update']),
+        'create_classes' => !empty($_POST['opt_create_classes']),
+        'create_users' => !empty($_POST['opt_create_users']),
+    ];
+    $_SESSION['import_dapodik_pending'] = ['records' => array_column($rows, 'record'), 'opts' => $opts];
+    $_SESSION['import_dapodik_preview'] = ['rows' => array_map(fn ($r) => $r + ['record' => null], $rows), 'opts' => $opts, 'file' => (string)$file['name']];
+    redirect_to('import-bulk');
+}
+
+function action_import_siswa_dapodik_confirm(): void
+{
+    require_role(['admin']);
+    $pending = $_SESSION['import_dapodik_pending'] ?? null;
+    if (!$pending || empty($pending['records'])) {
+        flash('danger', 'Tidak ada data Dapodik yang pending.');
+        redirect_to('import-bulk');
+    }
+    unset($_SESSION['import_dapodik_pending'], $_SESSION['import_dapodik_preview']);
+    $stats = dapodik_import_siswa_export($pending['records'], (bool)($pending['opts']['update'] ?? true), (bool)($pending['opts']['create_classes'] ?? true), (bool)($pending['opts']['create_users'] ?? true));
+    $msg = 'Import Dapodik selesai: ' . $stats['baru'] . ' baru, ' . $stats['diupdate'] . ' diupdate, ' . $stats['dilewati'] . ' dilewati.';
+    if ($stats['akun'] > 0) {
+        $msg .= ' ' . $stats['akun'] . ' akun login dibuat.';
+    }
+    if ($stats['kelas_baru']) {
+        $msg .= ' Kelas baru: ' . implode(', ', $stats['kelas_baru']) . '.';
+    }
+    if ($stats['errors']) {
+        $msg .= ' Catatan: ' . implode(' ', array_slice($stats['errors'], 0, 5));
+        if (count($stats['errors']) > 5) {
+            $msg .= ' ... dan ' . (count($stats['errors']) - 5) . ' catatan lainnya.';
+        }
+    }
+    flash($stats['baru'] + $stats['diupdate'] > 0 ? 'success' : 'warning', $msg);
+    redirect_to('students');
+}
