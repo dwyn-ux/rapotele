@@ -32,7 +32,11 @@ foreach (glob($base . '/app/Services/*.php') as $f) require_once $f;
 foreach (glob($base . '/app/Actions/*.php') as $f) require_once $f;
 foreach (glob($base . '/app/Pages/*.php') as $f) require_once $f;
 
-$admin = fetch_one("SELECT id FROM users WHERE role = ? LIMIT 1", ['admin']);
+require_once __DIR__ . '/_fixture.php';
+$fixtureTeacher = test_fixture_teacher();
+test_fixture_class($fixtureTeacher);
+test_fixture_subject();
+$admin = ['id' => test_fixture_admin($fixtureTeacher)];
 $teacher = fetch_one("SELECT id FROM teachers WHERE active = 1 LIMIT 1");
 $class = fetch_one("SELECT id, name FROM classes WHERE active = 1 LIMIT 1");
 $subject = fetch_one("SELECT id FROM subjects WHERE active = 1 LIMIT 1");

@@ -29,16 +29,239 @@ function migration_add_column(string $table, string $column, string $definition)
         try {
             db()->exec('ALTER TABLE ' . db_identifier($table) . ' ADD COLUMN ' . db_identifier($column) . ' ' . $definition);
         } catch (PDOException $exception) {
-            if (!(db_driver() === 'mysql' && str_contains($exception->getMessage(), 'Duplicate column name'))) {
-                $logDir = dirname(__DIR__) . '/storage/logs';
-                if (is_dir($logDir)) {
-                    @file_put_contents($logDir . '/app-errors.log',
-                        '[' . date('Y-m-d H:i:s') . '] migration_add_column ' . $table . '.' . $column . PHP_EOL
-                        . '  ' . $exception->getMessage() . PHP_EOL . PHP_EOL,
-                        FILE_APPEND | LOCK_EX
-                    );
+            $duplicate = db_driver() === 'mysql'
+                && ((string)$exception->getCode() === '1060' || str_contains($exception->getMessage(), 'Duplicate column name'));
+            if ($duplicate) {
+                return;
+            }
+            $logDir = dirname(__DIR__) . '/storage/logs';
+            if (is_dir($logDir)) {
+                @file_put_contents($logDir . '/app-errors.log',
+                    '[' . date('Y-m-d H:i:s') . '] migration_add_column ' . $table . '.' . $column . PHP_EOL
+                    . '  ' . $exception->getMessage() . PHP_EOL . PHP_EOL,
+                    FILE_APPEND | LOCK_EX
+                );
+            }
+            throw $exception;
+        }
+    }
+}
+
+function migrate_grade_schema(): void
+{
+    if (!table_exists('grades')) {
+        return;
+    }
+    if (!migration_column_exists('grades', 'assessment_type') || !migration_column_exists('grades', 'learning_objective_id')) {
+        throw new RuntimeException('Kolom nilai belum dapat dimigrasikan.');
+    }
+
+    $pdo = db();
+    if (db_driver() === 'mysql') {
+        $typeInfo = fetch_one(
+            "SELECT IS_NULLABLE, COLUMN_DEFAULT FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'grades' AND COLUMN_NAME = 'assessment_type'"
+        );
+        $default = trim((string)($typeInfo['COLUMN_DEFAULT'] ?? ''), "'");
+        if ($typeInfo && ((string)$typeInfo['IS_NULLABLE'] !== 'NO' || $default !== 'UH')) {
+            $pdo->exec("UPDATE grades SET assessment_type = 'UH' WHERE assessment_type IS NULL OR TRIM(assessment_type) = ''");
+            $pdo->exec(
+                'ALTER TABLE ' . db_identifier('grades') . ' MODIFY COLUMN '
+                . db_identifier('assessment_type') . " VARCHAR(20) NOT NULL DEFAULT 'UH'"
+            );
+        }
+        $duplicate = fetch_one(
+            "SELECT assignment_id, student_id, assessment_type, COALESCE(learning_objective_id, 0) AS objective_key
+             FROM grades
+             GROUP BY assignment_id, student_id, assessment_type, COALESCE(learning_objective_id, 0)
+             HAVING COUNT(*) > 1
+             LIMIT 1"
+        );
+        if ($duplicate) {
+            throw new RuntimeException('Data nilai duplikat menghalangi migrasi unique key.');
+        }
+
+        $keyInfo = fetch_one(
+            "SELECT EXTRA FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'grades' AND COLUMN_NAME = 'learning_objective_key'"
+        );
+        if (!$keyInfo) {
+            $pdo->exec(
+                'ALTER TABLE ' . db_identifier('grades') . ' ADD COLUMN ' . db_identifier('learning_objective_key')
+                . ' INT GENERATED ALWAYS AS (IFNULL(learning_objective_id, 0)) STORED'
+            );
+        } elseif (!str_contains(strtoupper((string)$keyInfo['EXTRA']), 'GENERATED')) {
+            $pdo->exec(
+                'ALTER TABLE ' . db_identifier('grades') . ' MODIFY COLUMN ' . db_identifier('learning_objective_key')
+                . ' INT GENERATED ALWAYS AS (IFNULL(learning_objective_id, 0)) STORED'
+            );
+        }
+
+        $indexRows = fetch_all(
+            "SELECT INDEX_NAME, NON_UNIQUE, SEQ_IN_INDEX, COLUMN_NAME
+             FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'grades'
+             ORDER BY INDEX_NAME, SEQ_IN_INDEX"
+        );
+        $indexes = [];
+        foreach ($indexRows as $row) {
+            $name = (string)$row['INDEX_NAME'];
+            $position = (int)$row['SEQ_IN_INDEX'];
+            $indexes[$name]['unique'] = (int)$row['NON_UNIQUE'] === 0;
+            $indexes[$name]['columns'][$position] = (string)$row['COLUMN_NAME'];
+        }
+        $oldIndexes = [];
+        $replaceIndexes = [];
+        $hasDesired = false;
+        foreach ($indexes as $name => $index) {
+            ksort($index['columns']);
+            $columns = array_values($index['columns']);
+            if ($index['unique'] && $columns === ['assignment_id', 'student_id']) {
+                $oldIndexes[] = $name;
+            }
+            if ($columns === ['assignment_id', 'student_id', 'assessment_type', 'learning_objective_key']) {
+                if ($index['unique']) {
+                    $hasDesired = true;
+                } else {
+                    $replaceIndexes[] = $name;
                 }
             }
+        }
+        if (!$hasDesired) {
+            $uniqueName = 'grades_assignment_student_type_objective';
+            $suffix = 2;
+            while (isset($indexes[$uniqueName])) {
+                $uniqueName = 'grades_assignment_student_type_objective_' . $suffix++;
+            }
+            $pdo->exec(
+                'ALTER TABLE ' . db_identifier('grades') . ' ADD UNIQUE KEY '
+                . db_identifier($uniqueName)
+                . ' (assignment_id, student_id, assessment_type, learning_objective_key)'
+            );
+        }
+        foreach (array_unique(array_merge($oldIndexes, $replaceIndexes)) as $indexName) {
+            if ($indexName !== 'PRIMARY') {
+                $pdo->exec('ALTER TABLE ' . db_identifier('grades') . ' DROP INDEX ' . db_identifier($indexName));
+            }
+        }
+        return;
+    }
+
+    $columnRows = fetch_all('PRAGMA table_xinfo(' . db_identifier('grades') . ')');
+    $columns = [];
+    foreach ($columnRows as $column) {
+        $columns[(string)$column['name']] = $column;
+    }
+    $keyGenerated = isset($columns['learning_objective_key'])
+        && ((int)($columns['learning_objective_key']['hidden'] ?? 0) === 2 || (int)($columns['learning_objective_key']['hidden'] ?? 0) === 3);
+    $indexRows = fetch_all('PRAGMA index_list(' . db_identifier('grades') . ')');
+    $hasOld = false;
+    $hasDesired = false;
+    foreach ($indexRows as $index) {
+        if ((int)$index['unique'] !== 1) {
+            continue;
+        }
+        $indexColumns = fetch_all('PRAGMA index_info(' . db_identifier((string)$index['name']) . ')');
+        $names = array_map(static fn (array $row): string => (string)$row['name'], $indexColumns);
+        if ($names === ['assignment_id', 'student_id']) {
+            $hasOld = true;
+        }
+        if ($names === ['assignment_id', 'student_id', 'assessment_type', 'learning_objective_key']) {
+            $hasDesired = true;
+        }
+    }
+    if ($keyGenerated && $hasDesired && !$hasOld) {
+        return;
+    }
+
+    $newTable = 'grades_migration_new';
+    if (table_exists($newTable)) {
+        throw new RuntimeException('Migrasi tabel nilai tidak dapat dilanjutkan karena tabel sementara sudah ada.');
+    }
+    foreach (['id', 'assignment_id', 'student_id', 'score', 'description', 'created_by', 'created_at', 'updated_at'] as $required) {
+        if (!isset($columns[$required])) {
+            throw new RuntimeException('Struktur tabel nilai tidak lengkap.');
+        }
+    }
+
+    $foreignKeys = (int)$pdo->query('PRAGMA foreign_keys')->fetchColumn();
+    try {
+        if ($foreignKeys === 1) {
+            $pdo->exec('PRAGMA foreign_keys = OFF');
+            if ((int)$pdo->query('PRAGMA foreign_keys')->fetchColumn() !== 0) {
+                throw new RuntimeException('PRAGMA foreign_keys tidak dapat dinonaktifkan untuk migrasi nilai.');
+            }
+        }
+        if (!$pdo->beginTransaction()) {
+            throw new RuntimeException('Transaksi migrasi SQLite tidak dapat dimulai.');
+        }
+        try {
+            $pdo->exec("UPDATE grades SET assessment_type = 'UH' WHERE assessment_type IS NULL OR TRIM(assessment_type) = ''");
+            $definitions = [];
+            $copyColumns = [];
+            $definition = static function (string $name) use ($columns): string {
+                if ($name === 'id') {
+                    return db_identifier('id') . ' INTEGER PRIMARY KEY AUTOINCREMENT';
+                }
+                if ($name === 'assessment_type') {
+                    return db_identifier('assessment_type') . " VARCHAR(20) NOT NULL DEFAULT 'UH'";
+                }
+                if ($name === 'learning_objective_id') {
+                    return db_identifier('learning_objective_id') . ' INT NULL';
+                }
+                $column = $columns[$name];
+                $type = trim((string)$column['type']);
+                if ($type === '') {
+                    $type = 'TEXT';
+                }
+                $sql = db_identifier($name) . ' ' . $type;
+                if ((int)$column['notnull'] === 1) {
+                    $sql .= ' NOT NULL';
+                }
+                if ($column['dflt_value'] !== null) {
+                    $sql .= ' DEFAULT ' . $column['dflt_value'];
+                }
+                return $sql;
+            };
+            foreach (['id', 'assignment_id', 'student_id', 'assessment_type', 'learning_objective_id'] as $name) {
+                $definitions[] = $definition($name);
+                $copyColumns[] = $name;
+            }
+            $definitions[] = db_identifier('learning_objective_key')
+                . ' INTEGER GENERATED ALWAYS AS (COALESCE(learning_objective_id, 0)) STORED';
+            foreach (['score', 'description', 'created_by', 'created_at', 'updated_at'] as $name) {
+                $definitions[] = $definition($name);
+                $copyColumns[] = $name;
+            }
+            $handled = array_fill_keys(array_merge($copyColumns, ['learning_objective_key']), true);
+            foreach ($columns as $name => $column) {
+                if (isset($handled[$name]) || (int)($column['hidden'] ?? 0) === 2 || (int)($column['hidden'] ?? 0) === 3) {
+                    continue;
+                }
+                $definitions[] = $definition($name);
+                $copyColumns[] = $name;
+            }
+            $quotedColumns = implode(', ', array_map('db_identifier', $copyColumns));
+            $pdo->exec(
+                'CREATE TABLE ' . db_identifier($newTable) . ' (' . implode(', ', $definitions)
+                . ', UNIQUE (assignment_id, student_id, assessment_type, learning_objective_key))'
+            );
+            $pdo->exec(
+                'INSERT INTO ' . db_identifier($newTable) . ' (' . $quotedColumns . ') SELECT '
+                . $quotedColumns . ' FROM ' . db_identifier('grades')
+            );
+            $pdo->exec('DROP TABLE ' . db_identifier('grades'));
+            $pdo->exec('ALTER TABLE ' . db_identifier($newTable) . ' RENAME TO ' . db_identifier('grades'));
+            $pdo->commit();
+        } catch (Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $exception;
+        }
+    } finally {
+        if ($foreignKeys === 1) {
+            $pdo->exec('PRAGMA foreign_keys = ON');
         }
     }
 }
@@ -48,6 +271,9 @@ function run_migrations(): void
     $pk = migration_pk();
     $bool = migration_bool();
     $engine = db_driver() === 'mysql' ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
+    $gradeObjectiveKey = db_driver() === 'mysql'
+        ? 'INT GENERATED ALWAYS AS (IFNULL(learning_objective_id, 0)) STORED'
+        : 'INTEGER GENERATED ALWAYS AS (COALESCE(learning_objective_id, 0)) STORED';
 
     $statements = [
         "CREATE TABLE IF NOT EXISTS school_profile (
@@ -227,12 +453,15 @@ function run_migrations(): void
             id $pk,
             assignment_id INT NOT NULL,
             student_id INT NOT NULL,
+            assessment_type VARCHAR(20) NOT NULL DEFAULT 'UH',
+            learning_objective_id INT NULL,
+            learning_objective_key $gradeObjectiveKey,
             score DECIMAL(5,2) NULL,
             description TEXT NULL,
             created_by INT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE (assignment_id, student_id)
+            UNIQUE (assignment_id, student_id, assessment_type, learning_objective_key)
         )$engine",
 
         "CREATE TABLE IF NOT EXISTS student_attendance_sessions (
@@ -690,6 +919,7 @@ function run_migrations(): void
     migration_add_column('teachers', 'is_bk', migration_bool() . ' NOT NULL DEFAULT 0');
     migration_add_column('grades', 'assessment_type', "VARCHAR(20) NOT NULL DEFAULT 'UH'");
     migration_add_column('grades', 'learning_objective_id', 'INT NULL');
+    migrate_grade_schema();
     migration_add_column('classes', 'dapodik_id', 'VARCHAR(64) NULL');
     migration_add_column('classes', 'grade', 'VARCHAR(16) NULL');
     migration_add_column('classes', 'major', 'VARCHAR(80) NULL');
@@ -1454,11 +1684,16 @@ function migrate_align_fk_column_types(): void
             try {
                 db()->exec(sprintf('ALTER TABLE %s DROP FOREIGN KEY %s', db_identifier($table), db_identifier($fkName)));
             } catch (PDOException $e2) {
-                // FK may not exist yet
+                $missingForeignKey = (string)$e2->getCode() === '1091'
+                    || str_contains($e2->getMessage(), "check that column/key exists")
+                    || str_contains(strtolower($e2->getMessage()), "doesn't exist");
+                if (!$missingForeignKey) {
+                    throw $e2;
+                }
             }
             db()->exec(sprintf('ALTER TABLE %s MODIFY %s %s', db_identifier($table), db_identifier($column), $definition));
         } catch (PDOException $e) {
-            // ignore
+            throw $e;
         }
     }
 }

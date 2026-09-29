@@ -102,7 +102,7 @@ function create_backup_payload(): array
 
 function save_backup_payload(array $backup, int $createdBy): string
 {
-    $dir = dirname(__DIR__) . '/storage/backups';
+    $dir = app_root() . '/storage/backups';
     ensure_directory($dir);
     $file = 'backup-' . date('Ymd-His') . '.json';
     $path = $dir . '/' . $file;

@@ -165,11 +165,109 @@ function now_string(): string
     return date('Y-m-d H:i:s');
 }
 
-function date_ymd(?string $value = null): string
+function date_ymd(mixed $value = null): string
 {
-    $value = $value ?: date('Y-m-d');
-    $time = strtotime($value);
-    return $time ? date('Y-m-d', $time) : date('Y-m-d');
+    if ($value === null || $value === '') {
+        return date('Y-m-d');
+    }
+    if (!is_string($value) || !preg_match('/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/D', $value)) {
+        throw new InvalidArgumentException('Tanggal harus dalam format Y-m-d yang valid.');
+    }
+
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+    $errors = DateTimeImmutable::getLastErrors();
+    if ($date === false
+        || ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0))
+        || $date->format('Y-m-d') !== $value
+    ) {
+        throw new InvalidArgumentException('Tanggal harus dalam format Y-m-d yang valid.');
+    }
+
+    return $value;
+}
+
+function strict_finite_float(mixed $value, string $message): float
+{
+    if (is_int($value) || is_float($value)) {
+        $number = (float)$value;
+    } elseif (is_string($value) && preg_match('/^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/D', $value)) {
+        $number = (float)$value;
+    } else {
+        throw new InvalidArgumentException($message);
+    }
+
+    if (!is_finite($number)) {
+        throw new InvalidArgumentException($message);
+    }
+
+    return $number;
+}
+
+function grade_score_value(mixed $value): ?float
+{
+    if ($value === null || (is_string($value) && trim($value) === '')) {
+        return null;
+    }
+
+    $score = strict_finite_float($value, 'Nilai harus berupa angka yang valid.');
+    if ($score < 0 || $score > 100) {
+        throw new InvalidArgumentException('Nilai harus antara 0 dan 100.');
+    }
+
+    return $score;
+}
+
+function allowed_status_value(mixed $value, array $allowed, string $message): string
+{
+    if (!is_string($value)) {
+        throw new InvalidArgumentException($message);
+    }
+
+    $status = strtolower($value);
+    if (!array_key_exists($status, $allowed)) {
+        throw new InvalidArgumentException($message);
+    }
+
+    return $status;
+}
+
+function positive_int_value(mixed $value, string $message): int
+{
+    if (is_int($value)) {
+        if ($value > 0) {
+            return $value;
+        }
+        throw new InvalidArgumentException($message);
+    }
+    if (!is_string($value) || !preg_match('/^[1-9][0-9]*$/D', $value)) {
+        throw new InvalidArgumentException($message);
+    }
+
+    $max = (string)PHP_INT_MAX;
+    if (strlen($value) > strlen($max) || (strlen($value) === strlen($max) && strcmp($value, $max) > 0)) {
+        throw new InvalidArgumentException($message);
+    }
+
+    $number = (int)$value;
+    if ($number <= 0) {
+        throw new InvalidArgumentException($message);
+    }
+
+    return $number;
+}
+
+function coordinate_value(mixed $value, float $min, float $max, string $message): ?float
+{
+    if ($value === null || (is_string($value) && trim($value) === '')) {
+        return null;
+    }
+
+    $number = strict_finite_float($value, $message);
+    if ($number < $min || $number > $max) {
+        throw new InvalidArgumentException($message);
+    }
+
+    return $number;
 }
 
 function allowed_statuses(): array

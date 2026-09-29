@@ -33,4 +33,6 @@ app/storage/uploads/*
 !/app/storage/uploads/.keep
 !/app/storage/uploads/student-photos/.keep
 !/app/storage/uploads/signatures/.keep
+/tests/_case_*.php
+/storage/*.sqlite.bak*
 nul

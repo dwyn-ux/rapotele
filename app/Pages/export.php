@@ -111,6 +111,12 @@ function page_export_csv(): void
         if (!$assignment) {
             throw new RuntimeException('Pembelajaran tidak ditemukan.');
         }
+        if (!is_admin()) {
+            $currentTeacherId = (int)(current_user()['teacher_id'] ?? 0);
+            if ((int)$assignment['teacher_id'] !== $currentTeacherId) {
+                throw new RuntimeException('Akses ditolak.');
+            }
+        }
 
         $sessions = fetch_all(
             'SELECT ses.id, ses.date, ses.meeting_no, ses.topic

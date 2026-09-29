@@ -2501,12 +2501,23 @@ function page_laporan_belajar(): void
     require_role(['admin', 'guru']);
     $studentId = (int)($_GET['student_id'] ?? 0);
     $classId = (int)($_GET['class_id'] ?? 0);
+    $classOptions = [];
+
+    foreach (assignments_for_current_user() as $assignment) {
+        $assignmentClassId = (int)$assignment['class_id'];
+        if ($assignmentClassId > 0 && !isset($classOptions[$assignmentClassId])) {
+            $classOptions[$assignmentClassId] = (string)$assignment['class_name'];
+        }
+    }
 
     if ($studentId > 0) {
         $student = fetch_one('SELECT s.*, c.name AS class_name, c.grade, c.homeroom_teacher_id, t.name AS homeroom_name, t.nip AS homeroom_nip FROM students s LEFT JOIN classes c ON c.id = s.class_id LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id WHERE s.id = ?', [$studentId]);
         if (!$student) {
             http_response_code(404);
             exit('Siswa tidak ditemukan.');
+        }
+        if (!is_admin() && !isset($classOptions[(int)($student['class_id'] ?? 0)])) {
+            render_access_denied('Anda tidak memiliki akses ke kelas siswa ini.');
         }
         $pdfContent = generate_laporan_belajar_pdf($student);
         $filename = 'Laporan_Belajar_' . preg_replace('/[^A-Za-z0-9_]/', '_', (string)$student['name']) . '.pdf';
@@ -2517,8 +2528,10 @@ function page_laporan_belajar(): void
         exit;
     }
 
-    $classes = assignments_for_current_user();
-    $classId = $classId ?: ((int)($classes[0]['class_id'] ?? 0));
+    if (!is_admin() && $classId !== 0 && !isset($classOptions[$classId])) {
+        render_access_denied('Kelas yang dipilih tidak tersedia untuk akun ini.');
+    }
+    $classId = $classId ?: (int)(array_key_first($classOptions) ?? 0);
     $students = $classId ? fetch_all('SELECT s.id, s.name, s.nis FROM students s WHERE s.class_id = ? AND s.active = 1 ORDER BY s.name', [$classId]) : [];
     render_header('Cetak Laporan Hasil Belajar');
     ?>
@@ -2527,9 +2540,8 @@ function page_laporan_belajar(): void
             <input type="hidden" name="page" value="laporan-belajar">
             <label>Kelas
                 <select name="class_id" onchange="this.form.submit()">
-                    <option value="">Pilih Kelas</option>
-                    <?php foreach (fetch_all('SELECT DISTINCT c.id, c.name FROM teaching_assignments ta JOIN classes c ON c.id = ta.class_id WHERE ta.active = 1 ORDER BY c.name') as $c): ?>
-                        <option value="<?= e($c['id']) ?>" <?= $classId == $c['id'] ? 'selected' : '' ?>><?= e($c['name']) ?></option>
+                    <?php foreach (['' => 'Pilih Kelas'] + $classOptions as $optionClassId => $className): ?>
+                        <option value="<?= e($optionClassId) ?>" <?= (string)$classId === (string)$optionClassId ? 'selected' : '' ?>><?= e($className) ?></option>
                     <?php endforeach; ?>
                 </select>
             </label>

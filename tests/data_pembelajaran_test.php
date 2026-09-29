@@ -38,7 +38,12 @@ function section(string $name): void {
     $log[] = "\n== $name ==";
 }
 
-$admin = fetch_one("SELECT id FROM users WHERE role = ? LIMIT 1", ['admin']);
+require_once __DIR__ . '/_fixture.php';
+
+$fixtureTeacher = test_fixture_teacher();
+test_fixture_class($fixtureTeacher);
+test_fixture_subject();
+$admin = ['id' => test_fixture_admin($fixtureTeacher)];
 $_SESSION['user_id'] = (int)$admin['id'];
 $_SESSION['_csrf'] = 'tok';
 

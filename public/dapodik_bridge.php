@@ -15,102 +15,128 @@ try {
         exit;
     }
 
+    $raw = (string)file_get_contents('php://input');
+    if (strlen($raw) > max_upload_bytes()) {
+        http_response_code(413);
+        echo json_encode(['ok' => false, 'message' => 'Payload terlalu besar.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if (trim($raw) === '') {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'message' => 'Payload JSON tidak valid.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    try {
+        $payload = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+    } catch (JsonException) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'message' => 'Payload JSON tidak valid.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if (!is_array($payload) || array_is_list($payload)) {
+        throw new InvalidArgumentException('Payload JSON harus berupa objek.');
+    }
+    if (array_key_exists('token', $payload) && !is_string($payload['token'])) {
+        throw new InvalidArgumentException('Token payload tidak valid.');
+    }
+    if (array_key_exists('npsn', $payload) && !is_string($payload['npsn'])) {
+        throw new InvalidArgumentException('NPSN payload tidak valid.');
+    }
+
     if (!app_installed()) {
         throw new RuntimeException('Aplikasi e-rapor belum diinstall.');
     }
-    run_migrations();
 
-    $raw = (string)file_get_contents('php://input');
-    if (strlen($raw) > max_upload_bytes()) {
-        throw new RuntimeException('Payload terlalu besar.');
+    $itemsKey = '';
+    $items = [];
+    if (array_key_exists('items', $payload)) {
+        $itemsKey = 'items';
+    } elseif (array_key_exists('payloads', $payload)) {
+        $itemsKey = 'payloads';
     }
-    $payload = $raw !== '' ? json_decode($raw, true) : [];
-    if (!is_array($payload)) {
-        throw new RuntimeException('Payload JSON tidak valid.');
+    if ($itemsKey !== '') {
+        if (!is_array($payload[$itemsKey]) || !array_is_list($payload[$itemsKey])) {
+            throw new InvalidArgumentException('Daftar data Dapodik tidak valid.');
+        }
+        $items = $payload[$itemsKey];
     }
 
     $expectedBridgeToken = trim((string)get_app_setting('dapodik_bridge_token', ''));
     $expectedDapodikToken = trim((string)get_app_setting('dapodik_token', ''));
     $expectedNpsn = trim((string)get_app_setting('dapodik_npsn', ''));
     $payloadNpsn = trim((string)($payload['npsn'] ?? ''));
-    if ($payloadNpsn === '') {
-        $itemsForNpsn = isset($payload['items']) && is_array($payload['items'])
-            ? $payload['items']
-            : (isset($payload['payloads']) && is_array($payload['payloads']) ? $payload['payloads'] : []);
-        if (isset($itemsForNpsn[0]) && is_array($itemsForNpsn[0])) {
-            $payloadNpsn = trim((string)($itemsForNpsn[0]['npsn'] ?? ''));
+    if ($payloadNpsn === '' && isset($items[0]) && is_array($items[0])) {
+        if (array_key_exists('npsn', $items[0]) && !is_string($items[0]['npsn'])) {
+            throw new InvalidArgumentException('NPSN payload tidak valid.');
         }
-    }
-    $tokenCandidates = [];
-    $headerToken = trim((string)($_SERVER['HTTP_X_ERAPORT_TOKEN'] ?? ''));
-    $bodyToken = trim((string)($payload['token'] ?? ''));
-    if ($headerToken !== '') {
-        $tokenCandidates['header'] = $headerToken;
-    }
-    if ($bodyToken !== '') {
-        $tokenCandidates['body'] = $bodyToken;
+        $payloadNpsn = trim((string)($items[0]['npsn'] ?? ''));
     }
 
+    $headerToken = trim((string)($_SERVER['HTTP_X_ERAPORT_TOKEN'] ?? ''));
+    $bodyToken = trim((string)($payload['token'] ?? ''));
+    $givenTokens = array_values(array_filter([$headerToken, $bodyToken], static fn (string $token): bool => $token !== ''));
     $tokenAccepted = false;
-    $matchedTokenSource = '';
-    foreach ($tokenCandidates as $source => $givenToken) {
+    foreach ($givenTokens as $givenToken) {
         if ($expectedBridgeToken !== '' && hash_equals($expectedBridgeToken, $givenToken)) {
             $tokenAccepted = true;
-            $matchedTokenSource = $source;
             break;
         }
-        if ($expectedDapodikToken !== '' && hash_equals($expectedDapodikToken, $givenToken)) {
-            if ($expectedNpsn === '' || ($payloadNpsn !== '' && hash_equals($expectedNpsn, $payloadNpsn))) {
-                $tokenAccepted = true;
-                $matchedTokenSource = $source;
-                break;
-            }
+        if ($expectedDapodikToken !== '' && hash_equals($expectedDapodikToken, $givenToken)
+            && ($expectedNpsn === '' || ($payloadNpsn !== '' && hash_equals($expectedNpsn, $payloadNpsn)))) {
+            $tokenAccepted = true;
+            break;
         }
     }
 
     if (!$tokenAccepted) {
-        $reasons = [];
-        if (!$tokenCandidates) {
-            $reasons[] = 'token tidak diterima oleh server';
-        }
-        if ($expectedDapodikToken === '' && $expectedBridgeToken === '') {
-            $reasons[] = 'Token / Key Webservice belum dikonfigurasi di menu Update Data';
-        } elseif ($expectedDapodikToken === '' && $expectedBridgeToken !== '') {
-            // Auto configure server token using the first successful sync token from helper.
-            $firstCandidate = reset($tokenCandidates) ?: '';
-            if ($firstCandidate !== '' && $payloadNpsn !== '') {
-                set_app_setting('dapodik_token', $firstCandidate);
-                set_app_setting('dapodik_npsn', $payloadNpsn);
-                $expectedDapodikToken = $firstCandidate;
-                $expectedNpsn = $payloadNpsn;
-                $reasons = [];
-            } else {
-                $reasons[] = 'Token bridge diterima, namun Token / Key Webservice di server masih kosong. Isi di menu Update Data.';
-            }
-        } elseif (!in_array(true, array_map(fn (string $token): bool => hash_equals($expectedDapodikToken, $token), $tokenCandidates), true)) {
-            $reasons[] = 'token yang dikirim helper tidak sama dengan Token / Key Webservice di server';
-        }
-
-        if ($expectedNpsn !== '' && ($payloadNpsn === '' || !hash_equals($expectedNpsn, $payloadNpsn))) {
-            $reasons[] = 'NPSN helper tidak sama dengan NPSN di server';
-        }
-
-        if (!empty($reasons)) {
-            http_response_code(403);
-            echo json_encode([
-                'ok' => false,
-                'message' => 'Token sinkron tidak valid. ' . ($reasons ? 'Penyebab: ' . implode('; ', $reasons) . '. ' : '') . 'Pakai Token Web Service Dapodik dan NPSN yang sama dengan konfigurasi Update Data di server e-rapor tujuan.',
-            ], JSON_UNESCAPED_UNICODE);
-            exit;
-        }
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'message' => 'Token sinkron tidak valid.'], JSON_UNESCAPED_UNICODE);
+        exit;
     }
 
-    $type = dapodik_validate_type((string)($payload['type'] ?? 'sekolah'), true);
+    $typeValue = array_key_exists('type', $payload) ? $payload['type'] : 'sekolah';
+    if (!is_string($typeValue)) {
+        throw new InvalidArgumentException('Jenis data Dapodik tidak valid.');
+    }
+    $type = trim($typeValue);
+    if (!array_key_exists($type, dapodik_data_types(true))) {
+        throw new InvalidArgumentException('Jenis data Dapodik tidak valid.');
+    }
+
     if ($type === 'all') {
-        $items = isset($payload['items']) && is_array($payload['items'])
-            ? $payload['items']
-            : (isset($payload['payloads']) && is_array($payload['payloads']) ? $payload['payloads'] : []);
-        $summary = dapodik_import_items($items);
+        if ($itemsKey === '' || $items === []) {
+            throw new InvalidArgumentException('Paket semua data Dapodik tidak valid.');
+        }
+        foreach ($items as $item) {
+            if (!is_array($item) || array_is_list($item)) {
+                throw new InvalidArgumentException('Item data Dapodik tidak valid.');
+            }
+            $itemType = $item['type'] ?? null;
+            if (!is_string($itemType) || !array_key_exists(trim($itemType), dapodik_data_types(false))) {
+                throw new InvalidArgumentException('Jenis data Dapodik tidak valid.');
+            }
+            if (array_key_exists('data', $item) && !is_array($item['data'])) {
+                throw new InvalidArgumentException('Data Dapodik tidak valid.');
+            }
+            if (array_key_exists('npsn', $item) && !is_string($item['npsn'])) {
+                throw new InvalidArgumentException('NPSN payload tidak valid.');
+            }
+        }
+
+        run_migrations();
+        try {
+            $summary = dapodik_import_items($items);
+        } catch (PDOException $exception) {
+            throw $exception;
+        } catch (InvalidArgumentException $exception) {
+            throw new InvalidArgumentException('Data Dapodik tidak valid.', 0, $exception);
+        } catch (RuntimeException $exception) {
+            if (str_starts_with($exception->getMessage(), 'Import ') && stripos($exception->getMessage(), 'SQLSTATE') === false) {
+                throw new InvalidArgumentException('Data Dapodik tidak valid.', 0, $exception);
+            }
+            throw $exception;
+        }
         $message = 'Bridge menerima semua data. ' . dapodik_summary_text($summary) . '.';
         execute_sql(
             'INSERT INTO dapodik_sync_logs (mode, data_type, endpoint, status, message, created_by) VALUES (?, ?, ?, ?, ?, ?)',
@@ -121,38 +147,52 @@ try {
         foreach (array_keys($summary) as $summaryType) {
             $warnings = dapodik_import_warning_payload((string)$summaryType);
             if ($warnings) {
-                $warningPayload[$summaryType] = $warnings;
+                $warningPayload[$summaryType] = ['warning_count' => (int)($warnings['warning_count'] ?? 0)];
             }
         }
 
         $response = ['ok' => true, 'type' => 'all', 'summary' => $summary, 'count' => array_sum($summary), 'warnings' => $warningPayload];
-        if (isset($firstCandidate) && $firstCandidate !== '') {
-            $response['auto_configured'] = true;
-        }
         echo json_encode($response, JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    $data = isset($payload['data']) && is_array($payload['data']) ? $payload['data'] : $payload;
+    if (!array_key_exists('data', $payload) || !is_array($payload['data'])) {
+        throw new InvalidArgumentException('Data Dapodik tidak valid.');
+    }
+    $data = $payload['data'];
     unset($data['token'], $data['type'], $data['npsn']);
 
-    $count = dapodik_import($type, $data);
+    run_migrations();
+    try {
+        $count = dapodik_import($type, $data);
+    } catch (PDOException $exception) {
+        throw $exception;
+    } catch (InvalidArgumentException $exception) {
+        throw new InvalidArgumentException('Data Dapodik tidak valid.', 0, $exception);
+    } catch (RuntimeException $exception) {
+        if (str_starts_with($exception->getMessage(), 'Import ') && stripos($exception->getMessage(), 'SQLSTATE') === false) {
+            throw new InvalidArgumentException('Data Dapodik tidak valid.', 0, $exception);
+        }
+        throw $exception;
+    }
     execute_sql(
         'INSERT INTO dapodik_sync_logs (mode, data_type, endpoint, status, message, created_by) VALUES (?, ?, ?, ?, ?, ?)',
         ['offline-bridge', $type, 'dapodik_bridge.php', 'success', "Bridge menerima $type. Data diproses: $count.", null]
     );
 
-    $response = ['ok' => true, 'type' => $type, 'count' => $count] + dapodik_import_warning_payload($type);
-    if (isset($firstCandidate) && $firstCandidate !== '') {
-        $response['auto_configured'] = true;
+    $warningPayload = dapodik_import_warning_payload($type);
+    $response = ['ok' => true, 'type' => $type, 'count' => $count];
+    if ($warningPayload) {
+        $response['warning_count'] = (int)($warningPayload['warning_count'] ?? 0);
     }
     echo json_encode($response, JSON_UNESCAPED_UNICODE);
-} catch (Throwable $exception) {
-    http_response_code(http_response_code() >= 400 ? http_response_code() : 500);
+} catch (InvalidArgumentException $exception) {
     log_exception($exception);
-    $msg = $exception->getMessage();
-    if (!app_debug() && !($exception instanceof InvalidArgumentException) && !($exception instanceof RuntimeException)) {
-        $msg = 'Database error: ' . $exception->getMessage();
-    }
-    echo json_encode(['ok' => false, 'message' => $msg], JSON_UNESCAPED_UNICODE);
+    http_response_code(422);
+    echo json_encode(['ok' => false, 'message' => $exception->getMessage()], JSON_UNESCAPED_UNICODE);
+} catch (Throwable $exception) {
+    log_exception($exception);
+    http_response_code(500);
+    $message = app_debug() ? $exception->getMessage() : 'Terjadi kesalahan internal.';
+    echo json_encode(['ok' => false, 'message' => $message], JSON_UNESCAPED_UNICODE);
 }

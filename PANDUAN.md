@@ -558,9 +558,6 @@ Mengirim nilai siswa dari e-rapor ke Dapodik:
 # Install/reset database
 php public/install.php
 
-# Seed data demo
-php seed_report.php
-
 # Generate rapor manual untuk siswa ID 1
 php -r "
 require 'app/bootstrap.php';
@@ -617,9 +614,8 @@ Untuk shared hosting:
 1. Pastikan `.htaccess` aktif (mod_rewrite)
 2. Set `APP_DEBUG=false` di `.env`
 3. Ganti password admin setelah install
-4. Hapus `seed_report.php` dari server production
-5. Backup database secara berkala
-6. Pastikan `storage/` tidak bisa diakses langsung (sudah ada `.htaccess`)
+4. Backup database secara berkala
+5. Pastikan `storage/` tidak bisa diakses langsung (sudah ada `.htaccess`)
 
 ---
 

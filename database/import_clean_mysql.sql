@@ -216,12 +216,15 @@ CREATE TABLE IF NOT EXISTS grades (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   assignment_id INT NOT NULL,
   student_id INT NOT NULL,
+  assessment_type VARCHAR(20) NOT NULL DEFAULT 'UH',
+  learning_objective_id INT NULL,
+  learning_objective_key INT GENERATED ALWAYS AS (IFNULL(learning_objective_id, 0)) STORED,
   score DECIMAL(5,2) NULL,
   description TEXT NULL,
   created_by INT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (assignment_id, student_id)
+  UNIQUE (assignment_id, student_id, assessment_type, learning_objective_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS student_attendance_sessions (

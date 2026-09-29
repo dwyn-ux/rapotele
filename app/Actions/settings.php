@@ -109,22 +109,49 @@ function action_save_extracurricular(): void
         isset($_POST['active']) ? 1 : 0,
         now_string(),
     ];
-    if ($id > 0) {
-        execute_sql('UPDATE extracurriculars SET class_name = ?, type = ?, name = ?, teacher_id = ?, active = ?, updated_at = ? WHERE id = ?', array_merge($data, [$id]));
-        $ekskulId = $id;
-    } else {
-        execute_sql('INSERT INTO extracurriculars (class_name, type, name, teacher_id, active, updated_at) VALUES (?, ?, ?, ?, ?, ?)', $data);
-        $ekskulId = (int)db()->lastInsertId();
+    $postedMembers = $_POST['members'] ?? [];
+    if (!is_array($postedMembers)) {
+        throw new RuntimeException('Daftar anggota siswa tidak valid.');
     }
-    // Simpan anggota ekskul
-    if ($ekskulId > 0 && table_exists('extracurricular_members')) {
-        execute_sql('DELETE FROM extracurricular_members WHERE extracurricular_id = ?', [$ekskulId]);
-        foreach ((array)($_POST['members'] ?? []) as $studentId) {
-            $studentId = (int)$studentId;
-            if ($studentId > 0) {
+    $memberIds = [];
+    foreach ($postedMembers as $studentId) {
+        $studentId = filter_var($studentId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($studentId === false) {
+            throw new RuntimeException('ID siswa tidak valid.');
+        }
+        $memberIds[$studentId] = $studentId;
+    }
+    if ($memberIds) {
+        $placeholders = implode(',', array_fill(0, count($memberIds), '?'));
+        $validStudentIds = array_map('intval', array_column(fetch_all("SELECT id FROM students WHERE id IN ($placeholders)", array_keys($memberIds)), 'id'));
+        if (count($validStudentIds) !== count($memberIds)) {
+            throw new RuntimeException('ID siswa tidak ditemukan.');
+        }
+    }
+
+    $hasMembers = table_exists('extracurricular_members');
+    $pdo = db();
+    try {
+        $pdo->beginTransaction();
+        if ($id > 0) {
+            execute_sql('UPDATE extracurriculars SET class_name = ?, type = ?, name = ?, teacher_id = ?, active = ?, updated_at = ? WHERE id = ?', array_merge($data, [$id]));
+            $ekskulId = $id;
+        } else {
+            execute_sql('INSERT INTO extracurriculars (class_name, type, name, teacher_id, active, updated_at) VALUES (?, ?, ?, ?, ?, ?)', $data);
+            $ekskulId = (int)db()->lastInsertId();
+        }
+        if ($ekskulId > 0 && $hasMembers) {
+            execute_sql('DELETE FROM extracurricular_members WHERE extracurricular_id = ?', [$ekskulId]);
+            foreach ($memberIds as $studentId) {
                 execute_sql('INSERT INTO extracurricular_members (extracurricular_id, student_id, updated_at) VALUES (?, ?, ?)', [$ekskulId, $studentId, now_string()]);
             }
         }
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $exception;
     }
     flash('success', 'Data ekskul tersimpan.');
     redirect_to('data-ekskul');
@@ -134,27 +161,64 @@ function action_save_extracurricular_scores(): void
 {
     require_role(['admin', 'guru']);
     $classId = (int)($_POST['class_id'] ?? 0);
-    $scores = $_POST['scores'] ?? [];
+    if ($classId <= 0) {
+        throw new RuntimeException('Kelas wajib dipilih.');
+    }
+    require_class_access($classId);
+
+    $postedScores = $_POST['scores'] ?? [];
+    if (!is_array($postedScores)) {
+        throw new RuntimeException('Data nilai ekstrakurikuler tidak valid.');
+    }
+
     $teacherId = (int)(current_user()['teacher_id'] ?? 0);
-    foreach ($scores as $studentId => $ekskulScores) {
-        foreach ($ekskulScores as $ekskulId => $score) {
-            $studentId = (int)$studentId;
-            $ekskulId = (int)$ekskulId;
-            $scoreVal = trim((string)$score);
-            if ($studentId > 0 && $ekskulId > 0) {
-                if (!is_admin()) {
-                    $ok = fetch_one('SELECT id FROM extracurriculars WHERE id = ? AND teacher_id = ? LIMIT 1', [$ekskulId, $teacherId]);
-                    if (!$ok) {
-                        throw new RuntimeException('Anda tidak berhak memberi nilai untuk ekskul ini.');
-                    }
-                }
-                $existing = fetch_one('SELECT id FROM extracurricular_scores WHERE student_id = ? AND extracurricular_id = ?', [$studentId, $ekskulId]);
-                if ($existing) {
-                    execute_sql('UPDATE extracurricular_scores SET score = ?, updated_at = ? WHERE id = ?', [$scoreVal, now_string(), (int)$existing['id']]);
-                } else {
-                    execute_sql('INSERT INTO extracurricular_scores (student_id, extracurricular_id, score, updated_at) VALUES (?, ?, ?, ?)', [$studentId, $ekskulId, $scoreVal, now_string()]);
-                }
+    $validatedScores = [];
+    foreach ($postedScores as $studentId => $extracurricularScores) {
+        $studentId = filter_var($studentId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($studentId === false || !is_array($extracurricularScores)
+            || !fetch_one('SELECT id FROM students WHERE id = ? AND class_id = ? AND active = 1', [$studentId, $classId])) {
+            throw new RuntimeException('Siswa tidak termasuk kelas yang dipilih.');
+        }
+        foreach ($extracurricularScores as $extracurricularId => $score) {
+            $extracurricularId = filter_var($extracurricularId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($extracurricularId === false || !is_scalar($score)) {
+                throw new RuntimeException('Data nilai ekstrakurikuler tidak valid.');
             }
+            $scoreValue = trim((string)$score);
+            if ($scoreValue === '') {
+                // Form selalu mengirim sel kosong untuk ekskul yang tidak diisi guru.
+                continue;
+            }
+            $numericScore = (float)$scoreValue;
+            if (!is_numeric($scoreValue) || $numericScore < 0 || $numericScore > 100) {
+                throw new RuntimeException('Nilai harus berupa angka antara 0 dan 100.');
+            }
+
+            $extracurricularSql = 'SELECT id FROM extracurriculars WHERE id = ?';
+            $extracurricularParams = [$extracurricularId];
+            if (!is_admin()) {
+                $extracurricularSql .= ' AND teacher_id = ?';
+                $extracurricularParams[] = $teacherId;
+            }
+            if (!fetch_one($extracurricularSql, $extracurricularParams)) {
+                throw new RuntimeException('Anda tidak berhak memberi nilai untuk ekskul ini.');
+            }
+            if (!fetch_one(
+                'SELECT em.student_id FROM extracurricular_members em JOIN students s ON s.id = em.student_id WHERE em.extracurricular_id = ? AND em.student_id = ? AND s.class_id = ? AND s.active = 1',
+                [$extracurricularId, $studentId, $classId]
+            )) {
+                throw new RuntimeException('Siswa bukan anggota aktif ekskul yang dipilih.');
+            }
+            $validatedScores[] = [$studentId, $extracurricularId, $scoreValue];
+        }
+    }
+
+    foreach ($validatedScores as [$studentId, $extracurricularId, $scoreValue]) {
+        $existing = fetch_one('SELECT id FROM extracurricular_scores WHERE student_id = ? AND extracurricular_id = ?', [$studentId, $extracurricularId]);
+        if ($existing) {
+            execute_sql('UPDATE extracurricular_scores SET score = ?, updated_at = ? WHERE id = ?', [$scoreValue, now_string(), (int)$existing['id']]);
+        } else {
+            execute_sql('INSERT INTO extracurricular_scores (student_id, extracurricular_id, score, updated_at) VALUES (?, ?, ?, ?)', [$studentId, $extracurricularId, $scoreValue, now_string()]);
         }
     }
     flash('success', 'Nilai ekstrakurikuler tersimpan.');
@@ -618,10 +682,21 @@ function action_save_promotion(): void
         redirect_to('naik-kelas');
     }
     require_class_access($classId);
+    $promotions = [];
     foreach ((array)($_POST['status'] ?? []) as $studentId => $status) {
         $studentId = (int)$studentId;
-        $status = in_array((string)$status, ['naik', 'tinggal'], true) ? (string)$status : 'naik';
-        $notes = trim((string)(($_POST['notes'][$studentId] ?? '')));
+        $status = is_scalar($status) ? (string)$status : '';
+        if ($studentId <= 0 || !in_array($status, ['naik', 'tinggal'], true)) {
+            throw new RuntimeException('Status kenaikan kelas tidak valid.');
+        }
+        if (!fetch_one('SELECT id FROM students WHERE id = ? AND class_id = ?', [$studentId, $classId])) {
+            throw new RuntimeException('Siswa tidak termasuk kelas yang diotorisasi.');
+        }
+        $postedNotes = $_POST['notes'][$studentId] ?? '';
+        $notes = is_scalar($postedNotes) ? trim((string)$postedNotes) : '';
+        $promotions[$studentId] = [$status, $notes];
+    }
+    foreach ($promotions as [$studentId, [$status, $notes]]) {
         $existing = fetch_one('SELECT id FROM graduations WHERE student_id = ?', [$studentId]);
         if ($existing) {
             execute_sql('UPDATE graduations SET status = ?, notes = ?, updated_at = ? WHERE student_id = ?', [$status, $notes, now_string(), $studentId]);
@@ -639,10 +714,13 @@ function action_save_deskripsi_nilai(): void
     $studentId = (int)($_POST['student_id'] ?? 0);
     $classId = (int)($_POST['class_id'] ?? 0);
     $grade = trim((string)($_POST['grade'] ?? ''));
-    if ($studentId <= 0 || $grade === '') {
+    if ($studentId <= 0 || $classId <= 0 || $grade === '') {
         throw new RuntimeException('Data tidak valid.');
     }
     require_class_access($classId);
+    if (!fetch_one('SELECT id FROM students WHERE id = ? AND class_id = ? AND active = 1', [$studentId, $classId])) {
+        throw new RuntimeException('Siswa tidak ditemukan atau bukan anggota kelas yang dipilih.');
+    }
     $descriptions = $_POST['desc'] ?? [];
     foreach ($descriptions as $subjectId => $desc) {
         $subjectId = (int)$subjectId;

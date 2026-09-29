@@ -90,6 +90,27 @@ function telegram_answer_callback(string $callbackQueryId, string $text = ''): v
     curl_close($ch);
 }
 
+function telegram_log_redact_command(string $text): string
+{
+    $redacted = preg_replace('/^(\s*\/?login)\b.*$/isu', '$1 [arguments redacted]', $text, 1);
+    return is_string($redacted) ? $redacted : '[login arguments redacted]';
+}
+
+function telegram_log_redact_response(string $text): string
+{
+    $redacted = preg_replace(
+        '/((?:password|passcode)(?:\s*(?:web|akun|account)|\s*[_ -]?hash)?\s*["\']?\s*(?:<\/b>\s*)?[:=]\s*["\']?\s*(?:<\/b>\s*)?(?:<code>|<b>)?)([^<>\r\n"\']+)/iu',
+        '$1[REDACTED]',
+        $text
+    );
+    if (!is_string($redacted)) {
+        return '[response redacted]';
+    }
+    $redacted = preg_replace('/\btg[a-f0-9]{8}\b/iu', '[REDACTED]', $redacted);
+
+    return is_string($redacted) ? $redacted : '[response redacted]';
+}
+
 function telegram_log(string $chatId, ?string $username, string $message, string $response): void
 {
     if (!table_exists('telegram_logs')) {
@@ -97,7 +118,12 @@ function telegram_log(string $chatId, ?string $username, string $message, string
     }
 
     $stmt = db()->prepare('INSERT INTO telegram_logs (chat_id, username, message, response) VALUES (?, ?, ?, ?)');
-    $stmt->execute([$chatId, $username, $message, $response]);
+    $stmt->execute([
+        $chatId,
+        $username,
+        telegram_log_redact_command($message),
+        telegram_log_redact_response($response),
+    ]);
 }
 
 function telegram_user_by_chat(string $chatId): ?array
@@ -529,7 +555,7 @@ function telegram_help(): string
         '📝 <b>Jurnal</b>',
         '  /jurnal ID YYYY-MM-DD | topik | kegiatan | materi | kendala | tindak_lanjut',
         '',
-        '💡 <i>Contoh: /daftar Fahmi Dwi Payana, S.H | Bahasa Indonesia | 1A</i>',
+        '💡 <i>Contoh: ketik <code>/daftar</code> untuk membuka form pendaftaran aman.</i>',
         '📌 <i>Status absensi: hadir, sakit, izin, alpa, terlambat.</i>',
     ]);
 }
@@ -628,15 +654,6 @@ function telegram_find_or_create_teacher(string $chatId, string $name): int
         return (int)$teacher['id'];
     }
 
-    $teacher = fetch_one(
-        "SELECT id FROM teachers WHERE name = ? AND (telegram_chat_id IS NULL OR telegram_chat_id = '' OR telegram_chat_id = ?) ORDER BY id LIMIT 1",
-        [$name, $chatId]
-    );
-    if ($teacher) {
-        execute_sql('UPDATE teachers SET telegram_chat_id = ?, active = 1, updated_at = ? WHERE id = ?', [$chatId, now_string(), (int)$teacher['id']]);
-        return (int)$teacher['id'];
-    }
-
     execute_sql(
         'INSERT INTO teachers (name, position, telegram_chat_id, active, updated_at) VALUES (?, ?, ?, 1, ?)',
         [$name, 'Guru Mapel', $chatId, now_string()]
@@ -668,11 +685,9 @@ function telegram_find_or_create_user_for_teacher(string $chatId, ?string $fromU
         return ['user' => fetch_one('SELECT * FROM users WHERE id = ?', [(int)$existing['id']]), 'password' => null, 'created' => false];
     }
 
-    $existing = fetch_one('SELECT * FROM users WHERE teacher_id = ? AND active = 1 ORDER BY id LIMIT 1', [$teacherId]);
+    $existing = fetch_one('SELECT id FROM users WHERE teacher_id = ? AND active = 1 ORDER BY id LIMIT 1', [$teacherId]);
     if ($existing) {
-        execute_sql('UPDATE users SET telegram_chat_id = ?, updated_at = ? WHERE id = ?', [$chatId, now_string(), (int)$existing['id']]);
-        telegram_user_set_login_state((int)$existing['id'], true);
-        return ['user' => fetch_one('SELECT * FROM users WHERE id = ?', [(int)$existing['id']]), 'password' => null, 'created' => false];
+        throw new RuntimeException('Akun guru ini sudah terhubung. Gunakan /login untuk masuk.');
     }
 
     $baseName = $fromUsername ? telegram_slug($fromUsername, 'guru') : $name;
@@ -684,6 +699,15 @@ function telegram_find_or_create_user_for_teacher(string $chatId, ?string $fromU
     );
     telegram_user_set_login_state((int)db()->lastInsertId(), true);
     return ['user' => fetch_one('SELECT * FROM users WHERE username = ?', [$username]), 'password' => $password, 'created' => true];
+}
+
+function telegram_teacher_identity_matches(array $teacher, string $nip, string $nuptk): bool
+{
+    $teacherNip = trim((string)($teacher['nip'] ?? ''));
+    $teacherNuptk = trim((string)($teacher['nuptk'] ?? ''));
+
+    return ($nip !== '' && $teacherNip !== '' && hash_equals($teacherNip, $nip))
+        || ($nuptk !== '' && $teacherNuptk !== '' && hash_equals($teacherNuptk, $nuptk));
 }
 
 function telegram_complete_registration(array $registration, array $input): array
@@ -752,17 +776,35 @@ function telegram_complete_registration(array $registration, array $input): arra
             throw new RuntimeException('Link daftar sudah dipakai atau kedaluwarsa. Ketik /daftar lagi di Telegram.');
         }
 
-        $teacher = fetch_one('SELECT id FROM teachers WHERE telegram_chat_id = ? ORDER BY id LIMIT 1', [$chatId]);
-        if (!$teacher) {
-            $teacher = fetch_one(
-                "SELECT id FROM teachers WHERE name = ? AND (telegram_chat_id IS NULL OR telegram_chat_id = '' OR telegram_chat_id = ?) ORDER BY id LIMIT 1",
-                [$name, $chatId]
-            );
+        $existingUser = fetch_one('SELECT id, name FROM users WHERE telegram_chat_id = ? ORDER BY id LIMIT 1', [$chatId]);
+        if ($existingUser) {
+            throw new RuntimeException('Telegram ini sudah terhubung ke akun ' . $existingUser['name'] . '. Ketik /login password untuk masuk.');
+        }
+
+        $teacher = fetch_one('SELECT * FROM teachers WHERE telegram_chat_id = ? ORDER BY id LIMIT 1', [$chatId]);
+        if (!$teacher && $nip !== '') {
+            $teacher = fetch_one('SELECT * FROM teachers WHERE nip = ? ORDER BY id LIMIT 1', [$nip]);
+        }
+        if (!$teacher && $nuptk !== '') {
+            $teacher = fetch_one('SELECT * FROM teachers WHERE nuptk = ? ORDER BY id LIMIT 1', [$nuptk]);
         }
 
         $teacherData = [$name, $nip, $nuptk, $gender, $phone, $email, $position, $chatId, 1, now_string()];
         if ($teacher) {
             $teacherId = (int)$teacher['id'];
+            $teacherChatId = trim((string)($teacher['telegram_chat_id'] ?? ''));
+            if ($teacherChatId !== '' && $teacherChatId !== $chatId && !telegram_teacher_identity_matches($teacher, $nip, $nuptk)) {
+                throw new RuntimeException('Guru ini sudah terhubung ke Telegram lain. Verifikasi NIP/NUPTK atau hubungi admin.');
+            }
+
+            $teacherUsers = fetch_all('SELECT telegram_chat_id FROM users WHERE teacher_id = ? AND active = 1', [$teacherId]);
+            foreach ($teacherUsers as $teacherUser) {
+                $userChatId = trim((string)($teacherUser['telegram_chat_id'] ?? ''));
+                if ($userChatId !== '' && $userChatId !== $chatId) {
+                    throw new RuntimeException('Akun guru ini sudah terhubung ke Telegram lain. Gunakan /login untuk masuk.');
+                }
+            }
+
             execute_sql(
                 'UPDATE teachers SET name = ?, nip = ?, nuptk = ?, gender = ?, phone = ?, email = ?, position = ?, telegram_chat_id = ?, active = ?, updated_at = ? WHERE id = ?',
                 array_merge($teacherData, [$teacherId])
@@ -894,45 +936,7 @@ function telegram_create_assignment_for_class(int $teacherId, int $subjectId, ar
 
 function telegram_register_teacher(string $chatId, ?string $fromUsername, string $text): string
 {
-    try {
-        $payload = trim((string)preg_replace('/^\/?daftar\b/i', '', $text, 1));
-        [$name, $subjectName, $className] = telegram_parse_registration($payload);
-        $teacherId = telegram_find_or_create_teacher($chatId, $name);
-        $subjectId = telegram_find_or_create_subject($subjectName);
-        execute_sql('UPDATE teachers SET telegram_chat_id = ?, updated_at = ? WHERE id = ?', [$chatId, now_string(), $teacherId]);
-        $userResult = telegram_find_or_create_user_for_teacher($chatId, $fromUsername, $name, $teacherId);
-        $assignmentResult = telegram_create_optional_assignment($teacherId, $subjectId, $className);
-
-        $user = $userResult['user'] ?? [];
-        $lines = [
-            '🎉 <b>Pendaftaran guru berhasil!</b>',
-            '',
-            '👤 <b>Nama:</b> ' . $name,
-            '📚 <b>Mapel:</b> ' . $subjectName,
-            '🆔 <b>Telegram ID:</b> <code>' . $chatId . '</code>',
-            '🌐 <b>Username web:</b> <code>' . ($user['username'] ?? '-') . '</code>',
-        ];
-        if (!empty($userResult['password'])) {
-            $lines[] = '🔑 <b>Password web:</b> <code>' . $userResult['password'] . '</code>';
-        } else {
-            $lines[] = '🔑 <b>Password web:</b> tetap memakai password akun yang sudah ada.';
-        }
-        if ($assignmentResult) {
-            $lines[] = '';
-            $lines[] = '📝 ' . $assignmentResult['message'];
-        } else {
-            $lines[] = '';
-            $lines[] = '📝 Pembelajaran kelas belum dibuat. Admin bisa mapping di Data Pembelajaran, atau daftar dengan format: <code>/daftar Nama | Mapel | Kelas</code>';
-        }
-        $lines[] = '';
-        $lines[] = '💡 Ketik <code>/profil</code> untuk cek akun atau <code>/kelas</code> untuk melihat pembelajaran.';
-        return implode("\n", $lines);
-    } catch (Throwable $exception) {
-        log_exception($exception);
-        return app_debug()
-            ? 'Pendaftaran gagal: ' . $exception->getMessage()
-            : 'Pendaftaran gagal. Cek format perintah atau hubungi admin.';
-    }
+    return 'Pendaftaran langsung dinonaktifkan. Ketik <code>/daftar</code> tanpa argumen untuk memakai form aman, atau <code>/login</code> untuk akun yang sudah ada.';
 }
 
 function telegram_assignment_for_user(int $assignmentId, array $user): ?array
@@ -979,11 +983,11 @@ function telegram_handle_command(string $chatId, ?string $fromUsername, string $
 
     if ($command === '/daftar') {
         $payload = trim(substr($text, $commandLength));
-        if ($payload === '') {
-            return telegram_registration_reply($chatId, $fromUsername);
+        if ($payload !== '') {
+            return 'Pendaftaran langsung dinonaktifkan. Ketik <code>/daftar</code> tanpa argumen untuk memakai form aman, atau <code>/login</code> untuk akun yang sudah ada.';
         }
 
-        return telegram_register_teacher($chatId, $fromUsername, $text);
+        return telegram_registration_reply($chatId, $fromUsername);
     }
 
     if ($command === '/login') {
@@ -1299,14 +1303,18 @@ function handle_telegram_webhook(): void
         return;
     }
 
-    $secret = (string)config('telegram.webhook_secret', '');
-    if ($secret !== '') {
-        $header = (string)($_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '');
-        if (!hash_equals($secret, $header)) {
-            http_response_code(403);
-            echo 'Forbidden';
-            return;
-        }
+    $secret = trim((string)config('telegram.webhook_secret', ''));
+    if ($secret === '') {
+        http_response_code(503);
+        echo 'Service Unavailable';
+        return;
+    }
+
+    $header = (string)($_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '');
+    if (!hash_equals($secret, $header)) {
+        http_response_code(403);
+        echo 'Forbidden';
+        return;
     }
 
     $raw = file_get_contents('php://input') ?: '';

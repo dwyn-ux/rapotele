@@ -12,19 +12,25 @@ if (PHP_SAPI !== 'cli') {
         @mkdir($appLogDir, 0775, true);
     }
     @ini_set('error_log', $appLogDir . '/php-error.log');
-    set_exception_handler(function (Throwable $e) use ($appLogDir): void {
-        $line = '[' . date('Y-m-d H:i:s') . '] ' . ($_SERVER['REQUEST_URI'] ?? 'cli') . ' ' . ($_SERVER['REQUEST_METHOD'] ?? 'CLI') . PHP_EOL
+    set_exception_handler(function (Throwable $e): void {
+        @error_log('[' . date('Y-m-d H:i:s') . '] ' . ($_SERVER['REQUEST_URI'] ?? 'cli') . ' ' . ($_SERVER['REQUEST_METHOD'] ?? 'CLI') . PHP_EOL
             . '  ' . get_class($e) . ': ' . $e->getMessage() . PHP_EOL
             . '  at ' . $e->getFile() . ':' . $e->getLine() . PHP_EOL
-            . $e->getTraceAsString() . PHP_EOL . PHP_EOL;
-        @file_put_contents($appLogDir . '/app-errors.log', $line, FILE_APPEND | LOCK_EX);
-        @file_put_contents($appLogDir . '/php-error.log', $line, FILE_APPEND | LOCK_EX);
+            . $e->getTraceAsString());
         if (!headers_sent()) {
             http_response_code(500);
             header('Content-Type: text/html; charset=UTF-8');
         }
-        $msg = htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
-        echo '<!doctype html><html><head><meta charset="utf-8"><title>Error</title></head><body><h1>Aplikasi gagal memproses halaman.</h1><p>' . $msg . '</p></body></html>';
+        $details = '';
+        if (function_exists('app_debug')) {
+            try {
+                if (app_debug()) {
+                    $details = '<pre>' . htmlspecialchars((string)$e, ENT_QUOTES, 'UTF-8') . '</pre>';
+                }
+            } catch (Throwable) {
+            }
+        }
+        echo '<!doctype html><html><head><meta charset="utf-8"><title>Error</title></head><body><h1>Aplikasi gagal memproses halaman.</h1>' . $details . '</body></html>';
         exit;
     });
 }
@@ -95,7 +101,13 @@ require_once __DIR__ . '/Core/database.php';
 require_once __DIR__ . '/Core/http.php';
 require_once __DIR__ . '/migrations.php';
 if (PHP_SAPI !== 'cli') {
-    run_migrations();
+    try {
+        run_migrations();
+    } catch (Throwable $migrationException) {
+        @error_log('[' . date('Y-m-d H:i:s') . '] Migrasi database gagal: '
+            . get_class($migrationException) . ': ' . $migrationException->getMessage() . PHP_EOL
+            . '  at ' . $migrationException->getFile() . ':' . $migrationException->getLine() . PHP_EOL);
+    }
 }
 require_once __DIR__ . '/Services/telegram.php';
 

@@ -120,7 +120,24 @@ function app_handle_post_request(): void
     try {
         app_dispatch_post_action();
     } catch (Throwable $exception) {
-        flash('danger', 'Gagal: ' . friendly_error($exception));
+        $status = ($exception instanceof InvalidArgumentException || $exception instanceof RuntimeException) ? 422 : 500;
+        $cause = $exception;
+        while ($cause) {
+            if ($cause instanceof PDOException) {
+                $status = 500;
+                break;
+            }
+            $cause = $cause->getPrevious();
+        }
+        if ($status !== 500 && stripos($exception->getMessage(), 'ACCESS DENIED:') === 0) {
+            $status = 403;
+        }
+        http_response_code($status);
+        $error = friendly_error($exception);
+        if ($status === 500) {
+            $error = 'Terjadi kesalahan internal. Silakan coba lagi atau hubungi admin.';
+        }
+        flash('danger', 'Gagal: ' . $error);
         redirect_to((string)($_GET['page'] ?? 'dashboard'));
     }
 }
@@ -171,7 +188,11 @@ function app_render_not_found(): void
 function app_render_exception(Throwable $exception): void
 {
     http_response_code(500);
+    $debug = app_debug();
     $message = friendly_error($exception);
+    if (!$debug) {
+        $message = 'Aplikasi gagal memproses halaman.';
+    }
     $renderAuthenticatedShell = false;
     try {
         $renderAuthenticatedShell = app_installed() && (bool)current_user();
@@ -179,21 +200,10 @@ function app_render_exception(Throwable $exception): void
         $renderAuthenticatedShell = false;
     }
 
-    $logDir = dirname(__DIR__, 2) . '/storage/logs';
-    if (!is_dir($logDir)) {
-        @mkdir($logDir, 0775, true);
-    }
-    $logFile = $logDir . '/app-errors.log';
-    $logLine = '[' . date('Y-m-d H:i:s') . '] ' . ($_SERVER['REQUEST_URI'] ?? 'cli') . ' ' . ($_SERVER['REQUEST_METHOD'] ?? 'CLI') . PHP_EOL
-        . '  ' . get_class($exception) . ': ' . $exception->getMessage() . PHP_EOL
-        . '  at ' . $exception->getFile() . ':' . $exception->getLine() . PHP_EOL
-        . $exception->getTraceAsString() . PHP_EOL . PHP_EOL;
-    @file_put_contents($logFile, $logLine, FILE_APPEND | LOCK_EX);
-
     if ($renderAuthenticatedShell) {
         render_header('Terjadi Kesalahan');
         echo '<section class="panel"><h3>Aplikasi gagal memproses halaman.</h3><p>' . e($message) . '</p>';
-        if (app_debug()) {
+        if ($debug) {
             echo '<pre style="background:#f5f5f5;padding:1rem;overflow:auto;font-size:.75rem;">' . e($exception->getTraceAsString()) . '</pre>';
         }
         render_footer();
@@ -202,7 +212,7 @@ function app_render_exception(Throwable $exception): void
 
     render_public_header('Terjadi Kesalahan');
     echo '<h1>Terjadi Kesalahan</h1><p>' . e($message) . '</p>';
-    if (app_debug()) {
+    if ($debug) {
         echo '<pre style="background:#f5f5f5;padding:1rem;overflow:auto;font-size:.75rem;">' . e($exception->getTraceAsString()) . '</pre>';
     }
     render_public_footer();
