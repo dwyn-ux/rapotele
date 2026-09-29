@@ -266,7 +266,44 @@ function migrate_grade_schema(): void
     }
 }
 
+function migrations_fingerprint(): string
+{
+    $hash = hash_file('sha256', __FILE__);
+
+    return $hash === false ? '' : $hash;
+}
+
 function run_migrations(): void
+{
+    $pdo = db();
+    $isMysql = db_driver() === 'mysql';
+    if ($isMysql) {
+        // DDL di setiap request saling berebut InnoDB metadata lock -> deadlock.
+        // Cuma satu proses yang boleh migrasi; sisanya lanjut pakai schema lama.
+        if ((int)$pdo->query("SELECT GET_LOCK('eraport_migrations', 30)")->fetchColumn() !== 1) {
+            return;
+        }
+    }
+
+    try {
+        $fingerprint = migrations_fingerprint();
+        if ($fingerprint !== '' && (string)get_app_setting('migrations_fingerprint', '') === $fingerprint) {
+            return;
+        }
+
+        run_migrations_locked();
+
+        if ($fingerprint !== '') {
+            set_app_setting('migrations_fingerprint', $fingerprint);
+        }
+    } finally {
+        if ($isMysql) {
+            $pdo->query("SELECT RELEASE_LOCK('eraport_migrations')");
+        }
+    }
+}
+
+function run_migrations_locked(): void
 {
     $pk = migration_pk();
     $bool = migration_bool();
