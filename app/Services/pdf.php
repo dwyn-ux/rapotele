@@ -1277,13 +1277,12 @@ function draw_report_learning_table_header(SimplePdf $pdf, bool $sma = false): f
     $y = 715.00;
     $titleHeight = 17.01;
     // Title band: plain text, no fill and no border.
-    $pdf->setFont('Helvetica', 12, true);
-    $title = $sma ? 'B. PENGETAHUAN' : 'LAPORAN HASIL BELAJAR';
-    if ($sma) {
-        $pdf->text(56.69, $y - 11.50, $title, 12, true);
-    } else {
-        $pdf->centerText(56.69, $y - 11.50, 481.89, $title, 12, true);
-    }
+    // Keep the report title identical and centered for SD, SMP, and SMA.
+    // The table columns remain level-specific, but the document heading should
+    // have one consistent visual hierarchy across every generated report.
+    $titleFontSize = 13.0;
+    $pdf->setFont('Helvetica', $titleFontSize, true);
+    $pdf->centerText(56.69, $y - 11.50, 481.89, 'LAPORAN HASIL BELAJAR', $titleFontSize, true);
     $y -= $titleHeight;
 
     // Column header row: only "No" and "Mata Pelajaran" get the light-blue fill.
