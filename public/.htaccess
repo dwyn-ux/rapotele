@@ -9,6 +9,6 @@ DirectoryIndex index.php
     RewriteRule ^ index.php [L]
 </IfModule>
 
-<FilesMatch "(^\.|\.sqlite$|\.db$|\.log$|\.json$|\.sql$|\.env$)">
+<FilesMatch "(^\.|\.sqlite$|\.db$|\.log$|\.json$|\.sql$|\.env$|\.exe$)">
     Require all denied
 </FilesMatch>

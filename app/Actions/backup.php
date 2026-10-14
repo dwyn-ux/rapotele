@@ -126,16 +126,20 @@ function action_create_backup(): void
     redirect_to('backup-restore');
 }
 
-function restore_backup_files(array $payload): int
+function validate_backup_files(array $payload): array
 {
     if (empty($payload['files']) || !is_array($payload['files'])) {
-        return 0;
+        return [];
+    }
+    if (count($payload['files']) > 1000) {
+        throw new RuntimeException('Backup memuat terlalu banyak file.');
     }
 
-    $restored = 0;
+    $files = [];
+    $totalBytes = 0;
     foreach ($payload['files'] as $file) {
         if (!is_array($file)) {
-            continue;
+            throw new RuntimeException('Format file backup tidak valid.');
         }
 
         $relative = safe_relative_path((string)($file['path'] ?? ''), backup_file_prefixes());
@@ -156,7 +160,22 @@ function restore_backup_files(array $payload): int
         if (!empty($file['sha256']) && !hash_equals((string)$file['sha256'], hash('sha256', $data))) {
             throw new RuntimeException('Checksum file backup tidak cocok: ' . $relative);
         }
+        $totalBytes += strlen($data);
+        if ($totalBytes > backup_max_upload_bytes()) {
+            throw new RuntimeException('Total ukuran file backup melebihi batas yang diizinkan.');
+        }
+        if (array_key_exists($relative, $files)) {
+            throw new RuntimeException('File backup duplikat: ' . $relative);
+        }
+        $files[$relative] = $data;
+    }
+    return $files;
+}
 
+function restore_backup_files(array $files): int
+{
+    $restored = 0;
+    foreach ($files as $relative => $data) {
         $path = app_root() . '/' . $relative;
         ensure_directory(dirname($path));
         if (file_put_contents($path, $data, LOCK_EX) === false) {
@@ -180,6 +199,7 @@ function action_restore_backup(): void
     if (!is_array($payload) || empty($payload['tables']) || !is_array($payload['tables'])) {
         throw new RuntimeException('Format backup tidak valid.');
     }
+    $validatedFiles = validate_backup_files($payload);
     db()->beginTransaction();
     try {
         foreach (array_reverse(backup_tables()) as $table) {
@@ -216,7 +236,7 @@ function action_restore_backup(): void
         db()->rollBack();
         throw $exception;
     }
-    $restoredFiles = restore_backup_files($payload);
+    $restoredFiles = restore_backup_files($validatedFiles);
     $message = 'Restore backup selesai.';
     if ($restoredFiles > 0) {
         $message .= ' File rapor/upload dipulihkan: ' . $restoredFiles . '.';

@@ -444,26 +444,15 @@ Untuk setiap dokumen cetak, tersedia opsi:
 
 ## 7. Integrasi Dapodik
 
-### 7.1 Update Data (Tarik dari Dapodik)
+### 7.1 Update Data (Import File Dapodik)
 
 **Halaman:** `?page=update-data`
 
-**Cara Online (jika Dapodik bisa diakses langsung):**
-1. Isi URL Dapodik (default: `http://127.0.0.1:5774`)
-2. Isi Token Web Service
-3. Isi NPSN
-4. Klik **Test Koneksi**
+1. Export JSON data dari Dapodik dengan prosedur resmi yang digunakan sekolah.
+2. Upload file JSON atau tempel payload pada halaman ini.
+3. Pilih jenis data dan klik **Import Data**.
 
-**Cara Offline (menggunakan Portable Helper):**
-1. Download config dan ZIP helper dari halaman ini
-2. Jalankan helper di komputer yang bisa akses Dapodik
-3. Helper akan menampilkan JSON → copy-paste ke kolom import
-4. Klik **Import JSON**
-
-**Cara Offline (menggunakan file):**
-1. Export JSON dari helper Dapodik
-2. Upload file JSON di halaman ini
-3. Klik **Import**
+Aplikasi tidak terhubung ke Web Service Dapodik, tidak menyimpan token Dapodik, dan tidak menyediakan helper/bridge atau pengiriman balik nilai.
 
 **Tipe data yang bisa diimport:**
 - `sekolah` → Data sekolah
@@ -474,14 +463,6 @@ Untuk setiap dokumen cetak, tersedia opsi:
 - `mapel` → Mata pelajaran
 - `pembelajaran` → Jadwal pembelajaran
 - `all` → Semua data sekaligus
-
-### 7.2 Kirim Data (Push ke Dapodik)
-
-**Halaman:** `?page=kirim-data-dapodik`
-
-Mengirim nilai siswa dari e-rapor ke Dapodik:
-1. Pilih tipe data: `nilai` (nilai siswa) atau `matev` (materi evaluasi)
-2. Klik **Kirim Data Nilai**
 
 ---
 
@@ -582,7 +563,6 @@ erapotkumerbot/
 │   ├── .htaccess           # URL rewrite + security
 │   ├── install.php         # Installer
 │   ├── media.php           # Serving file upload
-│   ├── dapodik_bridge.php  # Dapodik API endpoint
 │   └── assets/
 │       ├── app.css         # Stylesheet
 │       └── app.js          # JavaScript

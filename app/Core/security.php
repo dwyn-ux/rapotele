@@ -44,6 +44,34 @@ function require_role(array $roles): void
     }
 }
 
+function classes_for_homeroom_current_user(): array
+{
+    if (is_admin()) {
+        return fetch_all('SELECT * FROM classes WHERE active = 1 ORDER BY grade, name');
+    }
+
+    $teacherId = (int)(current_user()['teacher_id'] ?? 0);
+    if ($teacherId <= 0) {
+        return [];
+    }
+
+    return fetch_all('SELECT * FROM classes WHERE active = 1 AND homeroom_teacher_id = ? ORDER BY grade, name', [$teacherId]);
+}
+
+function require_homeroom_access(int $classId): void
+{
+    if (is_admin()) {
+        return;
+    }
+
+    $teacherId = (int)(current_user()['teacher_id'] ?? 0);
+    $class = $classId > 0 ? fetch_one('SELECT name, homeroom_teacher_id FROM classes WHERE id = ?', [$classId]) : null;
+    if (!$class || $teacherId <= 0 || (int)$class['homeroom_teacher_id'] !== $teacherId) {
+        $className = $class ? (string)$class['name'] : ('#' . $classId);
+        render_access_denied('Data rapor kelas ' . $className . ' hanya dapat diakses wali kelasnya atau admin.');
+    }
+}
+
 function csrf_token(): string
 {
     if (empty($_SESSION['_csrf'])) {
@@ -91,7 +119,7 @@ function validate_password_strength(string $password): void
 
 function is_weak_password(string $password): bool
 {
-    $weakPasswords = ['administrator', 'password', '12345678', 'qwerty123', 'guru123'];
+    $weakPasswords = ['administrator', 'admin123', 'password', '12345678', 'qwerty123', 'guru123', 'siswa123'];
     return in_array(strtolower($password), $weakPasswords, true);
 }
 

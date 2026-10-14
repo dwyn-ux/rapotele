@@ -18,8 +18,12 @@ function page_install(): void
 
     if (is_post()) {
         verify_csrf();
-        install_database();
-        flash('success', 'Database siap. Login awal: administrator / administrator. Segera ganti password setelah masuk.');
+        $initialAdminPassword = install_database();
+        $message = 'Database siap. ';
+        if ($initialAdminPassword !== null) {
+            $message .= 'Username awal: administrator. Password awal sekali pakai: ' . $initialAdminPassword . '. Simpan sekarang dan segera ganti setelah masuk.';
+        }
+        flash('success', $message);
         redirect_to('login');
     }
 
@@ -28,7 +32,7 @@ function page_install(): void
     <div class="center">
         <?= render_app_mark(true) ?>
         <h1>Instalasi E-Raport KumerBot</h1>
-        <p>Aplikasi akan membuat tabel dan data contoh pada database yang terhubung di config/config.php.</p>
+        <p>Aplikasi akan membuat tabel dan akun administrator pertama pada database yang terhubung di config/config.php.</p>
     </div>
     <form method="post">
         <?= csrf_field() ?>
@@ -380,9 +384,16 @@ function page_forgot_password(): void
     if (is_post()) {
         verify_csrf();
         try {
+            $rateIdentity = client_ip();
+            if (rate_limited('forgot-password', $rateIdentity, 3, 3600)) {
+                flash('success', 'Jika akun ditemukan dan terhubung Telegram, link login akan dikirimkan.');
+                redirect_to('login');
+            }
+            rate_limit_hit('forgot-password', $rateIdentity, 3600);
             $username = trim((string)($_POST['username'] ?? ''));
             if ($username === '') {
-                throw new RuntimeException('Masukkan username atau email.');
+                flash('success', 'Jika akun ditemukan dan terhubung Telegram, link login akan dikirimkan.');
+                redirect_to('login');
             }
 
             $user = fetch_one(
@@ -390,7 +401,8 @@ function page_forgot_password(): void
                 [$username, $username]
             );
             if (!$user) {
-                throw new RuntimeException('Akun tidak ditemukan.');
+                flash('success', 'Jika akun ditemukan dan terhubung Telegram, link login akan dikirimkan.');
+                redirect_to('login');
             }
 
             $chatId = trim((string)($user['telegram_chat_id'] ?? ''));
@@ -412,20 +424,16 @@ function page_forgot_password(): void
                 $response = telegram_card_response($message, $buttons);
                 telegram_send_message($chatId, $response);
 
-                flash('success', 'Link login sudah dikirim ke akun Telegram Anda. Cek chat Telegram dari bot.');
+                flash('success', 'Jika akun ditemukan dan terhubung Telegram, link login akan dikirimkan.');
                 redirect_to('login');
             }
 
-            if (!empty($user['email'])) {
-                flash('warning', 'Fitur reset via email belum tersedia. Hubungi admin untuk reset password.');
-                redirect_to('login');
-            }
-
-            flash('warning', 'Akun ini belum terhubung Telegram. Hubungi admin untuk reset password.');
+            flash('success', 'Jika akun ditemukan dan terhubung Telegram, link login akan dikirimkan.');
             redirect_to('login');
         } catch (Throwable $exception) {
-            flash('danger', friendly_error($exception));
-            redirect_to('lupa-password');
+            log_exception($exception);
+            flash('success', 'Jika akun ditemukan dan terhubung Telegram, link login akan dikirimkan.');
+            redirect_to('login');
         }
     }
 

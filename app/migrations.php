@@ -1025,9 +1025,18 @@ function run_migrations_locked(): void
     migration_add_column('school_profile', 'province', 'VARCHAR(120) NULL');
 
     migrate_foreign_keys();
+
+    // Sinkronisasi langsung Dapodik telah dihentikan. Hapus token dan URL lama
+    // dari instalasi yang sudah ada agar kredensial tidak tertinggal di database.
+    if (table_exists('app_settings')) {
+        execute_sql(
+            'DELETE FROM app_settings WHERE setting_key IN (?, ?, ?, ?)',
+            ['dapodik_url', 'dapodik_token', 'dapodik_npsn', 'dapodik_bridge_token']
+        );
+    }
 }
 
-function seed_defaults(): void
+function seed_defaults(): ?string
 {
     $schoolCount = (int)db()->query('SELECT COUNT(*) FROM school_profile')->fetchColumn();
     if ($schoolCount === 0) {
@@ -1041,104 +1050,29 @@ function seed_defaults(): void
 
     $userCount = (int)db()->query('SELECT COUNT(*) FROM users')->fetchColumn();
     if ($userCount > 0) {
-        return;
+        return null;
     }
-
-    $teachers = [
-        ['Siti Aminah, S.Pd', '198601012010012001', '1234567890123456', 'P', 'Guru Kelas'],
-        ['Budi Santoso, S.Pd', '198410102009011002', '2234567890123456', 'L', 'Guru Mapel'],
-        ['Rina Lestari, S.Pd', '199003032015022003', '3234567890123456', 'P', 'Guru Mapel'],
-    ];
-    $stmt = db()->prepare('INSERT INTO teachers (name, nip, nuptk, gender, position, email, active) VALUES (?, ?, ?, ?, ?, ?, 1)');
-    foreach ($teachers as $index => $teacher) {
-        $stmt->execute([$teacher[0], $teacher[1], $teacher[2], $teacher[3], $teacher[4], 'guru' . ($index + 1) . '@sekolah.local']);
-    }
-
-    $stmt = db()->prepare('INSERT INTO classes (name, grade, homeroom_teacher_id, academic_year, active) VALUES (?, ?, ?, ?, 1)');
-    $stmt->execute(['1A', '1', 1, (string)config('school.academic_year', '2025/2026')]);
-    $stmt->execute(['2A', '2', 2, (string)config('school.academic_year', '2025/2026')]);
-
-    $subjects = [
-        ['Bahasa Indonesia', 'B.Indo', 'Wajib', 'SMP,SMA'],
-        ['Matematika', 'MTK', 'Wajib', 'SMP,SMA'],
-        ['Pendidikan Pancasila', 'PP', 'Wajib', 'SMP,SMA'],
-        ['PJOK', 'PJOK', 'Wajib', 'SMP,SMA'],
-        ['Seni Budaya', 'SBdP', 'Wajib', 'SMP'],
-    ];
-    $stmt = db()->prepare('INSERT INTO subjects (name, short_name, group_name, level, active) VALUES (?, ?, ?, ?, 1)');
-    foreach ($subjects as $subject) {
-        $stmt->execute($subject);
-    }
-
-    $students = [
-        ['1001', '0091001001', 'Ahmad Fauzan', 'L', '1'],
-        ['1002', '0091001002', 'Bilqis Aulia', 'P', '1'],
-        ['1003', '0091001003', 'Cahya Pratama', 'L', '1'],
-        ['1004', '0091001004', 'Dinda Safitri', 'P', '1'],
-        ['2001', '0092001001', 'Eka Saputra', 'L', '2'],
-        ['2002', '0092001002', 'Farah Nabila', 'P', '2'],
-        ['2003', '0092001003', 'Gilang Ramadhan', 'L', '2'],
-        ['2004', '0092001004', 'Hana Zahra', 'P', '2'],
-    ];
-    $stmt = db()->prepare('INSERT INTO students (nis, nisn, name, gender, class_id, active) VALUES (?, ?, ?, ?, ?, 1)');
-    foreach ($students as $student) {
-        $stmt->execute($student);
-    }
-
-    $assignments = [
-        [1, 1, 1],
-        [1, 1, 2],
-        [2, 2, 2],
-        [3, 1, 4],
-        [3, 2, 5],
-    ];
-    $stmt = db()->prepare('INSERT INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active) VALUES (?, ?, ?, ?, ?, 1)');
-    foreach ($assignments as $assignment) {
-        $stmt->execute([
-            $assignment[0],
-            $assignment[1],
-            $assignment[2],
-            (string)config('school.academic_year', '2025/2026'),
-            (string)config('school.semester', 'Genap'),
-        ]);
-    }
-
-    $users = [
-        ['administrator', 'administrator', 'Administrator', 'adminrapor@sekolah.local', 'admin', null],
-        ['guru1', 'guru123', 'Siti Aminah', 'guru1@sekolah.local', 'guru', 1],
-        ['guru2', 'guru123', 'Budi Santoso', 'guru2@sekolah.local', 'guru', 2],
-        ['guru3', 'guru123', 'Rina Lestari', 'guru3@sekolah.local', 'guru', 3],
-    ];
+    $password = bin2hex(random_bytes(16));
     $stmt = db()->prepare('INSERT INTO users (username, password_hash, name, email, role, teacher_id, active) VALUES (?, ?, ?, ?, ?, ?, 1)');
-    foreach ($users as $user) {
-        $stmt->execute([
-            $user[0],
-            password_hash($user[1], PASSWORD_DEFAULT),
-            $user[2],
-            $user[3],
-            $user[4],
-            $user[5],
-        ]);
-    }
+    $stmt->execute(['administrator', password_hash($password, PASSWORD_DEFAULT), 'Administrator', null, 'admin', null]);
+    return $password;
 }
 
-function install_database(): void
+function install_database(): ?string
 {
     run_migrations();
-    seed_defaults();
+    $initialAdminPassword = seed_defaults();
     if (config('demo_seed', false)) {
         seed_extended_defaults();
     } else {
         seed_clean_defaults();
     }
+    return $initialAdminPassword;
 }
 
 function seed_clean_defaults(): void
 {
     foreach ([
-        'dapodik_url'                  => '',
-        'dapodik_token'                => '',
-        'dapodik_npsn'                 => '',
         'whatsapp_mode'                => 'simulate',
         'whatsapp_access_token'        => '',
         'whatsapp_phone_number_id'     => '',
@@ -1151,9 +1085,6 @@ function seed_clean_defaults(): void
         if (get_app_setting($key, null) === null) {
             set_app_setting($key, $value);
         }
-    }
-    if (get_app_setting('dapodik_bridge_token', '') === '') {
-        set_app_setting('dapodik_bridge_token', bin2hex(random_bytes(12)));
     }
     if (get_app_setting('whatsapp_cron_secret', '') === '') {
         set_app_setting('whatsapp_cron_secret', bin2hex(random_bytes(12)));
@@ -1187,14 +1118,6 @@ function seed_extended_defaults(): void
     seed_demo_whatsapp_data();
     seed_default_sp_thresholds();
 
-    foreach (['dapodik_url' => '', 'dapodik_token' => '', 'dapodik_npsn' => ''] as $key => $value) {
-        if (get_app_setting($key, null) === null) {
-            set_app_setting($key, $value);
-        }
-    }
-    if (get_app_setting('dapodik_bridge_token', '') === '') {
-        set_app_setting('dapodik_bridge_token', bin2hex(random_bytes(12)));
-    }
     foreach ([
         'whatsapp_mode' => 'simulate',
         'whatsapp_access_token' => '',

@@ -6,7 +6,7 @@ DirectoryIndex public/index.php index.php
 
     RewriteRule ^(app|config|database|storage|tools)(/|$) - [F,L]
     RewriteRule ^assets/(.*)$ public/assets/$1 [L]
-    RewriteRule ^(index|install|media|telegram_webhook|schedule_reminders|whatsapp_weekly|dapodik_bridge|dapodik_local_helper)\.php$ public/$1.php [L]
+    RewriteRule ^(index|install|media|telegram_webhook|schedule_reminders|whatsapp_weekly)\.php$ public/$1.php [L]
 
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d

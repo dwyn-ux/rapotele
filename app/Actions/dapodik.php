@@ -1,54 +1,5 @@
 <?php declare(strict_types=1);
 
-function dapodik_helper_defaults(string $dapodikUrl, string $dapodikToken, string $npsn, string $type = 'all'): array
-{
-    return [
-        'bridge_url' => app_url(''),
-        'bridge_token' => '',
-        'dapodik_url' => $dapodikUrl !== '' ? $dapodikUrl : 'http://127.0.0.1:5774',
-        'dapodik_token' => $dapodikToken,
-        'npsn' => $npsn,
-        'type' => $type,
-    ];
-}
-
-function dapodik_helper_download_url(string $download, array $defaults): string
-{
-    return app_url('dapodik_local_helper.php') . '?' . http_build_query(['download' => $download] + $defaults);
-}
-
-function action_save_dapodik_settings(): void
-{
-    require_role(['admin']);
-    $dapodikUrl = normalize_http_url((string)($_POST['url'] ?? ''));
-    $dapodikToken = trim((string)($_POST['token'] ?? ''));
-    $npsn = trim((string)($_POST['npsn'] ?? ''));
-    set_app_setting('dapodik_url', $dapodikUrl);
-    set_app_setting('dapodik_token', $dapodikToken);
-    set_app_setting('dapodik_npsn', $npsn);
-    if (array_key_exists('bridge_token', $_POST)) {
-        $bridgeToken = trim((string)($_POST['bridge_token'] ?? ''));
-        set_app_setting('dapodik_bridge_token', $bridgeToken !== '' ? $bridgeToken : bin2hex(random_bytes(12)));
-    } elseif (get_app_setting('dapodik_bridge_token', '') === '') {
-        set_app_setting('dapodik_bridge_token', bin2hex(random_bytes(12)));
-    }
-    $downloadAfterSave = (string)($_POST['download_after_save'] ?? '');
-    if (in_array($downloadAfterSave, ['portable', 'config'], true)) {
-        header('Location: ' . dapodik_helper_download_url($downloadAfterSave, dapodik_helper_defaults($dapodikUrl, $dapodikToken, $npsn)));
-        exit;
-    }
-    flash('success', 'Konfigurasi Dapodik tersimpan.');
-    redirect_to((string)($_POST['return_page'] ?? 'update-data'));
-}
-
-function action_generate_dapodik_bridge_token(): void
-{
-    require_role(['admin']);
-    set_app_setting('dapodik_bridge_token', 'bridge-' . bin2hex(random_bytes(16)));
-    flash('success', 'Token bridge baru dibuat.');
-    redirect_to('update-data');
-}
-
 function dapodik_data_types(bool $includeAll = false): array
 {
     $types = [
@@ -62,11 +13,6 @@ function dapodik_data_types(bool $includeAll = false): array
     ];
 
     return $includeAll ? ['all' => 'Semua Data Dasar'] + $types : $types;
-}
-
-function dapodik_default_sync_types(): array
-{
-    return ['sekolah', 'guru', 'rombel', 'siswa', 'anggota_rombel', 'pembelajaran'];
 }
 
 function dapodik_validate_type(string $type, bool $allowAll = false): string
@@ -124,7 +70,14 @@ function action_import_dapodik_offline(): void
     if ($jsonText === '') {
         throw new RuntimeException('Pilih file JSON atau tempel payload JSON Dapodik.');
     }
-    $payload = json_decode($jsonText, true);
+    if (strlen($jsonText) > max_upload_bytes()) {
+        throw new RuntimeException('Payload JSON melebihi batas ukuran yang diizinkan.');
+    }
+    try {
+        $payload = json_decode($jsonText, true, 512, JSON_THROW_ON_ERROR);
+    } catch (JsonException) {
+        throw new RuntimeException('JSON offline tidak valid.');
+    }
     if (!is_array($payload)) {
         throw new RuntimeException('JSON offline tidak valid.');
     }
@@ -132,177 +85,30 @@ function action_import_dapodik_offline(): void
         $type = dapodik_validate_type((string)$payload['type'], true);
     }
 
-    if ($type === 'all') {
-        $items = isset($payload['items']) && is_array($payload['items'])
-            ? $payload['items']
-            : (isset($payload['payloads']) && is_array($payload['payloads']) ? $payload['payloads'] : []);
-        $summary = dapodik_import_items($items);
-        $message = 'Import offline semua data selesai. ' . dapodik_summary_text($summary) . '.';
+    db()->beginTransaction();
+    try {
+        if ($type === 'all') {
+            $items = isset($payload['items']) && is_array($payload['items'])
+                ? $payload['items']
+                : (isset($payload['payloads']) && is_array($payload['payloads']) ? $payload['payloads'] : []);
+            $summary = dapodik_import_items($items);
+            $message = 'Import semua data dari file Dapodik selesai. ' . dapodik_summary_text($summary) . '.';
+        } else {
+            $records = isset($payload['data']) && is_array($payload['data']) ? $payload['data'] : $payload;
+            $count = dapodik_import($type, $records);
+            $message = "Import file Dapodik $type selesai. Data diproses: $count.";
+        }
         execute_sql(
             'INSERT INTO dapodik_sync_logs (mode, data_type, endpoint, status, message, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-            ['offline-import', 'all', 'manual-json', 'success', $message, (int)current_user()['id']]
+            ['offline-import', $type, 'manual-json', 'success', $message, (int)current_user()['id']]
         );
-        flash('success', $message);
-        redirect_to('update-data');
+        db()->commit();
+    } catch (Throwable $exception) {
+        db()->rollBack();
+        throw $exception;
     }
-
-    $records = isset($payload['data']) && is_array($payload['data']) ? $payload['data'] : $payload;
-    $count = dapodik_import($type, $records);
-    execute_sql(
-        'INSERT INTO dapodik_sync_logs (mode, data_type, endpoint, status, message, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-        ['offline-import', $type, 'manual-json', 'success', "Import offline $type selesai. Data diproses: $count.", (int)current_user()['id']]
-    );
-    flash('success', "Import offline $type selesai. Data diproses: $count.");
-    redirect_to('update-data');
-}
-
-function action_sync_dapodik(): void
-{
-    require_role(['admin']);
-    $type = dapodik_validate_type((string)($_POST['data_type'] ?? 'sekolah'), true);
-    if ($type === 'all') {
-        $summary = [];
-        $hasError = false;
-        foreach (dapodik_default_sync_types() as $singleType) {
-            $result = dapodik_fetch($singleType);
-            $hasError = $hasError || $result['status'] !== 'success';
-            $summary[] = $result['message'];
-            execute_sql(
-                'INSERT INTO dapodik_sync_logs (mode, data_type, endpoint, status, message, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-                ['pull', $singleType, $result['endpoint'], $result['status'], $result['message'], (int)current_user()['id']]
-            );
-        }
-        flash($hasError ? 'danger' : 'success', 'Sinkron semua selesai. ' . implode(' ', $summary));
-        redirect_to('update-data');
-    }
-
-    $result = dapodik_fetch($type);
-    execute_sql(
-        'INSERT INTO dapodik_sync_logs (mode, data_type, endpoint, status, message, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-        ['pull', $type, $result['endpoint'], $result['status'], $result['message'], (int)current_user()['id']]
-    );
-    flash($result['status'] === 'success' ? 'success' : 'danger', $result['message']);
-    redirect_to('update-data');
-}
-
-function action_send_dapodik(): void
-{
-    require_role(['admin']);
-    $kind = (string)($_POST['kind'] ?? 'nilai');
-    if (!in_array($kind, ['matev', 'nilai'], true)) {
-        throw new RuntimeException('Jenis payload Dapodik tidak valid.');
-    }
-    $payload = dapodik_payload($kind);
-    $url = normalize_http_url((string)get_app_setting('dapodik_url', ''));
-    $endpoint = $url ? rtrim($url, '/') . '/WebService/' . ($kind === 'nilai' ? 'simpanNilai' : 'simpanMatev') : '';
-    $message = $url ? dapodik_post_payload($url, $kind, $payload) : 'Payload ' . $kind . ' disiapkan. Isi URL Dapodik untuk mengirim online.';
-    execute_sql('INSERT INTO dapodik_sync_logs (mode, data_type, endpoint, status, message, created_by) VALUES (?, ?, ?, ?, ?, ?)', ['push', $kind, $endpoint, 'queued', $message, (int)current_user()['id']]);
     flash('success', $message);
-    redirect_to('kirim-data-dapodik');
-}
-
-function dapodik_endpoint_names(string $type): array
-{
-    $map = [
-        'sekolah' => ['getSekolah'],
-        'guru' => ['getGtk'],
-        'siswa' => ['getPesertaDidik'],
-        'rombel' => ['getRombonganBelajar'],
-        'anggota_rombel' => ['getAnggotaRombel', 'getAnggotaRombonganBelajar', 'getPesertaDidikRombel'],
-        'mapel' => ['getMataPelajaran'],
-        'pembelajaran' => ['getPembelajaran', 'getPembelajaranGuru', 'getDataPembelajaran'],
-    ];
-
-    return $map[$type] ?? [$type];
-}
-
-function dapodik_endpoint_name(string $type): string
-{
-    return dapodik_endpoint_names($type)[0];
-}
-
-function dapodik_endpoint_url(string $baseUrl, string $type, string $npsn, ?string $token = null, ?string $endpointName = null): string
-{
-    $params = ['npsn' => $npsn];
-    if ($token !== null && $token !== '') {
-        $params['token'] = $token;
-    }
-
-    return rtrim($baseUrl, '/') . '/WebService/' . ($endpointName ?? dapodik_endpoint_name($type)) . '?' . http_build_query($params);
-}
-
-function dapodik_fetch_json(string $endpoint, array $headers = []): array
-{
-    if (!function_exists('curl_init')) {
-        throw new RuntimeException('Ekstensi PHP cURL belum aktif.');
-    }
-
-    $ch = curl_init($endpoint);
-    $curlOptions = [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CONNECTTIMEOUT => 8,
-        CURLOPT_TIMEOUT => 30,
-        CURLOPT_HTTPHEADER => array_merge([
-            'Accept: application/json',
-            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
-        ], $headers),
-    ];
-    if (defined('CURLOPT_PROTOCOLS') && defined('CURLPROTO_HTTP') && defined('CURLPROTO_HTTPS')) {
-        $curlOptions[CURLOPT_PROTOCOLS] = CURLPROTO_HTTP | CURLPROTO_HTTPS;
-        $curlOptions[CURLOPT_REDIR_PROTOCOLS] = CURLPROTO_HTTP | CURLPROTO_HTTPS;
-    }
-    curl_setopt_array($ch, $curlOptions);
-    $body = curl_exec($ch);
-    $error = curl_error($ch);
-    $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-    curl_close($ch);
-    if ($body === false || $error) {
-        throw new RuntimeException('Gagal menghubungi Dapodik: ' . $error);
-    }
-    $json = json_decode((string)$body, true);
-    if (!is_array($json)) {
-        $preview = mb_strimwidth(trim((string)$body), 0, 160, '...');
-        throw new RuntimeException('Dapodik merespons HTTP ' . $code . ', tetapi bukan JSON valid' . ($preview !== '' ? ': ' . $preview : '.'));
-    }
-
-    return $json;
-}
-
-function dapodik_fetch(string $type): array
-{
-    $url = normalize_http_url((string)get_app_setting('dapodik_url', ''));
-    $token = trim((string)get_app_setting('dapodik_token', ''));
-    $npsn = trim((string)get_app_setting('dapodik_npsn', ''));
-    if ($url === '' || $token === '' || $npsn === '') {
-        return ['status' => 'error', 'endpoint' => '', 'message' => 'URL, token, dan NPSN Dapodik wajib diisi.'];
-    }
-
-    $errors = [];
-    foreach (dapodik_endpoint_names($type) as $endpointName) {
-        $endpoint = dapodik_endpoint_url($url, $type, $npsn, null, $endpointName);
-        try {
-            $json = dapodik_fetch_json($endpoint, ['Authorization: Bearer ' . $token]);
-            $count = dapodik_import($type, $json);
-            return ['status' => 'success', 'endpoint' => $endpoint . ' [Authorization Bearer]', 'message' => "Sinkron $type selesai. Data diproses: $count."];
-        } catch (RuntimeException $queryException) {
-            $bearerException = $queryException;
-        }
-
-        $fallbackEndpoint = dapodik_endpoint_url($url, $type, $npsn, $token, $endpointName);
-        try {
-            $json = dapodik_fetch_json($fallbackEndpoint);
-            $count = dapodik_import($type, $json);
-            return ['status' => 'success', 'endpoint' => $fallbackEndpoint . ' [query token]', 'message' => "Sinkron $type selesai. Data diproses: $count."];
-        } catch (RuntimeException $queryException) {
-            $errors[] = $endpointName . ' Bearer: ' . $bearerException->getMessage() . ' Query: ' . $queryException->getMessage();
-        }
-    }
-
-    return [
-        'status' => 'error',
-        'endpoint' => dapodik_endpoint_url($url, $type, $npsn),
-        'message' => 'Dapodik menolak semua endpoint kandidat. ' . implode('; ', $errors),
-    ];
+    redirect_to('update-data');
 }
 
 function dapodik_records(array $json): array
@@ -1248,87 +1054,6 @@ function dapodik_import(string $type, array $json): int
     return $count;
 }
 
-function dapodik_payload(string $kind): array
-{
-    if ($kind === 'matev') {
-        return [
-            'npsn' => get_app_setting('dapodik_npsn', ''),
-            'learning_objectives' => fetch_all('SELECT lo.*, s.name AS subject_name FROM learning_objectives lo JOIN subjects s ON s.id = lo.subject_id'),
-        ];
-    }
-    return [
-        'npsn' => get_app_setting('dapodik_npsn', ''),
-        'grades' => fetch_all('SELECT g.*, st.nisn, st.nis, st.name AS student_name, sub.name AS subject_name FROM grades g JOIN students st ON st.id = g.student_id JOIN teaching_assignments ta ON ta.id = g.assignment_id JOIN subjects sub ON sub.id = ta.subject_id'),
-        'final_scores' => fetch_all('SELECT fs.*, st.nisn, st.name AS student_name, sub.name AS subject_name FROM final_scores fs JOIN students st ON st.id = fs.student_id JOIN subjects sub ON sub.id = fs.subject_id'),
-    ];
-}
-
-function dapodik_push_endpoint_candidates(string $baseUrl, string $kind, string $token): array
-{
-    $baseUrl = rtrim(normalize_http_url($baseUrl), '/');
-    $names = $kind === 'matev'
-        ? ['simpanMatev', 'saveMatev', 'kirimMatev']
-        : ['simpanNilai', 'saveNilai', 'kirimNilai'];
-    $endpoints = [];
-    foreach ($names as $name) {
-        $endpoints[] = $baseUrl . '/WebService/' . $name;
-        if ($token !== '') {
-            $endpoints[] = $baseUrl . '/WebService/' . $name . '?' . http_build_query(['token' => $token]);
-        }
-    }
-    $endpoints[] = $baseUrl . '/erapor/' . rawurlencode($kind);
-    return array_values(array_unique($endpoints));
-}
-
-function dapodik_post_json_once(string $endpoint, array $payload, string $token): array
-{
-    $ch = curl_init($endpoint);
-    $headers = ['Content-Type: application/json'];
-    if ($token !== '') {
-        $headers[] = 'Authorization: Bearer ' . $token;
-    }
-    $curlOptions = [
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CONNECTTIMEOUT => 8,
-        CURLOPT_TIMEOUT => 30,
-    ];
-    if (defined('CURLOPT_PROTOCOLS') && defined('CURLPROTO_HTTP') && defined('CURLPROTO_HTTPS')) {
-        $curlOptions[CURLOPT_PROTOCOLS] = CURLPROTO_HTTP | CURLPROTO_HTTPS;
-        $curlOptions[CURLOPT_REDIR_PROTOCOLS] = CURLPROTO_HTTP | CURLPROTO_HTTPS;
-    }
-    curl_setopt_array($ch, $curlOptions);
-    $body = curl_exec($ch);
-    $error = curl_error($ch);
-    $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-    curl_close($ch);
-    return ['endpoint' => $endpoint, 'code' => $code, 'body' => (string)$body, 'error' => (string)$error];
-}
-
-function dapodik_post_payload(string $baseUrl, string $kind, array $payload): string
-{
-    if (!function_exists('curl_init')) {
-        return 'Pengiriman gagal: ekstensi PHP cURL belum aktif.';
-    }
-
-    $token = trim((string)get_app_setting('dapodik_token', ''));
-    $npsn = trim((string)get_app_setting('dapodik_npsn', ''));
-    $payload['token'] = $token;
-    $payload['npsn'] = $npsn;
-    $attempts = [];
-    foreach (dapodik_push_endpoint_candidates($baseUrl, $kind, $token) as $endpoint) {
-        $result = dapodik_post_json_once($endpoint, $payload, $token);
-        $attempts[] = basename((string)parse_url($endpoint, PHP_URL_PATH)) . ': HTTP ' . $result['code'] . ($result['error'] !== '' ? ' ' . $result['error'] : '');
-        if ($result['error'] === '' && $result['code'] >= 200 && $result['code'] < 300) {
-            return 'Pengiriman ' . $kind . ' diproses via ' . $endpoint . '. HTTP ' . $result['code'] . '. Respons: ' . mb_strimwidth(trim($result['body']), 0, 180, '...');
-        }
-    }
-
-    return 'Pengiriman ' . $kind . ' belum diterima Dapodik. Percobaan: ' . implode('; ', $attempts) . '. Cek endpoint write Dapodik/e-Rapor pada instalasi lokal.';
-}
-
 // ── Import siswa dari file export Dapodik (.xlsx "Daftar Peserta Didik") ──
 // Format: 4 baris kop, baris header (No, Nama, NIPD, JK, NISN, ..., Rombel
 // Saat Ini, ...), 1 baris sub-header (Data Ayah/Ibu/Wali), lalu data.
@@ -1700,11 +1425,10 @@ function dapodik_export_find_student(string $nisn, string $nis, string $name): ?
     return null;
 }
 
-function dapodik_import_siswa_export(array $records, bool $updateExisting, bool $createClasses, bool $createUsers): array
+function dapodik_import_siswa_export(array $records, bool $updateExisting, bool $createClasses): array
 {
     $stats = ['baru' => 0, 'diupdate' => 0, 'dilewati' => 0, 'akun' => 0, 'kelas_baru' => [], 'errors' => []];
     $classCache = [];
-    $defaultPassword = (string)config('default_student_password', 'siswa123');
     foreach ($records as $d) {
         $rowNo = (int)($d['_row'] ?? 0);
         try {
@@ -1736,21 +1460,6 @@ function dapodik_import_siswa_export(array $records, bool $updateExisting, bool 
                 );
                 $studentId = (int)db()->lastInsertId();
                 $stats['baru']++;
-            }
-            if ($createUsers && !fetch_one('SELECT id FROM users WHERE student_id = ?', [$studentId])) {
-                $username = $d['nisn'] !== '' ? $d['nisn'] : $d['nis'];
-                if ($username === '') {
-                    $stats['errors'][] = 'Baris ' . $rowNo . ' (' . $d['name'] . '): tanpa NISN/NIS, akun login dilewati.';
-                } elseif (fetch_one('SELECT id FROM users WHERE username = ?', [$username])) {
-                    $stats['errors'][] = 'Baris ' . $rowNo . ': username ' . $username . ' sudah dipakai, akun dilewati.';
-                } else {
-                    $email = filter_var($d['email'], FILTER_VALIDATE_EMAIL) ? $d['email'] : null;
-                    execute_sql(
-                        "INSERT INTO users (username, password_hash, name, email, role, student_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, 'siswa', ?, 1, ?, ?)",
-                        [$username, password_hash($defaultPassword, PASSWORD_DEFAULT), $d['name'], $email, $studentId, now_string(), now_string()]
-                    );
-                    $stats['akun']++;
-                }
             }
         } catch (Throwable $e) {
             $stats['dilewati']++;

@@ -66,7 +66,6 @@ function render_header(string $title): void
             'cetak-transkrip-ijazah' => ['Cetak Transkrip', 'cetak-transkrip-ijazah', 'file'],
         ],
         'Integrasi' => [
-            'kirim-data-dapodik' => ['Kirim Data Dapodik', 'kirim-data-dapodik', 'cloud-upload'],
             'backup-restore' => ['Backup dan Restore', 'backup-restore', 'hard-drive'],
             'telegram' => ['Bot Telegram', 'telegram', 'send'],
             'whatsapp' => ['WhatsApp Report', 'whatsapp', 'message-circle'],
@@ -99,7 +98,7 @@ function render_header(string $title): void
             'gabung-mapel', 'data-mapping', 'data-logo-ttd', 'tanggal-rapor', 'foto-siswa',
             'tema-kokurikuler', 'kegiatan-kokurikuler', 'kelompok-kokurikuler', 'input-kelulusan',
             'import-nomor-ijazah', 'setting-transkrip', 'setting-skl', 'mapping-mapel-skl',
-            'input-nilai-skl', 'kirim-data-dapodik', 'backup-restore', 'whatsapp', 'users',
+            'input-nilai-skl', 'backup-restore', 'whatsapp', 'users',
             'import-bulk', 'bulk-delete', 'violation-rules', 'teacher-attendance', 'assignments',
         ] as $adminPage) {
             foreach ($menuGroups as &$groupItems) {

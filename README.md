@@ -27,12 +27,7 @@ php -S 127.0.0.1:8000 -t public
 
 Buka `http://127.0.0.1:8000`.
 
-Login awal:
-
-- username: `administrator`
-- password: `administrator`
-
-Segera ganti password dari menu Profil.
+Installer menampilkan password awal acak satu kali untuk akun `administrator`. Simpan password tersebut saat instalasi dan segera ganti dari menu Profil.
 
 ## Logo aplikasi dan dokumen
 
@@ -54,17 +49,7 @@ Buka menu `Data Logo dan TTD`.
 8. Login ke `https://domain-anda/index.php?page=login`.
 9. Setelah berhasil, hapus atau batasi akses `install.php` bila hosting mengizinkan.
 
-### Import bersih via phpMyAdmin
-
-Jika ingin melewati installer, import file `database/import_clean_mysql.sql` lewat phpMyAdmin.
-
-File ini akan menghapus tabel aplikasi lama, membuat ulang schema, lalu mengisi data minimal saja:
-
-- akun awal `administrator` / `administrator`
-- profil sekolah kosong
-- setting dasar Dapodik, Telegram, dan WhatsApp
-
-Tidak ada data dummy siswa, guru, kelas, nilai, absensi, jurnal, atau pelanggaran. Setelah import, buka `https://domain-anda/index.php?page=login` dan jangan jalankan `install.php`.
+Gunakan installer aplikasi untuk membuat skema dan akun admin pertama. Import SQL dengan akun/password bawaan sengaja tidak lagi disediakan.
 
 ## Telegram
 
@@ -135,31 +120,11 @@ https://domain-anda/schedule_reminders.php?secret=SECRET_ANDA
 
 Default reminder dikirim 10 menit sebelum jadwal. Bisa diubah lewat `SCHEDULE_REMINDER_MINUTES_BEFORE`.
 
-## Helper Dapodik Lokal
+## Import Data Dapodik
 
-Buka menu `Update Data`, isi `Link Dapodik Lokal`, `Token / Key Webservice`, dan `NPSN`, lalu pilih `Unduh Portable ZIP v2.5`. Extract ZIP ke folder tetap di komputer Dapodik, misalnya `Desktop\Bridge-Dapodik`, lalu jalankan `jalankan-bridge-portable.bat` atau `eraport-dapodik-bridge-helper-v2.5.exe`.
+Menu `Update Data` hanya menerima JSON hasil export Dapodik yang diunggah manual. Aplikasi tidak menyediakan sinkronisasi online, pengiriman balik nilai, bridge, helper portable, atau penyimpanan token Dapodik.
 
-Mode portable menyimpan konfigurasi di `eraport-bridge-config.txt` pada folder yang sama dengan EXE. Model sinkronnya mengikuti pola RaportKu: helper cukup memakai `NPSN`, `Link Web Raport`, dan `Token Web Service Dapodik`. Token yang sama dipakai untuk membaca Dapodik lokal dan mengirim ke server e-rapor. Jika token berubah, tidak perlu download EXE ulang; ubah field token lalu klik `Simpan Konfigurasi`, atau download `Unduh Config Portable` dan ganti file `eraport-bridge-config.txt`.
-
-Gunakan tombol `Sinkron Data Dasar` di helper portable untuk menarik sekolah, guru, rombel, siswa, anggota rombel, dan pembelajaran. Rombel kelas Dapodik masuk ke menu `Data Kelas`, sedangkan rombel ekskul tidak dimasukkan ke Data Kelas. Data `anggota_rombel` dipakai untuk menempelkan siswa ke kelas masing-masing dan membuat ekskul hanya jika rombel ekskul punya anggota. Mapel dibuat dari data pembelajaran yang punya guru, sehingga referensi mapel mentah dari Dapodik tidak lagi memenuhi data mapel. Import JSON offline di menu `Update Data` tetap tersedia untuk file JSON Dapodik yang sudah ada. Jika Token / Key Webservice di server e-rapor masih kosong, bridge akan mengisi token dan NPSN server otomatis dari helper saat sinkron pertama berhasil membaca Dapodik lokal.
-
-Jika bridge masih membalas `Token sinkron tidak valid`, berarti server e-rapor sudah punya token/NPSN berbeda atau request tidak membawa NPSN. Pastikan `NPSN` dan `Token / Key Webservice` di menu `Update Data` server tujuan sama dengan yang dipakai helper portable, lalu klik `Simpan Konfigurasi` atau ganti file `eraport-bridge-config.txt` dengan hasil `Unduh Config Portable`.
-
-Helper v2.5 mengirim token sinkron lewat header dan body JSON sekaligus agar tetap kompatibel dengan hosting/proxy yang menghapus custom header. Jika Web Service Dapodik lokal tidak menyediakan endpoint anggota rombel atau pembelajaran, helper akan melewati endpoint itu dan tetap menyimpan data dasar lain yang berhasil dibaca.
-
-Jika log helper menampilkan respons Dapodik diawali `Access`, koneksi ke Dapodik sudah tembus tetapi Web Service menolak akses. Cek ulang Token Web Service Dapodik, NPSN, dan pastikan Web Service Dapodik aktif. Beberapa versi Dapodik menolak token di URL browser biasa dan hanya menerima header `Authorization: Bearer <token>`; helper v2 sudah mencoba mode Bearer lebih dulu lalu fallback ke token query.
-
-Untuk production, pakai token dari baris Web Service Dapodik yang benar-benar lolos test Bearer. Jika ada token lain tetap menghasilkan `403 Forbidden` walaupun NPSN benar, hapus lalu buat ulang baris aplikasi Web Service itu di Dapodik, isi IP Address dengan `localhost`, salin token baru, lalu test dari helper v2. Token yang gagal `403` jangan dipakai untuk sinkron produksi.
-
-Catatan: Dapodik kadang mengirim status HTTP `200` tetapi isi responsnya teks `HTTP/1.0 403 Forbidden...`. Karena itu validasi helper membaca isi respons dan hanya menerima respons JSON Dapodik yang valid.
-
-Jika source helper Windows berubah, build ulang EXE dengan:
-
-```powershell
-& .\tools\build_windows_helper.ps1
-```
-
-Jika policy PowerShell memblokir script, jalankan dulu `Set-ExecutionPolicy -Scope Process Bypass`, lalu ulangi command build. Script ini mencari `csc.exe` dari PATH lalu fallback ke .NET Framework bawaan Windows, membuat ulang `public/downloads/eraport-dapodik-bridge-helper-base.exe`, dan memvalidasi binary sudah memakai `Authorization: Bearer` serta endpoint anggota rombel.
+Untuk data peserta didik, menu `Import Data` juga menerima file export Dapodik `daftar_pd-*.xlsx`. Import tersebut hanya menyimpan data siswa dan kelas; akun login siswa dibuat terpisah agar setiap password unik.
 
 ## WhatsApp Weekly Report
 

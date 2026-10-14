@@ -57,7 +57,6 @@ return [
         'input-nilai-skl' => 'page_input_nilai_skl',
         'cetak-skl' => fn (): mixed => page_print_document('cetak-skl'),
         'cetak-transkrip-ijazah' => fn (): mixed => page_print_document('cetak-transkrip-ijazah'),
-        'kirim-data-dapodik' => 'page_kirim_data_dapodik',
         'backup-restore' => 'page_backup_restore',
         'backup-download' => 'page_backup_download',
         'whatsapp' => 'page_whatsapp',

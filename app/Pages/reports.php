@@ -4,12 +4,12 @@ function page_reports(): void
 {
     require_role(['admin', 'guru']);
     $classId = (int)($_GET['class_id'] ?? 0);
-    $classes = classes_for_current_user();
+    $classes = classes_for_homeroom_current_user();
     if (!$classId && $classes) {
         $classId = (int)$classes[0]['id'];
     }
     if ($classId > 0) {
-        require_class_access($classId);
+        require_homeroom_access($classId);
     }
     $class = $classId ? fetch_one('SELECT * FROM classes WHERE id = ?', [$classId]) : null;
     $students = $class ? fetch_all('SELECT * FROM students WHERE class_id = ? AND active = 1 ORDER BY name', [$classId]) : [];

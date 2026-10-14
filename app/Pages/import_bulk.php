@@ -176,7 +176,7 @@ function page_import_bulk(): void
             <div>
                 <label class="check"><input type="checkbox" name="opt_update" checked> Update data siswa yang sudah ada (cocok NISN/NIS/nama)</label>
                 <label class="check"><input type="checkbox" name="opt_create_classes" checked> Buatkan kelas otomatis bila rombel belum ada</label>
-                <label class="check"><input type="checkbox" name="opt_create_users" checked> Buatkan akun login siswa (username NISN, password default)</label>
+                <p class="hint">Import data siswa tidak membuat akun login otomatis. Buat akun secara terpisah dengan password unik.</p>
             </div>
             <div class="wide actions">
                 <button class="button primary" data-confirm="Validasi file Dapodik ini sebelum diimpor?" data-confirm-title="Validasi Dapodik?" data-confirm-label="Ya, validasi" data-confirm-tone="primary">📋 Validasi File Dapodik</button>
@@ -199,8 +199,8 @@ function action_import_bulk_download(): void
     $output = fopen('php://output', 'w');
     if ($type === 'guru') {
         fputcsv($output, ['username', 'password', 'name', 'nip', 'nuptk', 'gender', 'phone', 'email', 'position', 'telegram_chat_id']);
-        fputcsv($output, ['guru_budi', 'guru123', 'Budi Santoso, S.Pd', '198410102009011002', '', 'L', '70010002', 'budi@sekolah.local', 'Guru Mapel', '']);
-        fputcsv($output, ['guru_rina', 'guru123', 'Rina Lestari, S.Pd', '199003032015022003', '', 'P', '70010003', 'rina@sekolah.local', 'Guru Mapel', '']);
+        fputcsv($output, ['guru_budi', 'ContohKuat!2026', 'Budi Santoso, S.Pd', '198410102009011002', '', 'L', '70010002', 'budi@sekolah.local', 'Guru Mapel', '']);
+        fputcsv($output, ['guru_rina', 'ContohKuat!2026', 'Rina Lestari, S.Pd', '199003032015022003', '', 'P', '70010003', 'rina@sekolah.local', 'Guru Mapel', '']);
     } elseif ($type === 'jadwal') {
         fputcsv($output, ['hari', 'jam_ke', 'kelas', 'mapel', 'guru', 'jam_mulai', 'jam_selesai']);
         fputcsv($output, ['Senin', '1', '7A', 'PJOK', 'Kasfaril Ramadani', '07:00', '07:35']);
@@ -209,8 +209,8 @@ function action_import_bulk_download(): void
         fputcsv($output, ['Senin', '3', '7A', 'Bahasa Indonesia', 'Mekha Eka Sari', '08:25', '09:00']);
     } else {
         fputcsv($output, ['username', 'password', 'name', 'nis', 'nisn', 'gender', 'birth_place', 'birth_date', 'religion', 'address', 'phone', 'father_name', 'father_occupation', 'mother_name', 'mother_occupation', 'guardian_name', 'class_name']);
-        fputcsv($output, ['0081234001', 'siswa123', 'Ahmad Rizki', '0081234001', '0081234001', 'L', 'Jakarta', '2010-05-15', 'Islam', 'Jl. Merdeka No. 10, Kel. Sukamaju, Bandung 40123', '081234567890', 'H. Rizki Pratama', 'Wiraswasta', 'Siti Aminah', 'Guru', '', '7A']);
-        fputcsv($output, ['0081234002', 'siswa123', 'Siti Nurhaliza', '0081234002', '0081234002', 'P', 'Bandung', '2010-03-20', 'Islam', 'Jl. Cendana No. 5, Kel. Mekar Jaya, Bandung 40124', '081234567891', 'Nursalam', 'Petani', 'Rohmah', 'IRT', '', '7A']);
+        fputcsv($output, ['0081234001', 'ContohKuat!2026', 'Ahmad Rizki', '0081234001', '0081234001', 'L', 'Jakarta', '2010-05-15', 'Islam', 'Jl. Merdeka No. 10, Kel. Sukamaju, Bandung 40123', '081234567890', 'H. Rizki Pratama', 'Wiraswasta', 'Siti Aminah', 'Guru', '', '7A']);
+        fputcsv($output, ['0081234002', 'ContohKuat!2026', 'Siti Nurhaliza', '0081234002', '0081234002', 'P', 'Bandung', '2010-03-20', 'Islam', 'Jl. Cendana No. 5, Kel. Mekar Jaya, Bandung 40124', '081234567891', 'Nursalam', 'Petani', 'Rohmah', 'IRT', '', '7A']);
     }
     fclose($output);
     exit;

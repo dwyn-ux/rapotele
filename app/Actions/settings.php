@@ -363,6 +363,25 @@ function action_bulk_student_photo(): void
     if ($zip->open($tmpPath) !== \ZipArchive::OK) {
         throw new RuntimeException('File ZIP tidak valid atau rusak.');
     }
+    $maxImageBytes = (int)config('security.max_image_upload_bytes', 2 * 1024 * 1024);
+    if ($zip->numFiles > 1000) {
+        $zip->close();
+        throw new RuntimeException('ZIP memuat terlalu banyak file.');
+    }
+    $zipTotalBytes = 0;
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $stat = $zip->statIndex($i);
+        $size = is_array($stat) ? (int)($stat['size'] ?? -1) : -1;
+        if ($size < 0 || $size > $maxImageBytes) {
+            $zip->close();
+            throw new RuntimeException('ZIP berisi file yang tidak valid atau melebihi batas ukuran foto.');
+        }
+        $zipTotalBytes += $size;
+        if ($zipTotalBytes > 100 * 1024 * 1024) {
+            $zip->close();
+            throw new RuntimeException('Total isi ZIP melebihi batas 100 MB.');
+        }
+    }
 
     // Get all students with NISN for matching
     $allStudents = fetch_all('SELECT id, name, nisn FROM students WHERE active = 1 AND nisn != \'\' AND nisn IS NOT NULL');
@@ -416,7 +435,15 @@ function action_bulk_student_photo(): void
             $errors[] = ['filename' => basename($name), 'reason' => 'Gagal mengekstrak file dari ZIP'];
             continue;
         }
-        fwrite($fp, $zip->getFromIndex($i));
+        $imageData = $zip->getFromIndex($i);
+        if (!is_string($imageData) || strlen($imageData) > $maxImageBytes) {
+            fclose($fp);
+            @unlink($extractedPath);
+            $failed++;
+            $errors[] = ['filename' => basename($name), 'reason' => 'Gagal membaca atau ukuran gambar tidak valid'];
+            continue;
+        }
+        fwrite($fp, $imageData);
         fclose($fp);
 
         // Validate image
@@ -429,7 +456,7 @@ function action_bulk_student_photo(): void
 
         // Check file size (max 5MB)
         $fileSize = filesize($extractedPath);
-        if ($fileSize > (int)config('security.max_image_upload_bytes', 2 * 1024 * 1024)) {
+        if ($fileSize > $maxImageBytes) {
             $failed++;
             $errors[] = ['filename' => basename($name), 'reason' => 'Ukuran file melebihi batas'];
             @unlink($extractedPath);
@@ -681,7 +708,7 @@ function action_save_promotion(): void
         flash('danger', 'Anda tidak memiliki akses sebagai wali kelas.');
         redirect_to('naik-kelas');
     }
-    require_class_access($classId);
+    require_homeroom_access($classId);
     $promotions = [];
     foreach ((array)($_POST['status'] ?? []) as $studentId => $status) {
         $studentId = (int)$studentId;

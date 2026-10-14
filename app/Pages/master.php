@@ -465,7 +465,7 @@ function page_teachers(): void
             <?php else: ?>
                 <?php $autoUsername = $edit['name'] ? generate_username_from_name($edit['name']) : ''; ?>
                 <label>Username Login <input type="text" name="username" data-autofill-username value="<?= e($edit['username'] ?? '') ?>" placeholder="otomatis: <?= e($autoUsername) ?>"></label>
-                <label>Password Login <input type="password" name="password" value="<?= e(config('default_teacher_password', 'guru123')) ?>" placeholder="default: <?= e(config('default_teacher_password', 'guru123')) ?>"></label>
+                <label>Password Login <input type="password" name="password" required minlength="8" autocomplete="new-password" placeholder="Minimal 8 karakter, jangan mudah ditebak"></label>
             <?php endif; ?>
             <label class="check"><input type="checkbox" name="is_bk" <?= checked((int)($edit['is_bk'] ?? 0)) ?>> Guru BK (Bimbingan Konseling)</label>
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
@@ -619,7 +619,7 @@ function page_students(): void
                 <label>Password Baru <input type="password" name="password" placeholder="Kosongkan jika tidak diganti"></label>
             <?php else: ?>
                 <label>Username Login <input type="text" name="username" value="<?= e($edit['nisn'] ?? '') ?>" placeholder="default: NISN siswa"></label>
-                <label>Password Login <input type="password" name="password" value="<?= e(config('default_student_password', 'siswa123')) ?>" placeholder="default: <?= e(config('default_student_password', 'siswa123')) ?>"></label>
+                <label>Password Login <input type="password" name="password" minlength="8" autocomplete="new-password" placeholder="Isi bersama username bila ingin membuat akun"></label>
             <?php endif; ?>
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
             <div class="actions span-2"><button class="button primary">Simpan</button><a class="button" href="<?= e(route_url('students')) ?>">Reset</a></div>

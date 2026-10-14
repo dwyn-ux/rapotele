@@ -57,7 +57,7 @@ return [
     ],
 
     'schedule_reminder' => [
-        'secret' => (string)config_env('SCHEDULE_REMINDER_SECRET', 'isi_random_secret_reminder'),
+        'secret' => (string)config_env('SCHEDULE_REMINDER_SECRET', ''),
         'minutes_before' => config_env_int('SCHEDULE_REMINDER_MINUTES_BEFORE', 10),
     ],
 

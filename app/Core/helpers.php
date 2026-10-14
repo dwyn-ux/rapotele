@@ -134,10 +134,7 @@ function friendly_error(Throwable $exception, string $fallback = 'Terjadi kesala
     if ($exception instanceof InvalidArgumentException) {
         return $exception->getMessage();
     }
-    if ($exception instanceof RuntimeException && !$exception instanceof PDOException) {
-        return $exception->getMessage() . ' [' . $shortClass . ']';
-    }
-    return $fallback . ' [' . $shortClass . ' di ' . $origin . ']';
+    return $fallback;
 }
 
 function client_ip(): string

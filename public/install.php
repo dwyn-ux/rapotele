@@ -10,9 +10,11 @@ try {
         echo "Aplikasi sudah terpasang. Installer dikunci.\n";
         exit;
     }
-    install_database();
+    $initialAdminPassword = install_database();
     echo "Instalasi database selesai.\n";
-    echo "Login awal: administrator / administrator\n";
+    if ($initialAdminPassword !== null) {
+        echo "Username awal: administrator\nPassword awal sekali pakai: $initialAdminPassword\nSimpan password ini sekarang dan segera ganti setelah login.\n";
+    }
     echo "Buka index.php?page=login\n";
 } catch (Throwable $exception) {
     http_response_code(500);

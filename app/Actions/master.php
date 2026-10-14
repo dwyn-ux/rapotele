@@ -131,6 +131,7 @@ function action_save_teacher(): void
     $existingUser = fetch_one('SELECT id FROM users WHERE teacher_id = ?', [$teacherId]);
     if ($existingUser) {
         if ($password !== '') {
+            validate_password_strength($password);
             execute_sql('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [password_hash($password, PASSWORD_DEFAULT), now_string(), (int)$existingUser['id']]);
             flash('success', 'Password guru berhasil diubah.');
         }
@@ -139,8 +140,9 @@ function action_save_teacher(): void
             $username = unique_username(generate_username_from_name(trim((string)$_POST['name'])));
         }
         if ($password === '') {
-            $password = config('default_teacher_password', 'guru123');
+            throw new RuntimeException('Password wajib diisi saat membuat akun guru.');
         }
+        validate_password_strength($password);
         $taken = fetch_one('SELECT id FROM users WHERE username = ?', [$username]);
         if ($taken) {
             flash('danger', 'Username "' . $username . '" sudah dipakai user lain.');
@@ -150,7 +152,7 @@ function action_save_teacher(): void
             'INSERT INTO users (username, password_hash, name, role, teacher_id, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [$username, password_hash($password, PASSWORD_DEFAULT), trim((string)$_POST['name']), 'guru', $teacherId, 1, now_string(), now_string()]
         );
-        flash('success', 'Data guru & akun login tersimpan. Username: ' . $username . ' | Password: ' . $password);
+        flash('success', 'Data guru dan akun login tersimpan. Username: ' . $username);
     }
 
     flash('success', 'Data guru tersimpan.');
@@ -235,10 +237,15 @@ function action_save_student(): void
     $existingUser = fetch_one('SELECT id FROM users WHERE student_id = ?', [$studentId]);
     if ($existingUser) {
         if ($password !== '') {
+            validate_password_strength($password);
             execute_sql('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [password_hash($password, PASSWORD_DEFAULT), now_string(), (int)$existingUser['id']]);
             flash('success', 'Password siswa berhasil diubah.');
         }
-    } elseif ($username !== '' && $password !== '') {
+    } elseif ($username !== '' || $password !== '') {
+        if ($username === '' || $password === '') {
+            throw new RuntimeException('Username dan password wajib diisi bersamaan untuk membuat akun siswa.');
+        }
+        validate_password_strength($password);
         $taken = fetch_one('SELECT id FROM users WHERE username = ?', [$username]);
         if ($taken) {
             flash('danger', 'Username "' . $username . '" sudah dipakai user lain.');
@@ -508,10 +515,6 @@ function action_import_bulk(): void
     $imported = 0;
     $skipped = 0;
     $errors = [];
-    $defaultPassword = $type === 'guru'
-        ? (string)config('default_teacher_password', 'guru123')
-        : (string)config('default_student_password', 'siswa123');
-
     // ── Jadwal pelajaran: handle separately ──
     if ($type === 'jadwal') {
         $dayMap = ['senin' => 1, 'selasa' => 2, 'rabu' => 3, 'kamis' => 4, 'jumat' => 5, 'jum\'at' => 5, 'sabtu' => 6];
@@ -639,7 +642,7 @@ function action_import_bulk(): void
         }
 
         $username = trim((string)($data['username'] ?? ''));
-        $password = trim((string)($data['password'] ?? '')) ?: $defaultPassword;
+        $password = trim((string)($data['password'] ?? ''));
         $name = trim((string)($data['name'] ?? ''));
 
         if ($name === '') {
@@ -649,6 +652,18 @@ function action_import_bulk(): void
         }
         if ($username === '') {
             $errors[] = "Baris $rowNum: username kosong, dilewati.";
+            $skipped++;
+            continue;
+        }
+        if ($password === '') {
+            $errors[] = "Baris $rowNum: password wajib diisi, dilewati.";
+            $skipped++;
+            continue;
+        }
+        try {
+            validate_password_strength($password);
+        } catch (RuntimeException $exception) {
+            $errors[] = "Baris $rowNum: " . $exception->getMessage() . ' Dilewati.';
             $skipped++;
             continue;
         }
@@ -929,7 +944,7 @@ function action_import_siswa_dapodik_validate(): void
     $opts = [
         'update' => !empty($_POST['opt_update']),
         'create_classes' => !empty($_POST['opt_create_classes']),
-        'create_users' => !empty($_POST['opt_create_users']),
+        'create_users' => false,
     ];
     $_SESSION['import_dapodik_pending'] = ['records' => array_column($rows, 'record'), 'opts' => $opts];
     $_SESSION['import_dapodik_preview'] = ['rows' => array_map(fn ($r) => $r + ['record' => null], $rows), 'opts' => $opts, 'file' => (string)$file['name']];
@@ -945,7 +960,7 @@ function action_import_siswa_dapodik_confirm(): void
         redirect_to('import-bulk');
     }
     unset($_SESSION['import_dapodik_pending'], $_SESSION['import_dapodik_preview']);
-    $stats = dapodik_import_siswa_export($pending['records'], (bool)($pending['opts']['update'] ?? true), (bool)($pending['opts']['create_classes'] ?? true), (bool)($pending['opts']['create_users'] ?? true));
+    $stats = dapodik_import_siswa_export($pending['records'], (bool)($pending['opts']['update'] ?? true), (bool)($pending['opts']['create_classes'] ?? true));
     $msg = 'Import Dapodik selesai: ' . $stats['baru'] . ' baru, ' . $stats['diupdate'] . ' diupdate, ' . $stats['dilewati'] . ' dilewati.';
     if ($stats['akun'] > 0) {
         $msg .= ' ' . $stats['akun'] . ' akun login dibuat.';

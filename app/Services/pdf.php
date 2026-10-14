@@ -1732,12 +1732,12 @@ function page_cetak_nilai_rapor_pdf(): void
 {
     require_role(['admin', 'guru']);
     $classId = (int)($_GET['class_id'] ?? 0);
-    $classes = classes_for_current_user();
+    $classes = classes_for_homeroom_current_user();
     if (!$classId && $classes) {
         $classId = (int)$classes[0]['id'];
     }
     if ($classId > 0) {
-        require_class_access($classId);
+        require_homeroom_access($classId);
     }
     $class = $classId ? fetch_one('SELECT * FROM classes WHERE id = ?', [$classId]) : null;
     $students = $class ? fetch_all('SELECT * FROM students WHERE class_id = ? AND active = 1 ORDER BY name', [$classId]) : [];
@@ -1806,7 +1806,7 @@ function page_rapor_generate_class(): void
 {
     require_role(['admin', 'guru']);
     $classId = (int)($_GET['class_id'] ?? 0);
-    require_class_access($classId);
+    require_homeroom_access($classId);
     $students = fetch_all('SELECT id, name FROM students WHERE class_id = ? AND active = 1 ORDER BY name', [$classId]);
     $success = 0;
     $failed = [];
@@ -1849,7 +1849,7 @@ function page_rapor_generate_student(): void
         http_response_code(404);
         exit('Siswa tidak ditemukan.');
     }
-    require_class_access((int)$student['class_id']);
+    require_homeroom_access((int)$student['class_id']);
     try {
         generate_student_report_pdf($studentId);
         flash('success', 'PDF rapor siswa berhasil digenerate.');
@@ -1886,7 +1886,7 @@ function page_rapor_download_student(): void
         exit('Siswa tidak ditemukan.');
     }
     if (user_role() !== 'siswa') {
-        require_class_access((int)$student['class_id']);
+        require_homeroom_access((int)$student['class_id']);
     }
     $path = report_file_path($studentId);
     if (!is_file($path) || !empty($_GET['regenerate'])) {
@@ -1904,7 +1904,7 @@ function page_rapor_download_class(): void
 {
     require_role(['admin', 'guru']);
     $classId = (int)($_GET['class_id'] ?? 0);
-    require_class_access($classId);
+    require_homeroom_access($classId);
     $class = fetch_one('SELECT * FROM classes WHERE id = ?', [$classId]);
     $students = fetch_all('SELECT * FROM students WHERE class_id = ? AND active = 1 ORDER BY name', [$classId]);
     if (!$class || !$students) {
@@ -2278,7 +2278,7 @@ function page_biodata_download_student(): void
         http_response_code(404);
         exit('Siswa tidak ditemukan.');
     }
-    require_class_access((int)$student['class_id']);
+    require_homeroom_access((int)$student['class_id']);
     $path = biodata_file_path($studentId);
     if (!is_file($path)) {
         $path = generate_student_biodata_pdf($studentId);
@@ -2302,7 +2302,7 @@ function page_biodata_generate_student(): void
         http_response_code(404);
         exit('Siswa tidak ditemukan.');
     }
-    require_class_access((int)$student['class_id']);
+    require_homeroom_access((int)$student['class_id']);
     generate_student_biodata_pdf($studentId);
     flash('success', 'PDF biodata siswa berhasil digenerate.');
     redirect_to('cetak-pelengkap-rapor', ['class_id' => (int)($_GET['class_id'] ?? 0)]);
@@ -2312,7 +2312,7 @@ function page_biodata_generate_class(): void
 {
     require_role(['admin', 'guru']);
     $classId = (int)($_GET['class_id'] ?? 0);
-    require_class_access($classId);
+    require_homeroom_access($classId);
     $students = fetch_all('SELECT id FROM students WHERE class_id = ? AND active = 1 ORDER BY name', [$classId]);
     foreach ($students as $student) {
         generate_student_biodata_pdf((int)$student['id']);
@@ -2325,7 +2325,7 @@ function page_biodata_download_class(): void
 {
     require_role(['admin', 'guru']);
     $classId = (int)($_GET['class_id'] ?? 0);
-    require_class_access($classId);
+    require_homeroom_access($classId);
     $class = fetch_one('SELECT * FROM classes WHERE id = ?', [$classId]);
     $students = fetch_all('SELECT * FROM students WHERE class_id = ? AND active = 1 ORDER BY name', [$classId]);
     if (!$class || !$students) {
