@@ -199,13 +199,21 @@ function action_save_student(): void
 {
     require_role(['admin']);
     $id = (int)($_POST['id'] ?? 0);
+    $classId = (int)($_POST['class_id'] ?? 0);
+    if ($classId > 0 && !fetch_one('SELECT id FROM classes WHERE id = ?', [$classId])) {
+        throw new RuntimeException('Kelas siswa tidak ditemukan. Pilih kelas yang tersedia sesuai jenjang.');
+    }
+    if ($id > 0 && !fetch_one('SELECT id FROM students WHERE id = ?', [$id])) {
+        throw new RuntimeException('Data siswa tidak ditemukan. Muat ulang halaman lalu coba lagi.');
+    }
+    $birthDate = trim((string)($_POST['birth_date'] ?? ''));
     $data = [
         trim((string)($_POST['nis'] ?? '')),
         trim((string)($_POST['nisn'] ?? '')),
         trim((string)$_POST['name']),
         (string)($_POST['gender'] ?? ''),
         trim((string)($_POST['birth_place'] ?? '')),
-        $_POST['birth_date'] ?: null,
+        $birthDate !== '' ? $birthDate : null,
         trim((string)($_POST['religion'] ?? '')),
         trim((string)($_POST['address'] ?? '')),
         trim((string)($_POST['phone'] ?? '')),
@@ -214,7 +222,7 @@ function action_save_student(): void
         trim((string)($_POST['mother_name'] ?? '')),
         trim((string)($_POST['mother_occupation'] ?? '')),
         trim((string)($_POST['guardian_name'] ?? '')),
-        (int)($_POST['class_id'] ?? 0) ?: null,
+        $classId > 0 ? $classId : null,
         isset($_POST['active']) ? 1 : 0,
         now_string(),
     ];

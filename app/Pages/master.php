@@ -548,6 +548,16 @@ function page_students(): void
     $allClasses = classes_with_level();
     $classes = array_column_map($allClasses, 'id', 'name');
     $levelFilter = (string)($_GET['level'] ?? '');
+    $editClassLevel = '';
+    if ($edit && !empty($edit['class_id'])) {
+        foreach ($allClasses as $classRow) {
+            if ((int)$classRow['id'] === (int)$edit['class_id']) {
+                $editClassLevel = trim((string)($classRow['level'] ?? ''));
+                break;
+            }
+        }
+    }
+    $formLevel = $editClassLevel !== '' ? $editClassLevel : $levelFilter;
     try {
         $rows = fetch_all('SELECT s.*, c.name AS class_name, c.level AS class_level FROM students s LEFT JOIN classes c ON c.id = s.class_id ORDER BY c.grade, c.name, s.name');
     } catch (Throwable) {
@@ -599,10 +609,10 @@ function page_students(): void
             <label>Pekerjaan Ibu <input type="text" name="mother_occupation" value="<?= e($edit['mother_occupation'] ?? '') ?>"></label>
             <label>Nama Wali <input type="text" name="guardian_name" value="<?= e($edit['guardian_name'] ?? '') ?>"></label>
             <label>Jenjang
-                <select id="stu-level" data-edit-level="<?= e((string)($_GET['level'] ?? '')) ?>">
+                <select id="stu-level" data-edit-level="<?= e($formLevel) ?>">
                     <option value="">Pilih Jenjang</option>
                     <?php foreach (school_levels() as $lv): ?>
-                        <option value="<?= e($lv) ?>"<?= (string)($_GET['level'] ?? '') === $lv ? ' selected' : '' ?>><?= e($lv) ?></option>
+                        <option value="<?= e($lv) ?>"<?= $formLevel === $lv ? ' selected' : '' ?>><?= e($lv) ?></option>
                     <?php endforeach; ?>
                 </select>
             </label>
@@ -645,6 +655,13 @@ function page_students(): void
             }
             levelEl.addEventListener('change', rebuild);
             if (preLevel) { levelEl.value = preLevel; rebuild(); }
+            classEl.form.addEventListener('submit', function(event){
+                if (levelEl.value && !classEl.value) {
+                    event.preventDefault();
+                    window.alert('Pilih kelas yang sesuai dengan jenjang terlebih dahulu.');
+                    classEl.focus();
+                }
+            });
         })();
         </script>
     <?php input_panel_end(); ?>
