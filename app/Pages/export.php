@@ -10,10 +10,10 @@ function export_csv(array $headers, array $rows, callable $renderer, string $fil
     $out = fopen('php://output', 'w');
     fwrite($out, "\xEF\xBB\xBF");
 
-    fputcsv($out, $headers);
+    fputcsv($out, $headers, ',', '"', '\\');
 
     foreach ($rows as $row) {
-        fputcsv($out, $renderer($row));
+        fputcsv($out, $renderer($row), ',', '"', '\\');
     }
 
     fclose($out);
@@ -150,5 +150,6 @@ function page_export_csv(): void
         export_csv($headerCells, $students, $renderer, 'Absensi_' . $assignment['class_name'] . '_' . $assignment['subject_name'] . '.csv');
     }
 
-    throw new RuntimeException('Tipe export tidak dikenal.');
+    http_response_code(400);
+    exit('Tipe export tidak dikenal.');
 }

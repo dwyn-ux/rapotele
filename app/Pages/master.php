@@ -463,7 +463,7 @@ function page_teachers(): void
                 <label>Username Login <input type="text" name="username" value="<?= e($existingUser['username'] ?? '') ?>" readonly></label>
                 <label>Password Baru <input type="password" name="password" placeholder="Kosongkan jika tidak diganti"></label>
             <?php else: ?>
-                <?php $autoUsername = $edit['name'] ? generate_username_from_name($edit['name']) : ''; ?>
+                <?php $autoUsername = !empty($edit['name']) ? generate_username_from_name((string)$edit['name']) : ''; ?>
                 <label>Username Login <input type="text" name="username" data-autofill-username value="<?= e($edit['username'] ?? '') ?>" placeholder="otomatis: <?= e($autoUsername) ?>"></label>
                 <label>Password Login <input type="password" name="password" required minlength="8" autocomplete="new-password" placeholder="Minimal 8 karakter, jangan mudah ditebak"></label>
             <?php endif; ?>
