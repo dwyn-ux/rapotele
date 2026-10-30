@@ -71,6 +71,13 @@ function action_save_school(): void
     if ($id === 0) {
         set_app_setting('promotion.enabled', !empty($_POST['promotion_enabled']) ? '1' : '0');
     }
+    $nipLabel = trim((string)($_POST['nip_label'] ?? ''));
+    if ($nipLabel === 'custom') {
+        $nipLabel = trim((string)($_POST['nip_label_custom'] ?? ''));
+    }
+    if (in_array($nipLabel, ['NIP', 'NBM', 'NIK', 'NUP'], true) || ($nipLabel !== '' && mb_strlen($nipLabel) <= 20)) {
+        set_app_setting('report.nip_label', $nipLabel !== '' ? $nipLabel : 'NIP');
+    }
     flash('success', 'Data sekolah tersimpan.');
     redirect_to('schools');
 }

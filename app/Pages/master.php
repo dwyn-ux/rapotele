@@ -4,6 +4,7 @@ function page_school(): void
 {
     require_role(['admin']);
     $school = get_school_profile();
+    $nipLabel = report_nip_label();
     render_header('Data Sekolah');
     ?>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
@@ -93,7 +94,33 @@ function page_school(): void
                         <label class="school-label">NIP Kepala Sekolah</label>
                         <input type="text" class="school-input" name="principal_nip" value="<?= e($school['principal_nip'] ?? '') ?>" placeholder="Masukkan NIP Kepala Sekolah">
                     </div>
+                    <div class="school-form-group">
+                        <label class="school-label">Label Identitas Kepala Sekolah</label>
+                        <select class="school-input school-select" name="nip_label">
+                            <?php $currentNipLabel = (string)($nipLabel ?? 'NIP'); ?>
+                            <?php foreach (['NIP' => 'NIP (Nomor Induk Pegawai)', 'NBM' => 'NBM (Nomor Badan Madrasah)', 'NIK' => 'NIK (Nomor Induk Kependudukan)', 'NUP' => 'NUP (Nomor Urut Pegawai)'] as $val => $lbl): ?>
+                                <option value="<?= e($val) ?>" <?= $currentNipLabel === $val ? 'selected' : '' ?>><?= e($lbl) ?></option>
+                            <?php endforeach; ?>
+                            <?php if (!in_array($currentNipLabel, ['NIP', 'NBM', 'NIK', 'NUP'], true)): ?>
+                                <option value="<?= e($currentNipLabel) ?>" selected><?= e($currentNipLabel) ?> (custom)</option>
+                            <?php endif; ?>
+                            <option value="custom" data-custom> custom (isi sendiri)…</option>
+                        </select>
+                        <input type="text" class="school-input" name="nip_label_custom" id="nip-label-custom" style="margin-top:6px;display:none;" placeholder="Label lain, contoh: NIP/NIK" value="<?= e(in_array($currentNipLabel, ['NIP', 'NBM', 'NIK', 'NUP'], true) ? '' : $currentNipLabel) ?>">
+                    </div>
                 </div>
+                <script>
+                (function() {
+                    var sel = document.querySelector('select[name="nip_label"]');
+                    var custom = document.getElementById('nip-label-custom');
+                    if (!sel || !custom) return;
+                    function sync() {
+                        if (sel.value === 'custom') { custom.style.display = ''; custom.required = true; }
+                        else { custom.style.display = 'none'; custom.required = false; custom.value = ''; }
+                    }
+                    sel.addEventListener('change', sync); sync();
+                })();
+                </script>
                 <div class="school-form-grid two-col">
                     <div class="school-form-group">
                         <label class="school-label">Tahun Ajaran <span class="required">*</span></label>
@@ -325,6 +352,7 @@ function page_school_edit(): void
         'village' => '', 'district' => '', 'regency' => '', 'province' => '',
     ];
     render_header($id > 0 ? 'Edit Sekolah' : 'Tambah Sekolah');
+    $nipLabel = report_nip_label();
     ?>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
@@ -398,7 +426,32 @@ function page_school_edit(): void
                         <label class="school-label">NIP Kepala Sekolah</label>
                         <input type="text" class="school-input" name="principal_nip" value="<?= e($school['principal_nip'] ?? '') ?>">
                     </div>
+                    <div class="school-form-group">
+                        <label class="school-label">Label Identitas Kepala Sekolah</label>
+                        <select class="school-input school-select" name="nip_label">
+                            <?php foreach (['NIP' => 'NIP (Nomor Induk Pegawai)', 'NBM' => 'NBM (Nomor Badan Madrasah)', 'NIK' => 'NIK (Nomor Induk Kependudukan)', 'NUP' => 'NUP (Nomor Urut Pegawai)'] as $val => $lbl): ?>
+                                <option value="<?= e($val) ?>" <?= $nipLabel === $val ? 'selected' : '' ?>><?= e($lbl) ?></option>
+                            <?php endforeach; ?>
+                            <?php if (!in_array($nipLabel, ['NIP', 'NBM', 'NIK', 'NUP'], true)): ?>
+                                <option value="<?= e($nipLabel) ?>" selected><?= e($nipLabel) ?> (custom)</option>
+                            <?php endif; ?>
+                            <option value="custom" data-custom> custom (isi sendiri)…</option>
+                        </select>
+                        <input type="text" class="school-input" name="nip_label_custom" id="nip-label-custom" style="margin-top:6px;display:none;" placeholder="Label lain, contoh: NIP/NIK" value="<?= e(in_array($nipLabel, ['NIP', 'NBM', 'NIK', 'NUP'], true) ? '' : $nipLabel) ?>">
+                    </div>
                 </div>
+                <script>
+                (function() {
+                    var sel = document.querySelector('select[name="nip_label"]');
+                    var custom = document.getElementById('nip-label-custom');
+                    if (!sel || !custom) return;
+                    function sync() {
+                        if (sel.value === 'custom') { custom.style.display = ''; custom.required = true; }
+                        else { custom.style.display = 'none'; custom.required = false; custom.value = ''; }
+                    }
+                    sel.addEventListener('change', sync); sync();
+                })();
+                </script>
             </div>
         </div>
         <div class="school-section-card">

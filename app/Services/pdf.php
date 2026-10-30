@@ -1624,7 +1624,7 @@ function draw_report_page_two(SimplePdf $pdf, array $payload, int $pageNo = 2, b
     $pdf->centerText($sigColumns[0]['x'], $nameY, $sigColumns[0]['w'], '............................', 10);
     $pdf->centeredWrappedText($sigColumns[1]['x'], $nameY, $sigColumns[1]['w'], $principalName, 9, 2, true, 10.50);
     $pdf->centeredWrappedText($sigColumns[2]['x'], $nameY, $sigColumns[2]['w'], $homeroomName, 9, 2, true, 10.50);
-    $pdf->centerText($sigColumns[1]['x'], $nameY - 24.00, $sigColumns[1]['w'], 'NIP. ' . ($principalNip ?: '-'), 8.5);
+    $pdf->centerText($sigColumns[1]['x'], $nameY - 24.00, $sigColumns[1]['w'], report_nip_label() . '. ' . ($principalNip ?: '-'), 8.5);
     $pdf->centerText($sigColumns[2]['x'], $nameY - 24.00, $sigColumns[2]['w'], 'NIP. ' . ($homeroomNip ?: '-'), 8.5);
 }
 
@@ -1744,7 +1744,7 @@ function generate_student_graduation_document_pdf(array $student, string $kind):
     $pdf->text(360.00, 220.00, $dateText, 10);
     $pdf->text(360.00, 205.00, 'Kepala Sekolah,', 10);
     $pdf->text(360.00, 145.00, (string)($school['principal_name'] ?: 'Kepala Sekolah'), 10, true);
-    $pdf->text(360.00, 132.00, 'NIP. ' . (string)($school['principal_nip'] ?: '-'), 10);
+    $pdf->text(360.00, 132.00, report_nip_label() . '. ' . (string)($school['principal_nip'] ?: '-'), 10);
 
     return $pdf->output();
 }
@@ -2179,7 +2179,7 @@ function generate_student_biodata_pdf(int $studentId): string
     }
 
     $pdf->centeredWrappedText($sigX, $y - 95.00, $sigW, (string)($school['principal_name'] ?: '............................'), 9, 2, true, 10.50);
-    $pdf->centerText($sigX, $y - 119.00, $sigW, 'NIP. ' . (string)($school['principal_nip'] ?: '-'), 8.5);
+    $pdf->centerText($sigX, $y - 119.00, $sigW, report_nip_label() . '. ' . (string)($school['principal_nip'] ?: '-'), 8.5);
 
 
     // ==========================================
@@ -2513,7 +2513,7 @@ function page_cetak_sp(): void
     }
     $pdf->text($rm - 180, $y, (string)($school['principal_name'] ?: '..................................'), 10, true);
     $y -= 14.0;
-    $pdf->text($rm - 180, $y, 'NIP. ' . (string)($school['principal_nip'] ?: '...........................'), 9);
+    $pdf->text($rm - 180, $y, report_nip_label() . '. ' . (string)($school['principal_nip'] ?: '...........................'), 9);
 
     $pdfContent = $pdf->output();
     $filename = 'SP_' . preg_replace('/[^A-Za-z0-9_]/', '_', (string)$student['name']) . '_' . $spLabel . '.pdf';
@@ -2907,7 +2907,7 @@ function generate_laporan_belajar_pdf(array $student): string
     $y -= 12.0;
 
     $pdf->setFont('Helvetica', 10);
-    $pdf->text($col2X - 6, $y, $principalNip ? 'NIP. ' . $principalNip : '............................', 10);
+    $pdf->text($col2X - 6, $y, $principalNip ? report_nip_label() . '. ' . $principalNip : '............................', 10);
     $pdf->text($col3X - 6, $y, $homeroomNip ? 'NIP. ' . $homeroomNip : '............................', 10);
 
     draw_laporan_footer($pdf, $student, $pageNo);

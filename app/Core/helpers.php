@@ -345,6 +345,12 @@ function set_app_setting(string $key, mixed $value): void
     execute_sql('INSERT INTO app_settings (setting_key, setting_value, updated_at) VALUES (?, ?, ?)', [$key, (string)$value, now_string()]);
 }
 
+function report_nip_label(): string
+{
+    $label = trim((string)get_app_setting('report.nip_label', 'NIP'));
+    return $label !== '' ? $label : 'NIP';
+}
+
 function signature_asset(?string $type = null, ?int $id = null): ?array
 {
     try {
