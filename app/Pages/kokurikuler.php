@@ -437,6 +437,7 @@ function page_input_nilai_ekskul(): void
     <?php if ($classId > 0 && $ekskuls): ?>
     <?php if ($students): ?>
     <section class="panel">
+        <p style="color:var(--text-muted,#6b7280);margin-bottom:10px;">Isi nilai (0–100) dan absensi (jumlah pertemuan hadir/sakit/izin/alpa) untuk setiap ekskul yang diikuti siswa.</p>
         <form method="post">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="save_extracurricular_scores">
@@ -457,19 +458,29 @@ function page_input_nilai_ekskul(): void
                                 <td><?= e($student['name']) ?></td>
                                 <?php foreach ($ekskuls as $ekskul): ?>
                                     <?php
-                                    $score = fetch_one(
-                                        'SELECT score FROM extracurricular_scores WHERE student_id = ? AND extracurricular_id = ?',
+                                    $row = fetch_one(
+                                        'SELECT score, hadir, sakit, izin, alpa FROM extracurricular_scores WHERE student_id = ? AND extracurricular_id = ?',
                                         [(int)$student['id'], (int)$ekskul['id']]
                                     );
+                                    $sid = (int)$student['id'];
+                                    $eid = (int)$ekskul['id'];
                                     ?>
-                                    <td><input class="small-input" name="scores[<?= e($student['id']) ?>][<?= e($ekskul['id']) ?>]" value="<?= e($score['score'] ?? '') ?>" placeholder="Nilai"></td>
+                                    <td style="min-width:150px;">
+                                        <input class="small-input" style="width:50px;" name="scores[<?= $sid ?>][<?= $eid ?>]" value="<?= e($row['score'] ?? '') ?>" placeholder="Nilai" title="Nilai">
+                                        <div style="display:flex;gap:3px;margin-top:4px;align-items:center;font-size:0.75rem;">
+                                            <label title="Hadir" style="margin:0;display:flex;align-items:center;gap:2px;">H<input class="small-input" style="width:32px;font-size:0.8rem;" type="number" min="0" name="absen[<?= $sid ?>][<?= $eid ?>][hadir]" value="<?= e($row['hadir'] ?? 0) ?>"></label>
+                                            <label title="Sakit" style="margin:0;display:flex;align-items:center;gap:2px;">S<input class="small-input" style="width:32px;font-size:0.8rem;" type="number" min="0" name="absen[<?= $sid ?>][<?= $eid ?>][sakit]" value="<?= e($row['sakit'] ?? 0) ?>"></label>
+                                            <label title="Izin" style="margin:0;display:flex;align-items:center;gap:2px;">I<input class="small-input" style="width:32px;font-size:0.8rem;" type="number" min="0" name="absen[<?= $sid ?>][<?= $eid ?>][izin]" value="<?= e($row['izin'] ?? 0) ?>"></label>
+                                            <label title="Alpa / Tanpa Keterangan" style="margin:0;display:flex;align-items:center;gap:2px;">A<input class="small-input" style="width:32px;font-size:0.8rem;" type="number" min="0" name="absen[<?= $sid ?>][<?= $eid ?>][alpa]" value="<?= e($row['alpa'] ?? 0) ?>"></label>
+                                        </div>
+                                    </td>
                                 <?php endforeach; ?>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
-            <div class="actions"><button class="button primary">Simpan Nilai</button></div>
+            <div class="actions"><button class="button primary">Simpan Nilai &amp; Absensi</button></div>
         </form>
     </section>
     <?php else: ?>

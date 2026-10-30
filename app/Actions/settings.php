@@ -170,9 +170,14 @@ function action_save_extracurricular_scores(): void
     if (!is_array($postedScores)) {
         throw new RuntimeException('Data nilai ekstrakurikuler tidak valid.');
     }
+    $postedAttendance = $_POST['absen'] ?? [];
+    if (!is_array($postedAttendance)) {
+        $postedAttendance = [];
+    }
 
     $teacherId = (int)(current_user()['teacher_id'] ?? 0);
     $validatedScores = [];
+    $validatedAttendance = [];
     foreach ($postedScores as $studentId => $extracurricularScores) {
         $studentId = filter_var($studentId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if ($studentId === false || !is_array($extracurricularScores)
@@ -185,14 +190,6 @@ function action_save_extracurricular_scores(): void
                 throw new RuntimeException('Data nilai ekstrakurikuler tidak valid.');
             }
             $scoreValue = trim((string)$score);
-            if ($scoreValue === '') {
-                // Form selalu mengirim sel kosong untuk ekskul yang tidak diisi guru.
-                continue;
-            }
-            $numericScore = (float)$scoreValue;
-            if (!is_numeric($scoreValue) || $numericScore < 0 || $numericScore > 100) {
-                throw new RuntimeException('Nilai harus berupa angka antara 0 dan 100.');
-            }
 
             $extracurricularSql = 'SELECT id FROM extracurriculars WHERE id = ?';
             $extracurricularParams = [$extracurricularId];
@@ -209,19 +206,43 @@ function action_save_extracurricular_scores(): void
             )) {
                 throw new RuntimeException('Siswa bukan anggota aktif ekskul yang dipilih.');
             }
-            $validatedScores[] = [$studentId, $extracurricularId, $scoreValue];
+
+            $absen = $postedAttendance[$studentId][$extracurricularId] ?? [];
+            $hadir = isset($absen['hadir']) && is_scalar($absen['hadir']) ? max(0, (int)$absen['hadir']) : 0;
+            $sakit = isset($absen['sakit']) && is_scalar($absen['sakit']) ? max(0, (int)$absen['sakit']) : 0;
+            $izin  = isset($absen['izin']) && is_scalar($absen['izin']) ? max(0, (int)$absen['izin']) : 0;
+            $alpa  = isset($absen['alpa']) && is_scalar($absen['alpa']) ? max(0, (int)$absen['alpa']) : 0;
+
+            // Lewati jika nilai kosong dan absensi semua nol
+            if ($scoreValue === '' && $hadir === 0 && $sakit === 0 && $izin === 0 && $alpa === 0) {
+                continue;
+            }
+            if ($scoreValue !== '') {
+                $numericScore = (float)$scoreValue;
+                if (!is_numeric($scoreValue) || $numericScore < 0 || $numericScore > 100) {
+                    throw new RuntimeException('Nilai harus berupa angka antara 0 dan 100.');
+                }
+            }
+
+            $validatedScores[] = [$studentId, $extracurricularId, $scoreValue, $hadir, $sakit, $izin, $alpa];
         }
     }
 
-    foreach ($validatedScores as [$studentId, $extracurricularId, $scoreValue]) {
+    foreach ($validatedScores as [$studentId, $extracurricularId, $scoreValue, $hadir, $sakit, $izin, $alpa]) {
         $existing = fetch_one('SELECT id FROM extracurricular_scores WHERE student_id = ? AND extracurricular_id = ?', [$studentId, $extracurricularId]);
         if ($existing) {
-            execute_sql('UPDATE extracurricular_scores SET score = ?, updated_at = ? WHERE id = ?', [$scoreValue, now_string(), (int)$existing['id']]);
+            execute_sql(
+                'UPDATE extracurricular_scores SET score = ?, hadir = ?, sakit = ?, izin = ?, alpa = ?, updated_at = ? WHERE id = ?',
+                [$scoreValue !== '' ? $scoreValue : null, $hadir, $sakit, $izin, $alpa, now_string(), (int)$existing['id']]
+            );
         } else {
-            execute_sql('INSERT INTO extracurricular_scores (student_id, extracurricular_id, score, updated_at) VALUES (?, ?, ?, ?)', [$studentId, $extracurricularId, $scoreValue, now_string()]);
+            execute_sql(
+                'INSERT INTO extracurricular_scores (student_id, extracurricular_id, score, hadir, sakit, izin, alpa, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [$studentId, $extracurricularId, $scoreValue !== '' ? $scoreValue : null, $hadir, $sakit, $izin, $alpa, now_string()]
+            );
         }
     }
-    flash('success', 'Nilai ekstrakurikuler tersimpan.');
+    flash('success', 'Nilai dan absensi ekstrakurikuler tersimpan.');
     redirect_to('input-nilai-ekskul');
 }
 

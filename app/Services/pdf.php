@@ -1046,7 +1046,9 @@ function report_extracurriculars_for_student(array $student): array
     $studentId = (int)($student['id'] ?? 0);
     if ($studentId > 0 && table_exists('extracurricular_members')) {
         $memberRows = fetch_all(
-            'SELECT e.*, t.name AS teacher_name, es.score AS keterangan
+            'SELECT e.*, t.name AS teacher_name, es.score AS keterangan,
+                    COALESCE(es.hadir, 0) AS hadir, COALESCE(es.sakit, 0) AS sakit,
+                    COALESCE(es.izin, 0) AS izin, COALESCE(es.alpa, 0) AS alpa
              FROM extracurricular_members em
              JOIN extracurriculars e ON e.id = em.extracurricular_id
              LEFT JOIN teachers t ON t.id = e.teacher_id
@@ -1062,7 +1064,9 @@ function report_extracurriculars_for_student(array $student): array
     }
     $className = (string)($student['class_name'] ?? '');
     $rows = fetch_all(
-        'SELECT e.*, t.name AS teacher_name, es.score AS keterangan
+        'SELECT e.*, t.name AS teacher_name, es.score AS keterangan,
+                COALESCE(es.hadir, 0) AS hadir, COALESCE(es.sakit, 0) AS sakit,
+                COALESCE(es.izin, 0) AS izin, COALESCE(es.alpa, 0) AS alpa
          FROM extracurriculars e
          LEFT JOIN teachers t ON t.id = e.teacher_id
          LEFT JOIN extracurricular_scores es ON es.student_id = ? AND es.extracurricular_id = e.id
@@ -1075,7 +1079,9 @@ function report_extracurriculars_for_student(array $student): array
         return $rows;
     }
     return fetch_all(
-        'SELECT e.*, t.name AS teacher_name, es.score AS keterangan
+        'SELECT e.*, t.name AS teacher_name, es.score AS keterangan,
+                COALESCE(es.hadir, 0) AS hadir, COALESCE(es.sakit, 0) AS sakit,
+                COALESCE(es.izin, 0) AS izin, COALESCE(es.alpa, 0) AS alpa
          FROM extracurriculars e
          LEFT JOIN teachers t ON t.id = e.teacher_id
          LEFT JOIN extracurricular_scores es ON es.student_id = ? AND es.extracurricular_id = e.id
@@ -1450,10 +1456,22 @@ function draw_kokurikuler_section(SimplePdf $pdf, array $payload, float $topY = 
     return $bodyTop - $bodyHeight;
 }
 
+function format_extracurricular_attendance(array $row): string
+{
+    $hadir = (int)($row['hadir'] ?? 0);
+    $sakit = (int)($row['sakit'] ?? 0);
+    $izin  = (int)($row['izin'] ?? 0);
+    $alpa  = (int)($row['alpa'] ?? 0);
+    if ($hadir === 0 && $sakit === 0 && $izin === 0 && $alpa === 0) {
+        return '';
+    }
+    return 'H:' . $hadir . ' S:' . $sakit . ' I:' . $izin . ' A:' . $alpa;
+}
+
 function draw_extrakurikuler_section(SimplePdf $pdf, array $payload, float $topY = 447.87): float
 {
     $headerHeight = 22.68;
-    $rowHeight = 17.01;
+    $rowHeight = 24.00;
     $pdf->setFont('Helvetica', 10, true);
     $pdf->rect(56.69, $topY, 22.68, -$headerHeight, 'B', [0.973, 0.973, 1.000]);
     $pdf->centerText(56.69, $topY - 14.33, 22.68, 'No', 10, true);
@@ -1467,21 +1485,32 @@ function draw_extrakurikuler_section(SimplePdf $pdf, array $payload, float $topY
     for ($no = 1; $no <= 2; $no++) {
         $row = $rows[$no - 1] ?? [];
         $pdf->rect(56.69, $rowTop, 22.68, -$rowHeight, 'S');
-        $pdf->centerText(56.69, $rowTop - 11.5, 22.68, (string)$no, 10);
+        $pdf->centerText(56.69, $rowTop - 14.0, 22.68, (string)$no, 10);
         $pdf->rect(79.37, $rowTop, 141.73, -$rowHeight, 'S');
-        if ($row) {
-            $pdf->text(85.04, $rowTop - 11.5, trim((string)($row['name'] ?? '')), 9);
-        }
         $pdf->rect(221.10, $rowTop, 317.48, -$rowHeight, 'S');
         if ($row) {
+            $pdf->text(85.04, $rowTop - 14.0, trim((string)($row['name'] ?? '')), 9);
+            $absenText = format_extracurricular_attendance($row);
+            $line1Y = $rowTop - 10.5;
+            $line2Y = $rowTop - 20.5;
+            $hasLine2 = $absenText !== '';
+            if ($hasLine2) {
+                $line1Y = $rowTop - 9.0;
+                $line2Y = $rowTop - 19.0;
+            }
             $keterangan = trim((string)($row['keterangan'] ?? ''));
             if ($keterangan !== '') {
-                $pdf->text(226.77, $rowTop - 11.5, $keterangan, 9);
+                $pdf->text(226.77, $line1Y, 'Nilai: ' . $keterangan, 9);
             } else {
                 $note = trim((string)($row['type'] ?? ''));
                 $teacher = trim((string)($row['teacher_name'] ?? ''));
                 $text = trim(($note !== '' ? $note : 'Aktif') . ($teacher !== '' ? ' - Pembina: ' . $teacher : ''));
-                $pdf->text(226.77, $rowTop - 11.5, $text, 9);
+                $pdf->text(226.77, $line1Y, $text, 9);
+            }
+            if ($hasLine2) {
+                $pdf->setFont('Helvetica', 8);
+                $pdf->text(226.77, $line2Y, 'Absensi (' . $absenText . ')', 8);
+                $pdf->setFont('Helvetica', 10);
             }
         }
         $rowTop -= $rowHeight;

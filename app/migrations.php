@@ -892,6 +892,10 @@ function run_migrations_locked(): void
             extracurricular_id INT NOT NULL,
             score VARCHAR(20) NULL,
             notes TEXT NULL,
+            hadir INT NULL DEFAULT 0,
+            sakit INT NULL DEFAULT 0,
+            izin INT NULL DEFAULT 0,
+            alpa INT NULL DEFAULT 0,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             UNIQUE (student_id, extracurricular_id)
         )$engine",
@@ -1009,6 +1013,10 @@ function run_migrations_locked(): void
     migration_add_column('extracurriculars', 'active', migration_bool() . ' NOT NULL DEFAULT 1');
     migration_add_column('extracurriculars', 'updated_at', 'DATETIME NULL');
     migration_add_column('extracurricular_members', 'updated_at', 'DATETIME NULL');
+    migration_add_column('extracurricular_scores', 'hadir', 'INT NULL DEFAULT 0');
+    migration_add_column('extracurricular_scores', 'sakit', 'INT NULL DEFAULT 0');
+    migration_add_column('extracurricular_scores', 'izin', 'INT NULL DEFAULT 0');
+    migration_add_column('extracurricular_scores', 'alpa', 'INT NULL DEFAULT 0');
 
     migration_add_column('school_profile', 'short_days', 'VARCHAR(64) NULL');
     migration_add_column('school_profile', 'regular_period_minutes', 'INT NULL DEFAULT 35');
