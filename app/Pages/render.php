@@ -10,8 +10,7 @@ function render_header(string $title): void
             'update-data' => ['Update Data E-Rapor', 'update-data', 'database'],
         ],
         'Data Referensi' => [
-            'school' => ['Profil & Lokasi Sekolah', 'school', 'map-pin'],
-            'schools' => ['Daftar Sekolah', 'schools', 'building'],
+            'schools' => ['Data Sekolah', 'schools', 'building'],
             'teachers' => ['Data Guru', 'teachers', 'users'],
             'students' => ['Data Siswa', 'students', 'graduation-cap'],
             'classes' => ['Data Kelas', 'classes', 'school'],
@@ -95,7 +94,7 @@ function render_header(string $title): void
 
     if (!is_admin()) {
         foreach ([
-            'update-data', 'school', 'teachers', 'classes', 'subjects', 'data-ekskul', 'data-kelompok',
+            'update-data', 'teachers', 'classes', 'subjects', 'data-ekskul', 'data-kelompok',
             'gabung-mapel', 'data-mapping', 'data-logo-ttd', 'tanggal-rapor', 'foto-siswa',
             'tema-kokurikuler', 'kegiatan-kokurikuler', 'kelompok-kokurikuler', 'input-kelulusan',
             'import-nomor-ijazah', 'setting-transkrip', 'setting-skl', 'mapping-mapel-skl',
@@ -127,6 +126,9 @@ function render_header(string $title): void
     $cmdPaletteJson = json_encode($cmdPaletteIndex, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
     $active = (string)($_GET['page'] ?? 'dashboard');
+    if ($active === 'school') {
+        $active = 'schools';
+    }
     $appLogoUrl = signature_media_url('logo');
 
     // Determine user initials for avatar

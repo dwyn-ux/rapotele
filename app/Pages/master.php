@@ -3,9 +3,14 @@
 function page_school(): void
 {
     require_role(['admin']);
-    $school = get_school_profile();
+    $id = (int)($_GET['id'] ?? 0);
+    $school = $id > 0 ? fetch_one('SELECT * FROM school_profile WHERE id = ?', [$id]) : get_school_profile();
+    if ($id > 0 && !$school) {
+        flash('error', 'Sekolah tidak ditemukan.');
+        redirect_to('schools');
+    }
     $nipLabel = report_nip_label();
-    render_header('Data Sekolah');
+    render_header('Profil & Lokasi Sekolah');
     ?>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
@@ -17,7 +22,7 @@ function page_school(): void
                 <i data-lucide="building-2"></i>
             </div>
             <div>
-                <h1 class="school-page-title">Data Sekolah</h1>
+                <h1 class="school-page-title">Profil &amp; Lokasi Sekolah</h1>
                 <p class="school-page-subtitle">Lengkapi dan perbarui data sekolah sesuai ketentuan</p>
             </div>
         </div>
@@ -28,7 +33,9 @@ function page_school(): void
     </div>
 
     <form method="post" id="school-form">
-        <?= csrf_field() ?><input type="hidden" name="action" value="save_school">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="save_school">
+        <input type="hidden" name="id" value="<?= (int)($school['id'] ?? 0) ?>">
 
         <!-- Section 1: Informasi Umum -->
         <div class="school-section-card">
@@ -246,7 +253,7 @@ function page_school(): void
 
         <!-- Actions -->
         <div class="school-form-actions">
-            <a href="<?= e(route_url('dashboard')) ?>" class="school-btn school-btn-secondary">
+            <a href="<?= e(route_url('schools')) ?>" class="school-btn school-btn-secondary">
                 <i data-lucide="x"></i>
                 <span>Batal</span>
             </a>
@@ -316,6 +323,7 @@ function page_schools(): void
         <td><?= e($row['class_count']) ?></td>
         <td><?= status_badge(1) ?></td>
         <td>
+            <a href="<?= e(route_url('school', ['id' => (int)$row['id']])) ?>" class="button small">Profil &amp; Lokasi</a>
             <a href="<?= e(route_url('school-edit', ['id' => (int)$row['id']])) ?>" class="button small primary">Edit</a>
             <?php if ((int)$row['class_count'] === 0): ?>
                 <form method="post" style="display:inline">
