@@ -10,7 +10,8 @@ function render_header(string $title): void
             'update-data' => ['Update Data E-Rapor', 'update-data', 'database'],
         ],
         'Data Referensi' => [
-            'schools' => ['Data Sekolah', 'schools', 'building'],
+            'school' => ['Profil & Lokasi Sekolah', 'school', 'map-pin'],
+            'schools' => ['Daftar Sekolah', 'schools', 'building'],
             'teachers' => ['Data Guru', 'teachers', 'users'],
             'students' => ['Data Siswa', 'students', 'graduation-cap'],
             'classes' => ['Data Kelas', 'classes', 'school'],
