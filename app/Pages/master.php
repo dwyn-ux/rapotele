@@ -262,8 +262,8 @@ function page_school(): void
         var lat = parseFloat(document.getElementById('school_lat').value) || -2.5;
         var lng = parseFloat(document.getElementById('school_lng').value) || 118.0;
         var map = L.map('school-map').setView([lat, lng], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
         }).addTo(map);
         var icon = L.divIcon({html:'<svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 0C5.6 0 0 5.6 0 12.5S12.5 41 12.5 41 25 19.4 25 12.5 19.4 0 12.5 0z" fill="#2563EB"/><circle cx="12.5" cy="12.5" r="5" fill="#fff"/></svg>', className:'', iconSize:[25,41], iconAnchor:[12,41]});
         var marker = (document.getElementById('school_lat').value && document.getElementById('school_lng').value)
