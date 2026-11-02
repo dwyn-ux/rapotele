@@ -349,6 +349,7 @@ function run_migrations_locked(): void
             id $pk,
             dapodik_id VARCHAR(64) NULL,
             name VARCHAR(80) NOT NULL,
+            report_name VARCHAR(80) NULL,
             grade VARCHAR(16) NOT NULL,
             level VARCHAR(16) NULL,
             major VARCHAR(80) NULL,
@@ -962,6 +963,7 @@ function run_migrations_locked(): void
     migration_add_column('grades', 'learning_objective_id', 'INT NULL');
     migrate_grade_schema();
     migration_add_column('classes', 'dapodik_id', 'VARCHAR(64) NULL');
+    migration_add_column('classes', 'report_name', 'VARCHAR(80) NULL');
     migration_add_column('classes', 'grade', 'VARCHAR(16) NULL');
     migration_add_column('classes', 'major', 'VARCHAR(80) NULL');
     migration_add_column('classes', 'homeroom_teacher_id', 'INT NULL');

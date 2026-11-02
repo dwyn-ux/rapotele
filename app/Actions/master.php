@@ -176,8 +176,10 @@ function action_save_class(): void
         redirect_to('classes');
         return;
     }
+    $reportName = trim((string)($_POST['report_name'] ?? ''));
     $data = [
         trim((string)$_POST['name']),
+        $reportName !== '' ? $reportName : null,
         trim((string)$_POST['grade']),
         strtoupper(trim((string)($_POST['level'] ?? ''))),
         trim((string)($_POST['major'] ?? '')),
@@ -189,12 +191,12 @@ function action_save_class(): void
     ];
     if ($id > 0) {
         execute_sql(
-            'UPDATE classes SET name = ?, grade = ?, level = ?, major = ?, school_id = ?, homeroom_teacher_id = ?, academic_year = ?, active = ?, updated_at = ? WHERE id = ?',
+            'UPDATE classes SET name = ?, report_name = ?, grade = ?, level = ?, major = ?, school_id = ?, homeroom_teacher_id = ?, academic_year = ?, active = ?, updated_at = ? WHERE id = ?',
             array_merge($data, [$id])
         );
     } else {
         execute_sql(
-            'INSERT INTO classes (name, grade, level, major, school_id, homeroom_teacher_id, academic_year, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO classes (name, report_name, grade, level, major, school_id, homeroom_teacher_id, academic_year, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             $data
         );
     }

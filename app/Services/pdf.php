@@ -671,7 +671,7 @@ function report_student_payload(int $studentId): array
 {
     try {
         $student = fetch_one(
-            'SELECT s.*, c.name AS class_name, c.grade, c.level AS class_level, c.major AS class_major, c.homeroom_teacher_id, t.name AS homeroom_name, t.nip AS homeroom_nip
+            'SELECT s.*, COALESCE(NULLIF(c.report_name, \'\'), c.name) AS class_name, c.name AS physical_class_name, c.report_name, c.grade, c.level AS class_level, c.major AS class_major, c.homeroom_teacher_id, t.name AS homeroom_name, t.nip AS homeroom_nip
              FROM students s
              LEFT JOIN classes c ON c.id = s.class_id
              LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id
@@ -680,7 +680,7 @@ function report_student_payload(int $studentId): array
         );
     } catch (Throwable) {
         $student = fetch_one(
-            'SELECT s.*, c.name AS class_name, c.grade, c.major AS class_major, c.homeroom_teacher_id, t.name AS homeroom_name, t.nip AS homeroom_nip
+            'SELECT s.*, COALESCE(NULLIF(c.report_name, \'\'), c.name) AS class_name, c.name AS physical_class_name, c.report_name, c.grade, c.major AS class_major, c.homeroom_teacher_id, t.name AS homeroom_name, t.nip AS homeroom_nip
              FROM students s
              LEFT JOIN classes c ON c.id = s.class_id
              LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id
@@ -1070,10 +1070,10 @@ function report_extracurriculars_for_student(array $student): array
          FROM extracurriculars e
          LEFT JOIN teachers t ON t.id = e.teacher_id
          LEFT JOIN extracurricular_scores es ON es.student_id = ? AND es.extracurricular_id = e.id
-         WHERE e.active = 1 AND (e.class_name = ? OR e.class_name = ? OR e.class_name = ?)
+         WHERE e.active = 1 AND (e.class_name = ? OR e.class_name = ? OR e.class_name = ? OR e.class_name = ?)
          ORDER BY e.type, e.name
          LIMIT 2',
-        [$studentId, $className, 'Semua Kelas', 'Pramuka Reguler']
+        [$studentId, $className, (string)($student['physical_class_name'] ?? $className), 'Semua Kelas', 'Pramuka Reguler']
     );
     if ($rows) {
         return $rows;
@@ -1787,7 +1787,17 @@ function page_cetak_nilai_rapor_pdf(): void
         <?php panel_title('Cetak Nilai Rapor Siswa'); ?>
         <form method="get" class="grid four">
             <input type="hidden" name="page" value="cetak-nilai-rapor">
-            <label>Pilih Kelas <select name="class_id"><?= options(array_column_map($classes, 'id', 'name'), $classId) ?></select></label>
+            <?php
+            $classDropdown = [];
+            foreach ($classes as $c) {
+                $label = (string)$c['name'];
+                if (!empty($c['report_name']) && $c['report_name'] !== $c['name']) {
+                    $label .= ' (Rapor: ' . $c['report_name'] . ')';
+                }
+                $classDropdown[(string)$c['id']] = $label;
+            }
+            ?>
+            <label>Pilih Kelas <select name="class_id"><?= options($classDropdown, $classId) ?></select></label>
             <label>Format Rapor <select name="format"><?= options(['auto' => 'Otomatis (Deteksi Jenjang)', 'sd' => 'SD', 'smp' => 'SMP/MTs', 'sma' => 'SMA/MA'], $_GET['format'] ?? 'auto') ?></select></label>
             <label>Posisi Tanda Tangan KS <select name="posisittdks"><?= options(['sejajar' => 'Sejajar Wali Kelas', 'bawah' => 'Di Bawah Wali Kelas'], $_GET['posisittdks'] ?? 'sejajar') ?></select></label>
             <label>Posisi Tanda Tangan <select name="isittd"><?= options(['tanpa' => 'Tanpa Tanda Tangan', 'dengan' => 'Dengan Tanda Tangan'], $_GET['isittd'] ?? 'tanpa') ?></select></label>
@@ -1811,7 +1821,7 @@ function page_cetak_nilai_rapor_pdf(): void
         <td><?= e($student['name']) ?></td>
         <td><?= e($student['nisn']) ?></td>
         <td><?= e($student['nis']) ?></td>
-        <td><?= e($class['name'] ?? '-') ?></td>
+        <td><?= e(!empty($class['report_name']) && $class['report_name'] !== $class['name'] ? $class['name'] . ' (Rapor: ' . $class['report_name'] . ')' : ($class['name'] ?? '-')) ?></td>
         <td><?= $exists ? '<span class="badge ok">Siap</span>' : '<span class="badge off">Belum Ada</span>' ?></td>
         <td>
             <div class="row-actions">
@@ -1968,7 +1978,7 @@ function biodata_file_path(int $studentId): string
 function generate_student_biodata_pdf(int $studentId): string
 {
     $student = fetch_one(
-        'SELECT s.*, c.name AS class_name, c.grade, c.level AS class_level, c.major AS class_major, c.homeroom_teacher_id, t.name AS homeroom_name, t.nip AS homeroom_nip
+        'SELECT s.*, COALESCE(NULLIF(c.report_name, \'\'), c.name) AS class_name, c.name AS physical_class_name, c.report_name, c.grade, c.level AS class_level, c.major AS class_major, c.homeroom_teacher_id, t.name AS homeroom_name, t.nip AS homeroom_nip
          FROM students s
          LEFT JOIN classes c ON c.id = s.class_id
          LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id
@@ -2539,7 +2549,7 @@ function page_laporan_belajar(): void
     }
 
     if ($studentId > 0) {
-        $student = fetch_one('SELECT s.*, c.name AS class_name, c.grade, c.homeroom_teacher_id, t.name AS homeroom_name, t.nip AS homeroom_nip FROM students s LEFT JOIN classes c ON c.id = s.class_id LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id WHERE s.id = ?', [$studentId]);
+        $student = fetch_one('SELECT s.*, COALESCE(NULLIF(c.report_name, \'\'), c.name) AS class_name, c.grade, c.homeroom_teacher_id, t.name AS homeroom_name, t.nip AS homeroom_nip FROM students s LEFT JOIN classes c ON c.id = s.class_id LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id WHERE s.id = ?', [$studentId]);
         if (!$student) {
             http_response_code(404);
             exit('Siswa tidak ditemukan.');

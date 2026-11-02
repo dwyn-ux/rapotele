@@ -30,7 +30,17 @@ function page_print_document(string $type): void
         <?php panel_title(($titles[$type] ?? 'Cetak') . ' Siswa'); ?>
         <form method="get" class="grid four">
             <input type="hidden" name="page" value="<?= e($type) ?>">
-            <label>Pilih Kelas <select name="class_id"><?= options(array_column_map($classes, 'id', 'name'), $classId) ?></select></label>
+            <?php
+            $classDropdown = [];
+            foreach ($classes as $c) {
+                $label = (string)$c['name'];
+                if (!empty($c['report_name']) && $c['report_name'] !== $c['name']) {
+                    $label .= ' (Rapor: ' . $c['report_name'] . ')';
+                }
+                $classDropdown[(string)$c['id']] = $label;
+            }
+            ?>
+            <label>Pilih Kelas <select name="class_id"><?= options($classDropdown, $classId) ?></select></label>
             <?php if ($type === 'cetak-pelengkap-rapor'): ?>
                 <label>Posisi Tanda Tangan KS <select name="posisittdks"><?= options(['sejajar' => 'Sejajar Wali Kelas', 'bawah' => 'Di Bawah Wali Kelas'], $_GET['posisittdks'] ?? 'sejajar') ?></select></label>
                 <label>Ukuran Kertas <select name="kertas"><?= options(['A4' => 'A4', 'F4' => 'F4'], $_GET['kertas'] ?? 'A4') ?></select></label>
@@ -62,7 +72,7 @@ function page_print_document(string $type): void
             <td><?= e($no++) ?></td>
             <td><?= e($student['name']) ?></td>
             <td><?= e($student['nisn']) ?></td>
-            <td><?= e($class['name'] ?? '-') ?></td>
+            <td><?= e(!empty($class['report_name']) ? $class['report_name'] : ($class['name'] ?? '-')) ?></td>
             <td><?= $exists ? '<span class="badge ok">Siap</span>' : '<span class="badge off">Belum Ada</span>' ?></td>
             <td>
                 <div class="row-actions">
@@ -77,7 +87,7 @@ function page_print_document(string $type): void
     <?php else: ?>
     <section class="panel print-panel">
         <?php panel_title($titles[$type] ?? 'Cetak', '', '<button type="button" class="button warning" onclick="window.print()">Generate ' . e($titles[$type] ?? 'Cetak') . '</button><button type="button" class="button success" onclick="window.print()">Download/Cetak</button>'); ?>
-        <h2><?= e($titles[$type] ?? 'Cetak') ?> <?= e($class['name'] ?? '') ?></h2>
+        <h2><?= e($titles[$type] ?? 'Cetak') ?> <?= e(!empty($class['report_name']) ? $class['report_name'] : ($class['name'] ?? '')) ?></h2>
         <?php if (in_array($type, ['cetak-leger-rapor', 'cetak-leger-pts'], true)): ?>
             <?php render_leger_table($students); ?>
         <?php elseif ($type === 'cetak-buku-induk'): ?>
@@ -153,7 +163,7 @@ function render_student_report_card(array $student, string $type): void
 function page_input_kelulusan(): void
 {
     require_role(['admin']);
-    $rows = fetch_all('SELECT s.*, c.name AS class_name, g.status, g.certificate_no, g.transcript_no, g.graduation_date, g.notes FROM students s LEFT JOIN classes c ON c.id = s.class_id LEFT JOIN graduations g ON g.student_id = s.id ORDER BY c.grade, c.name, s.name');
+    $rows = fetch_all('SELECT s.*, COALESCE(NULLIF(c.report_name, \'\'), c.name) AS class_name, g.status, g.certificate_no, g.transcript_no, g.graduation_date, g.notes FROM students s LEFT JOIN classes c ON c.id = s.class_id LEFT JOIN graduations g ON g.student_id = s.id ORDER BY c.grade, c.name, s.name');
     render_header('Input Kelulusan');
     table_panel('Data Kelulusan Siswa', ['Nama', 'Kelas', 'Status', 'No Ijazah', 'No Transkrip', 'Tanggal', 'Simpan'], $rows, function ($row) { ?>
         <form method="post" class="inline-form"><?= csrf_field() ?><input type="hidden" name="action" value="save_graduation"><input type="hidden" name="student_id" value="<?= e($row['id']) ?>">
@@ -164,7 +174,7 @@ function page_input_kelulusan(): void
 function page_import_nomor_ijazah(): void
 {
     require_role(['admin']);
-    $rows = fetch_all('SELECT s.name, s.nisn, c.name AS class_name, g.certificate_no, g.transcript_no, g.graduation_date FROM students s LEFT JOIN classes c ON c.id = s.class_id LEFT JOIN graduations g ON g.student_id = s.id ORDER BY c.grade, c.name, s.name');
+    $rows = fetch_all('SELECT s.name, s.nisn, COALESCE(NULLIF(c.report_name, \'\'), c.name) AS class_name, g.certificate_no, g.transcript_no, g.graduation_date FROM students s LEFT JOIN classes c ON c.id = s.class_id LEFT JOIN graduations g ON g.student_id = s.id ORDER BY c.grade, c.name, s.name');
     render_header('Import Nomor Ijazah');
     ?>
     <section class="panel">

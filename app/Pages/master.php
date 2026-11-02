@@ -558,6 +558,10 @@ function page_classes(): void
                 <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>" placeholder="Contoh: 7A, 8B, 9C">
             </label>
             <label>
+                <span class="field-icon"><i data-lucide="printer"></i> Nama Cetak Rapor</span>
+                <input type="text" name="report_name" value="<?= e($edit['report_name'] ?? '') ?>" placeholder="Opsional (misal: VII, 7A, X-E1). Kosongkan jika sama">
+            </label>
+            <label>
                 <span class="field-icon"><i data-lucide="building"></i> Sekolah <span style="color:#c00">*</span></span>
                 <select name="school_id" required>
                     <option value="">- Pilih Sekolah -</option>
@@ -597,7 +601,7 @@ function page_classes(): void
     <?php input_panel_end(); ?>
     <?php table_panel('Daftar Kelas', ['Sekolah', 'Kelas', 'Tingkat', 'Jenjang', 'Jurusan', 'Wali Kelas', 'Jumlah Siswa', 'Status', 'Aksi'], $rows, function ($row) {
         $count = (int)fetch_one('SELECT COUNT(*) AS c FROM students WHERE class_id = ?', [(int)$row['id']])['c'];
-        ?><td><?= e($row['school_name'] ?? '-') ?></td><td><?= e($row['name']) ?></td><td><?= e($row['grade']) ?></td><td><?= e($row['level'] ?? '-') ?></td><td><?= e($row['major'] ?? '-') ?></td><td><?= e($row['teacher_name']) ?></td><td><?= e($count) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('classes', (int)$row['id'], 'delete_class') ?></td><?php
+        ?><td><?= e($row['school_name'] ?? '-') ?></td><td><strong><?= e($row['name']) ?></strong><?php if (!empty($row['report_name']) && $row['report_name'] !== $row['name']): ?><br><small style="color:var(--text-muted);font-size:0.82em;display:inline-flex;align-items:center;gap:3px;margin-top:2px;" title="Nama yang dicetak pada lembar rapor"><i data-lucide="printer" style="width:11px;height:11px"></i> Rapor: <strong><?= e($row['report_name']) ?></strong></small><?php endif; ?></td><td><?= e($row['grade']) ?></td><td><?= e($row['level'] ?? '-') ?></td><td><?= e($row['major'] ?? '-') ?></td><td><?= e($row['teacher_name']) ?></td><td><?= e($count) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('classes', (int)$row['id'], 'delete_class') ?></td><?php
     }, '', true); ?>
     <?php render_footer();
 }

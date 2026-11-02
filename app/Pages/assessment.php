@@ -219,7 +219,7 @@ function current_student(): array
         render_access_denied('Akun ini belum terhubung dengan data siswa. Hubungi admin untuk ربط akun dengan data siswa.');
     }
     $student = fetch_one(
-        'SELECT s.*, c.name AS class_name, c.grade, s.location_lat, s.location_lng, sp.location_lat AS school_lat, sp.location_lng AS school_lng, sp.attendance_radius_meters AS radius
+        'SELECT s.*, COALESCE(NULLIF(c.report_name, \'\'), c.name) AS class_name, c.name AS physical_class_name, c.grade, s.location_lat, s.location_lng, sp.location_lat AS school_lat, sp.location_lng AS school_lng, sp.attendance_radius_meters AS radius
          FROM students s
          LEFT JOIN classes c ON c.id = s.class_id
          LEFT JOIN school_profile sp ON sp.id = 1
