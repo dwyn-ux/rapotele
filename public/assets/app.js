@@ -513,13 +513,13 @@ document.addEventListener('DOMContentLoaded', function() {
     var checkSvg = '<svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
     var searchSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
 
-    document.querySelectorAll('select:not(.search-select-original)').forEach(function(sel) {
-        try {
-            if (sel.closest('.search-select')) return;
-            if (sel.options.length < 8) return;
-            if (sel.multiple) return;
+    function initSearchableSelect(sel) {
+        if (sel.classList.contains('search-select-original')) return;
+        if (sel.closest('.search-select')) return;
+        if (sel.options.length < 8) return;
+        if (sel.multiple) return;
 
-            var wrap = document.createElement('div');
+        var wrap = document.createElement('div');
         wrap.className = 'search-select';
         sel.parentNode.insertBefore(wrap, sel);
         wrap.appendChild(sel);
@@ -527,6 +527,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var trigger = document.createElement('div');
         trigger.className = 'search-select-trigger';
+        trigger.setAttribute('tabindex', '0');
+        trigger.setAttribute('role', 'combobox');
+        trigger.setAttribute('aria-expanded', 'false');
+        trigger.setAttribute('aria-haspopup', 'listbox');
         trigger.innerHTML = '<span class="placeholder">Pilih...</span>' + chevron;
         wrap.appendChild(trigger);
 
@@ -536,27 +540,128 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var searchBox = document.createElement('div');
         searchBox.className = 'search-select-search';
-        searchBox.innerHTML = searchSvg + '<input type="text" placeholder="Cari...">';
+        searchBox.innerHTML = searchSvg + '<input type="text" placeholder="Cari..." autocomplete="off" spellcheck="false">';
         dd.appendChild(searchBox);
+
+        var searchInput = searchBox.querySelector('input');
 
         var optList = document.createElement('div');
         optList.className = 'search-select-options';
+        optList.setAttribute('role', 'listbox');
         dd.appendChild(optList);
 
         var items = [];
+        var activeIndex = -1;
+
+        function getVisibleItems() {
+            return items.filter(function(item) {
+                return item.el.style.display !== 'none';
+            });
+        }
+
+        function scrollOptionIntoView(el) {
+            if (!el || !optList) return;
+            var elTop = el.offsetTop;
+            var elBottom = elTop + el.offsetHeight;
+            var listTop = optList.scrollTop;
+            var listBottom = listTop + optList.clientHeight;
+            if (elTop < listTop) {
+                optList.scrollTop = elTop;
+            } else if (elBottom > listBottom) {
+                optList.scrollTop = elBottom - optList.clientHeight;
+            }
+        }
+
+        function setActive(index, scroll) {
+            var visible = getVisibleItems();
+            if (!visible.length) {
+                activeIndex = -1;
+                items.forEach(function(item) { item.el.classList.remove('active'); });
+                return;
+            }
+            if (index < 0) {
+                index = visible.length - 1;
+            } else if (index >= visible.length) {
+                index = 0;
+            }
+            activeIndex = index;
+            items.forEach(function(item) { item.el.classList.remove('active'); });
+            var activeEl = visible[activeIndex].el;
+            activeEl.classList.add('active');
+            if (scroll) {
+                scrollOptionIntoView(activeEl);
+            }
+        }
+
+        function selectOption(optionEl) {
+            if (!optionEl) return;
+            var val = optionEl.dataset.value;
+            sel.value = val;
+            optList.querySelectorAll('.search-select-option').forEach(function(o) {
+                o.classList.remove('selected');
+            });
+            optionEl.classList.add('selected');
+            var triggerSpan = trigger.querySelector('span');
+            var text = optionEl.querySelector('span').textContent;
+            triggerSpan.textContent = text;
+            if (val === '') {
+                triggerSpan.classList.add('placeholder');
+            } else {
+                triggerSpan.classList.remove('placeholder');
+            }
+            closeDropdown();
+            sel.dispatchEvent(new Event('change', { bubbles: true }));
+            trigger.focus();
+        }
+
+        function syncFromSelect() {
+            var currentVal = sel.value;
+            var matchedOption = null;
+            optList.querySelectorAll('.search-select-option').forEach(function(o) {
+                if (o.dataset.value === currentVal) {
+                    o.classList.add('selected');
+                    matchedOption = o;
+                } else {
+                    o.classList.remove('selected');
+                }
+            });
+            var triggerSpan = trigger.querySelector('span');
+            if (matchedOption) {
+                triggerSpan.textContent = matchedOption.querySelector('span').textContent;
+                triggerSpan.classList.toggle('placeholder', currentVal === '');
+            } else {
+                var opt = sel.selectedOptions && sel.selectedOptions[0];
+                triggerSpan.textContent = opt ? opt.textContent : 'Pilih...';
+                triggerSpan.classList.toggle('placeholder', !opt || !opt.value);
+            }
+        }
 
         function openDropdown() {
+            document.querySelectorAll('.search-select-dropdown.open').forEach(function(d) {
+                if (d !== dd) d.classList.remove('open');
+            });
+            document.querySelectorAll('.search-select-trigger.open').forEach(function(t) {
+                if (t !== trigger) {
+                    t.classList.remove('open');
+                    t.setAttribute('aria-expanded', 'false');
+                }
+            });
+
             dd.classList.add('open');
             trigger.classList.add('open');
-            var input = searchBox.querySelector('input');
-            input.value = '';
+            trigger.setAttribute('aria-expanded', 'true');
+            searchInput.value = '';
             filterItems('');
-            setTimeout(function() { input.focus(); }, 30);
+            searchInput.focus();
+            setTimeout(function() { searchInput.focus(); }, 30);
         }
 
         function closeDropdown() {
             dd.classList.remove('open');
             trigger.classList.remove('open');
+            trigger.setAttribute('aria-expanded', 'false');
+            activeIndex = -1;
+            items.forEach(function(item) { item.el.classList.remove('active'); });
         }
 
         function isOpen() {
@@ -564,7 +669,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         function filterItems(q) {
-            var lc = q.toLowerCase();
+            var lc = (q || '').toLowerCase().trim();
             var anyVisible = false;
             items.forEach(function(item) {
                 var match = lc === '' || item.text.indexOf(lc) !== -1;
@@ -580,43 +685,118 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (anyVisible && empty) {
                 empty.remove();
             }
+
+            var visible = getVisibleItems();
+            if (visible.length > 0) {
+                var targetIdx = 0;
+                if (lc === '') {
+                    var selectedIdx = visible.findIndex(function(item) {
+                        return item.el.classList.contains('selected');
+                    });
+                    if (selectedIdx >= 0) {
+                        targetIdx = selectedIdx;
+                    }
+                }
+                setActive(targetIdx, true);
+            } else {
+                setActive(-1, false);
+            }
         }
 
         function buildItems() {
             optList.innerHTML = '';
             items = [];
+            var selectedFound = false;
+            var triggerSpan = trigger.querySelector('span');
+
             for (var i = 0; i < sel.options.length; i++) {
                 var opt = sel.options[i];
                 if (opt.disabled && opt.value === '') continue;
                 var div = document.createElement('div');
                 div.className = 'search-select-option';
+                div.setAttribute('role', 'option');
                 div.dataset.value = opt.value;
                 div.innerHTML = checkSvg + '<span>' + opt.textContent + '</span>';
                 if (opt.selected) {
                     div.classList.add('selected');
-                    trigger.querySelector('span').textContent = opt.textContent;
+                    triggerSpan.textContent = opt.textContent;
+                    triggerSpan.classList.toggle('placeholder', opt.value === '');
+                    selectedFound = true;
                 }
                 (function(optionEl) {
-                    optionEl.addEventListener('click', function() {
-                        sel.value = this.dataset.value;
-                        optList.querySelectorAll('.search-select-option').forEach(function(o) { o.classList.remove('selected'); });
-                        this.classList.add('selected');
-                        trigger.querySelector('span').textContent = this.querySelector('span').textContent;
-                        closeDropdown();
-                        sel.dispatchEvent(new Event('change', {bubbles: true}));
+                    optionEl.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        selectOption(this);
+                    });
+                    optionEl.addEventListener('mousemove', function() {
+                        var visible = getVisibleItems();
+                        var idx = visible.findIndex(function(it) { return it.el === optionEl; });
+                        if (idx !== -1 && idx !== activeIndex) {
+                            setActive(idx, false);
+                        }
                     });
                 })(div);
                 optList.appendChild(div);
-                items.push({el: div, text: opt.textContent.toLowerCase()});
+                items.push({ el: div, text: opt.textContent.toLowerCase() });
+            }
+
+            if (!selectedFound) {
+                var first = sel.options[0];
+                triggerSpan.textContent = first ? first.textContent : 'Pilih...';
+                triggerSpan.classList.add('placeholder');
             }
         }
+
         buildItems();
 
-        searchBox.querySelector('input').addEventListener('input', function() {
+        sel.addEventListener('change', syncFromSelect);
+
+        if (sel.form) {
+            sel.form.addEventListener('reset', function() {
+                setTimeout(syncFromSelect, 10);
+            });
+        }
+
+        if (window.MutationObserver) {
+            var observer = new MutationObserver(function() {
+                buildItems();
+            });
+            observer.observe(sel, { childList: true });
+        }
+
+        searchInput.addEventListener('input', function() {
             filterItems(this.value);
         });
-        searchBox.querySelector('input').addEventListener('click', function(e) {
+
+        searchInput.addEventListener('click', function(e) {
             e.stopPropagation();
+        });
+
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setActive(activeIndex + 1, true);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setActive(activeIndex - 1, true);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                var visible = getVisibleItems();
+                if (activeIndex >= 0 && activeIndex < visible.length) {
+                    selectOption(visible[activeIndex].el);
+                } else if (visible.length > 0) {
+                    selectOption(visible[0].el);
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                closeDropdown();
+                trigger.focus();
+            } else if (e.key === 'Tab') {
+                closeDropdown();
+            }
         });
 
         trigger.addEventListener('click', function(e) {
@@ -625,22 +805,46 @@ document.addEventListener('DOMContentLoaded', function() {
             if (isOpen()) {
                 closeDropdown();
             } else {
-                document.querySelectorAll('.search-select-dropdown').forEach(function(d) { d.classList.remove('open'); });
-                document.querySelectorAll('.search-select-trigger.open').forEach(function(t) { t.classList.remove('open'); });
                 openDropdown();
+            }
+        });
+
+        trigger.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!isOpen()) {
+                    openDropdown();
+                }
+            } else if (e.key === 'Escape') {
+                if (isOpen()) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    closeDropdown();
+                }
             }
         });
 
         dd.addEventListener('click', function(e) {
             e.stopPropagation();
         });
+    }
+
+    document.querySelectorAll('select:not(.search-select-original)').forEach(function(sel) {
+        try {
+            initSearchableSelect(sel);
         } catch (err) {
             console.warn('Search select skipped:', sel.name || sel.id, err);
         }
     });
 
     document.addEventListener('click', function() {
-        document.querySelectorAll('.search-select-dropdown').forEach(function(d) { d.classList.remove('open'); });
-        document.querySelectorAll('.search-select-trigger.open').forEach(function(t) { t.classList.remove('open'); });
+        document.querySelectorAll('.search-select-dropdown.open').forEach(function(d) {
+            d.classList.remove('open');
+        });
+        document.querySelectorAll('.search-select-trigger.open').forEach(function(t) {
+            t.classList.remove('open');
+            t.setAttribute('aria-expanded', 'false');
+        });
     });
 });

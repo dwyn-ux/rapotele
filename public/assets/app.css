@@ -3474,7 +3474,7 @@ body.app-dialog-open { overflow: hidden; }
   white-space: nowrap;
 }
 
-.search-select-trigger:hover { border-color: var(--primary, #6366f1); }
+.search-select-trigger:hover, .search-select-trigger:focus-visible { border-color: var(--primary, #6366f1); outline: none; }
 .search-select-trigger.open { border-color: var(--primary, #6366f1); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary, #6366f1) 12%, transparent); }
 
 .search-select-trigger .placeholder { color: var(--text-muted, #94a3b8); font-weight: 400; }
@@ -3551,8 +3551,8 @@ body.app-dialog-open { overflow: hidden; }
   align-items: center;
   gap: 8px;
 }
-.search-select-option:hover { background: var(--surface-secondary, #f1f5f9); }
-.search-select-option.selected { background: color-mix(in srgb, var(--primary, #6366f1) 10%, var(--surface)); color: var(--primary, #6366f1); font-weight: var(--font-weight-semibold); }
+.search-select-option:hover, .search-select-option.active { background: var(--surface-secondary, #f1f5f9); }
+.search-select-option.selected { background: color-mix(in srgb, var(--primary, #6366f1) 10%, var(--surface)); color: var(--primary, #6366f1); font-weight: var(--font-weight-semibold); } .search-select-option.selected:hover, .search-select-option.selected.active { background: color-mix(in srgb, var(--primary, #6366f1) 18%, var(--surface)); }
 .search-select-option .check-icon { width: 16px; opacity: 0; flex-shrink: 0; }
 .search-select-option.selected .check-icon { opacity: 1; }
 
