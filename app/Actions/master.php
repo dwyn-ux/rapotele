@@ -339,44 +339,125 @@ function action_save_assignment(): void
     require_role(['admin']);
     $id = (int)($_POST['id'] ?? 0);
     $teacherId = (int)($_POST['teacher_id'] ?? 0);
-    $classId = (int)($_POST['class_id'] ?? 0);
     $subjectId = (int)($_POST['subject_id'] ?? 0);
-    if ($teacherId <= 0 || $classId <= 0 || $subjectId <= 0) {
-        flash('danger', 'Guru, kelas, dan mapel wajib dipilih.');
-        redirect_to('assignments');
-    }
     $academicYear = trim((string)($_POST['academic_year'] ?? ''));
     $semester = trim((string)($_POST['semester'] ?? ''));
+
     if ($academicYear === '' || $semester === '') {
         flash('danger', 'Tahun ajaran dan semester wajib diisi.');
         redirect_to('assignments');
     }
-    $classRow = fetch_one('SELECT name, level FROM classes WHERE id = ?', [$classId]);
+
+    $teacherRow = fetch_one('SELECT id, name FROM teachers WHERE id = ?', [$teacherId]);
     $subjectRow = assignment_subject_row($subjectId);
-    $teacherRow = fetch_one('SELECT id FROM teachers WHERE id = ?', [$teacherId]);
-    if (!$classRow || !$subjectRow || !$teacherRow) {
-        flash('danger', 'Guru, kelas, atau mapel tidak ditemukan.');
+    if (!$teacherRow || !$subjectRow) {
+        flash('danger', 'Guru atau mapel tidak ditemukan.');
         redirect_to('assignments');
     }
-    if (!subject_has_level($subjectRow['level'] ?? null, (string)($classRow['level'] ?? ''))) {
-        flash('danger', 'Mapel "' . $subjectRow['name'] . '" tidak berlaku untuk jenjang kelas "' . $classRow['name'] . '".');
-        redirect_to('assignments');
-    }
-    $data = [
-        $teacherId,
-        $classId,
-        $subjectId,
-        $academicYear,
-        $semester,
-        isset($_POST['active']) ? 1 : 0,
-        now_string(),
-    ];
+
+    // Determine target classes (supports single class_id or multiple class_ids[])
+    $classIds = [];
     if ($id > 0) {
-        execute_sql('UPDATE teaching_assignments SET teacher_id = ?, class_id = ?, subject_id = ?, academic_year = ?, semester = ?, active = ?, updated_at = ? WHERE id = ?', array_merge($data, [$id]));
+        $singleClassId = (int)($_POST['class_id'] ?? 0);
+        if ($singleClassId <= 0 && !empty($_POST['class_ids'])) {
+            $singleClassId = (int)reset($_POST['class_ids']);
+        }
+        if ($singleClassId > 0) {
+            $classIds = [$singleClassId];
+        }
     } else {
-        execute_sql('INSERT INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)', $data);
+        $rawClassIds = (array)($_POST['class_ids'] ?? []);
+        if (empty($rawClassIds) && !empty($_POST['class_id'])) {
+            $rawClassIds = [$_POST['class_id']];
+        }
+        foreach ($rawClassIds as $cid) {
+            $cid = (int)$cid;
+            if ($cid > 0 && !in_array($cid, $classIds, true)) {
+                $classIds[] = $cid;
+            }
+        }
     }
-    flash('success', 'Data pembelajaran tersimpan.');
+
+    if (empty($classIds)) {
+        flash('danger', 'Guru, mapel, dan minimal satu kelas wajib dipilih.');
+        redirect_to('assignments');
+    }
+
+    $active = isset($_POST['active']) ? 1 : 0;
+    $now = now_string();
+
+    // If editing a single existing assignment
+    if ($id > 0) {
+        $classId = $classIds[0];
+        $classRow = fetch_one('SELECT name, level FROM classes WHERE id = ?', [$classId]);
+        if (!$classRow) {
+            flash('danger', 'Kelas tidak ditemukan.');
+            redirect_to('assignments');
+        }
+        if (!subject_has_level($subjectRow['level'] ?? null, (string)($classRow['level'] ?? ''))) {
+            flash('danger', 'Mapel "' . $subjectRow['name'] . '" tidak berlaku untuk jenjang kelas "' . $classRow['name'] . '".');
+            redirect_to('assignments');
+        }
+        execute_sql(
+            'UPDATE teaching_assignments SET teacher_id = ?, class_id = ?, subject_id = ?, academic_year = ?, semester = ?, active = ?, updated_at = ? WHERE id = ?',
+            [$teacherId, $classId, $subjectId, $academicYear, $semester, $active, $now, $id]
+        );
+        flash('success', 'Data pembelajaran kelas ' . $classRow['name'] . ' tersimpan.');
+        redirect_to('assignments');
+    }
+
+    // Adding assignments (single or multiple classes)
+    $savedClasses = [];
+    $createdCount = 0;
+    $updatedCount = 0;
+    $skippedClasses = [];
+
+    foreach ($classIds as $classId) {
+        $classRow = fetch_one('SELECT id, name, level FROM classes WHERE id = ?', [$classId]);
+        if (!$classRow) {
+            continue;
+        }
+
+        if (!subject_has_level($subjectRow['level'] ?? null, (string)($classRow['level'] ?? ''))) {
+            $skippedClasses[] = $classRow['name'];
+            continue;
+        }
+
+        $existing = fetch_one(
+            'SELECT id FROM teaching_assignments WHERE class_id = ? AND subject_id = ? AND academic_year = ? AND semester = ?',
+            [$classId, $subjectId, $academicYear, $semester]
+        );
+
+        if ($existing) {
+            execute_sql(
+                'UPDATE teaching_assignments SET teacher_id = ?, active = ?, updated_at = ? WHERE id = ?',
+                [$teacherId, $active, $now, (int)$existing['id']]
+            );
+            $updatedCount++;
+        } else {
+            execute_sql(
+                'INSERT INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [$teacherId, $classId, $subjectId, $academicYear, $semester, $active, $now]
+            );
+            $createdCount++;
+        }
+        $savedClasses[] = (string)$classRow['name'];
+    }
+
+    if (empty($savedClasses)) {
+        flash('danger', 'Tidak ada pembelajaran yang disimpan' . ($skippedClasses ? '. Kelas berikut tidak sesuai jenjang mapel: ' . implode(', ', $skippedClasses) : '.'));
+        redirect_to('assignments');
+    }
+
+    $msg = 'Data pembelajaran berhasil disimpan untuk ' . count($savedClasses) . ' kelas (' . implode(', ', $savedClasses) . ').';
+    if ($createdCount > 0 && $updatedCount > 0) {
+        $msg .= " ($createdCount baru, $updatedCount diperbarui)";
+    }
+    if (!empty($skippedClasses)) {
+        $msg .= ' Dilewati karena jenjang tidak sesuai: ' . implode(', ', $skippedClasses);
+    }
+
+    flash('success', $msg);
     redirect_to('assignments');
 }
 

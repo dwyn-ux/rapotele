@@ -220,7 +220,7 @@ function subject_name_level(int $subjectId): ?array
 function classes_with_level(): array
 {
     try {
-        return fetch_all('SELECT id, name, level FROM classes WHERE active = 1 ORDER BY grade, name');
+        return fetch_all('SELECT id, name, grade, level FROM classes WHERE active = 1 ORDER BY grade, name');
     } catch (Throwable) {
         return array_map(function ($r) {
             return ['id' => (int)$r['id'], 'name' => (string)$r['name'], 'level' => null];

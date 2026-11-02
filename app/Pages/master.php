@@ -838,26 +838,10 @@ function page_assignments(): void
     <?php
     input_panel_start($edit ? 'Edit Pembelajaran' : 'Input Pembelajaran', 'Tambah Pembelajaran', (bool)$edit || isset($_GET['add']));
     ?>
-        <form method="post" class="grid four">
+        <form method="post" class="grid four" id="asg-form">
             <?= csrf_field() ?><input type="hidden" name="action" value="save_assignment"><input type="hidden" name="id" value="<?= e($edit['id'] ?? 0) ?>">
-            <label>Guru <select name="teacher_id" required><?= options($teachers, $edit['teacher_id'] ?? '') ?></select></label>
-            <label>Jenjang
-                <select id="asg-level" data-edit-level="<?= e($editLevel) ?>">
-                    <option value="">Pilih Jenjang</option>
-                    <?php foreach (school_levels() as $lv): ?>
-                        <option value="<?= e($lv) ?>"<?= $editLevel === $lv ? ' selected' : '' ?>><?= e($lv) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-            <label>Kelas
-                <select name="class_id" id="asg-class" required>
-                    <option value="">Pilih Kelas</option>
-                    <?php foreach ($allClasses as $c): ?>
-                        <option value="<?= (int)$c['id'] ?>" data-level="<?= e($c['level'] ?? '') ?>"<?= (int)($edit['class_id'] ?? 0) === (int)$c['id'] ? ' selected' : '' ?>><?= e($c['name']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-            <label>Mapel
+            <label class="span-2">Guru <select name="teacher_id" required><?= options($teachers, $edit['teacher_id'] ?? '') ?></select></label>
+            <label class="span-2">Mapel
                 <select name="subject_id" id="asg-subject" required>
                     <option value="">Pilih Mapel</option>
                     <?php foreach ($allSubjects as $s): ?>
@@ -865,36 +849,193 @@ function page_assignments(): void
                     <?php endforeach; ?>
                 </select>
             </label>
+            <label>Filter Jenjang
+                <select id="asg-level" data-edit-level="<?= e($editLevel) ?>">
+                    <option value="">Semua Jenjang</option>
+                    <?php foreach (school_levels() as $lv): ?>
+                        <option value="<?= e($lv) ?>"<?= $editLevel === $lv ? ' selected' : '' ?>><?= e($lv) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
             <label>Tahun Ajaran <input type="text" name="academic_year" required value="<?= e($edit['academic_year'] ?? current_academic_year()) ?>" readonly></label>
             <label>Semester <input type="text" name="semester" required value="<?= e($edit['semester'] ?? current_semester()) ?>" readonly></label>
-            <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
-            <div class="actions span-2"><button class="button primary">Simpan</button><a class="button" href="<?= e(route_url('assignments')) ?>">Reset</a></div>
+            <label class="check" style="align-self:center;margin-top:1.5rem;"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
+
+            <?php if ($edit): ?>
+                <label class="span-4">Kelas
+                    <select name="class_id" id="asg-class" required>
+                        <option value="">Pilih Kelas</option>
+                        <?php foreach ($allClasses as $c): ?>
+                            <option value="<?= (int)$c['id'] ?>" data-level="<?= e($c['level'] ?? '') ?>"<?= (int)($edit['class_id'] ?? 0) === (int)$c['id'] ? ' selected' : '' ?>><?= e($c['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+            <?php else: ?>
+                <div class="span-4 asg-classes-card">
+                    <div class="asg-classes-header">
+                        <div class="asg-classes-title">
+                            <i data-lucide="layers"></i>
+                            <strong>Pilih Kelas</strong>
+                            <span class="hint">(Centang satu atau beberapa kelas sekaligus untuk guru &amp; mapel ini)</span>
+                        </div>
+                        <div class="asg-classes-actions">
+                            <button type="button" class="button" id="btn-select-all-classes" style="padding:4px 10px;font-size:0.8rem;">
+                                <i data-lucide="check-square"></i> Pilih Semua
+                            </button>
+                            <button type="button" class="button" id="btn-deselect-all-classes" style="padding:4px 10px;font-size:0.8rem;">
+                                Batal Semua
+                            </button>
+                        </div>
+                    </div>
+                    <div class="asg-classes-grid" id="asg-classes-container">
+                        <?php if (empty($allClasses)): ?>
+                            <p class="hint" style="grid-column:1/-1;text-align:center;padding:12px 0;">Belum ada data kelas aktif. Silakan tambahkan kelas terlebih dahulu di menu Data Kelas.</p>
+                        <?php else: ?>
+                            <?php foreach ($allClasses as $c): ?>
+                                <label class="asg-class-item" data-level="<?= e($c['level'] ?? '') ?>">
+                                    <input type="checkbox" name="class_ids[]" value="<?= (int)$c['id'] ?>" class="asg-class-cb">
+                                    <span class="asg-class-name"><?= e($c['name']) ?></span>
+                                    <?php if (!empty($c['level'])): ?>
+                                        <span class="badge muted asg-class-level"><?= e($c['level']) ?></span>
+                                    <?php endif; ?>
+                                </label>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
+                    <div id="asg-classes-empty" class="hint" style="display:none;padding:12px;text-align:center;">
+                        Tidak ada kelas yang sesuai dengan jenjang yang dipilih.
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <div class="actions span-4">
+                <button class="button primary"><i data-lucide="save"></i> <?= $edit ? 'Simpan Perubahan' : 'Simpan Pembelajaran' ?></button>
+                <a class="button" href="<?= e(route_url('assignments')) ?>"><i data-lucide="rotate-ccw"></i> Reset</a>
+            </div>
         </form>
         <script>
         (function(){
             var levelEl = document.getElementById('asg-level');
             var classEl = document.getElementById('asg-class');
             var subjectEl = document.getElementById('asg-subject');
-            var allClassOpts = Array.from(classEl.options).map(function(o){ return {value:o.value, level:o.getAttribute('data-level')||'', text:o.textContent}; });
+            var form = document.getElementById('asg-form');
+            var classItems = Array.from(document.querySelectorAll('.asg-class-item'));
+            var emptyNotice = document.getElementById('asg-classes-empty');
+
+            var allClassOpts = classEl ? Array.from(classEl.options).map(function(o){ return {value:o.value, level:o.getAttribute('data-level')||'', text:o.textContent}; }) : [];
             var allSubjectOpts = Array.from(subjectEl.options).map(function(o){ return {value:o.value, level:o.getAttribute('data-level')||'', text:o.textContent}; });
             var preLevel = levelEl.value || levelEl.getAttribute('data-edit-level') || '';
-            function rebuild(selectEl, allOpts, level) {
-                var prev = selectEl.value;
-                selectEl.innerHTML = '<option value="">' + (selectEl === classEl ? 'Pilih Kelas' : 'Pilih Mapel') + '</option>';
-                allOpts.filter(function(o){ return !o.value || !level || subjectMatch(o.level, level); }).forEach(function(o){
-                    var opt = document.createElement('option');
-                    opt.value = o.value; opt.textContent = o.text;
-                    opt.setAttribute('data-level', o.level);
-                    selectEl.appendChild(opt);
-                });
-                if (prev && selectEl.querySelector('option[value="' + prev + '"]')) selectEl.value = prev;
-            }
+
             function subjectMatch(subjectLevel, classLevel) {
                 if (!subjectLevel) return true;
                 return subjectLevel.split(',').map(function(s){return s.trim();}).indexOf(classLevel) !== -1;
             }
-            levelEl.addEventListener('change', function(){ rebuild(classEl, allClassOpts, levelEl.value); rebuild(subjectEl, allSubjectOpts, levelEl.value); });
-            if (preLevel) { rebuild(classEl, allClassOpts, preLevel); rebuild(subjectEl, allSubjectOpts, preLevel); }
+
+            function rebuildSubjects(level) {
+                var prev = subjectEl.value;
+                subjectEl.innerHTML = '<option value="">Pilih Mapel</option>';
+                allSubjectOpts.filter(function(o){ return !o.value || !level || subjectMatch(o.level, level); }).forEach(function(o){
+                    var opt = document.createElement('option');
+                    opt.value = o.value; opt.textContent = o.text;
+                    opt.setAttribute('data-level', o.level);
+                    subjectEl.appendChild(opt);
+                });
+                if (prev && subjectEl.querySelector('option[value="' + prev + '"]')) subjectEl.value = prev;
+            }
+
+            function filterClasses(level) {
+                if (classEl) {
+                    var prev = classEl.value;
+                    classEl.innerHTML = '<option value="">Pilih Kelas</option>';
+                    allClassOpts.filter(function(o){ return !o.value || !level || subjectMatch(o.level, level); }).forEach(function(o){
+                        var opt = document.createElement('option');
+                        opt.value = o.value; opt.textContent = o.text;
+                        opt.setAttribute('data-level', o.level);
+                        classEl.appendChild(opt);
+                    });
+                    if (prev && classEl.querySelector('option[value="' + prev + '"]')) classEl.value = prev;
+                    return;
+                }
+
+                if (!classItems.length) return;
+                var visibleCount = 0;
+                classItems.forEach(function(item) {
+                    var itemLevel = item.getAttribute('data-level') || '';
+                    var match = !level || !itemLevel || itemLevel === level;
+                    item.style.display = match ? '' : 'none';
+                    if (!match) {
+                        var cb = item.querySelector('.asg-class-cb');
+                        if (cb && cb.checked) {
+                            cb.checked = false;
+                            item.classList.remove('is-checked');
+                        }
+                    } else {
+                        visibleCount++;
+                    }
+                });
+                if (emptyNotice) {
+                    emptyNotice.style.display = visibleCount === 0 ? '' : 'none';
+                }
+            }
+
+            document.querySelectorAll('.asg-class-cb').forEach(function(cb) {
+                cb.addEventListener('change', function() {
+                    var item = cb.closest('.asg-class-item');
+                    if (item) item.classList.toggle('is-checked', cb.checked);
+                });
+            });
+
+            var btnAll = document.getElementById('btn-select-all-classes');
+            if (btnAll) {
+                btnAll.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    classItems.forEach(function(item) {
+                        if (item.style.display !== 'none') {
+                            var cb = item.querySelector('.asg-class-cb');
+                            if (cb) {
+                                cb.checked = true;
+                                item.classList.add('is-checked');
+                            }
+                        }
+                    });
+                });
+            }
+
+            var btnNone = document.getElementById('btn-deselect-all-classes');
+            if (btnNone) {
+                btnNone.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    document.querySelectorAll('.asg-class-cb').forEach(function(cb) {
+                        cb.checked = false;
+                        var item = cb.closest('.asg-class-item');
+                        if (item) item.classList.remove('is-checked');
+                    });
+                });
+            }
+
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    if (!classEl) {
+                        var checked = form.querySelectorAll('input[name="class_ids[]"]:checked');
+                        if (!checked.length) {
+                            e.preventDefault();
+                            alert('Pilih minimal satu kelas untuk pembelajaran.');
+                            var container = document.getElementById('asg-classes-container');
+                            if (container) container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    }
+                });
+            }
+
+            levelEl.addEventListener('change', function(){
+                rebuildSubjects(levelEl.value);
+                filterClasses(levelEl.value);
+            });
+
+            if (preLevel) {
+                rebuildSubjects(preLevel);
+                filterClasses(preLevel);
+            }
         })();
         </script>
     <?php input_panel_end(); ?>
