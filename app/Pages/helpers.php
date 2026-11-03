@@ -290,7 +290,7 @@ function assignment_rows(): array
              JOIN subjects s ON s.id = ta.subject_id
              ORDER BY c.grade, c.name, s.name'
         );
-        foreach ($rows as &$r) { $r['class_level'] = null; }
+        foreach ($rows as &$r) { $r['class_level'] = null; $r['physical_group'] = null; }
         unset($r);
         return $rows;
     }
@@ -306,7 +306,7 @@ function assignments_for_current_user(): array
     }
     try {
         return fetch_all(
-            "SELECT ta.*, t.name AS teacher_name, c.name AS class_name, c.level AS class_level, s.name AS subject_name
+            "SELECT ta.*, t.name AS teacher_name, c.name AS class_name, c.level AS class_level, c.physical_group, s.name AS subject_name
              FROM teaching_assignments ta
              JOIN teachers t ON t.id = ta.teacher_id
              JOIN classes c ON c.id = ta.class_id
@@ -326,7 +326,7 @@ function assignments_for_current_user(): array
              ORDER BY c.grade, c.name, s.name",
             $params
         );
-        foreach ($rows as &$r) { $r['class_level'] = null; }
+        foreach ($rows as &$r) { $r['class_level'] = null; $r['physical_group'] = null; }
         unset($r);
         return $rows;
     }

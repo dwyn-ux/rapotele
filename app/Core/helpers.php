@@ -410,4 +410,84 @@ function unique_username(string $base): string
     return $username;
 }
 
+if (!function_exists('class_physical_group')) {
+    function class_physical_group(int $classId): ?string
+    {
+        if ($classId <= 0 || !table_column_exists('classes', 'physical_group')) {
+            return null;
+        }
+        $c = fetch_one('SELECT physical_group FROM classes WHERE id = ?', [$classId]);
+        $g = trim((string)($c['physical_group'] ?? ''));
+        return $g !== '' ? $g : null;
+    }
+}
+
+if (!function_exists('sibling_classes_for_class')) {
+    function sibling_classes_for_class(int $classId): array
+    {
+        $group = class_physical_group($classId);
+        if (!$group) {
+            return [];
+        }
+        $mainClass = fetch_one('SELECT school_id, academic_year FROM classes WHERE id = ?', [$classId]);
+        if (!$mainClass) {
+            return [];
+        }
+        $params = [$group, $classId, (string)$mainClass['academic_year']];
+        $sql = 'SELECT * FROM classes WHERE physical_group = ? AND id <> ? AND academic_year = ? AND active = 1';
+        if (!empty($mainClass['school_id'])) {
+            $sql .= ' AND school_id = ?';
+            $params[] = (int)$mainClass['school_id'];
+        }
+        $sql .= ' ORDER BY name';
+        return fetch_all($sql, $params);
+    }
+}
+
+if (!function_exists('physical_group_class_ids')) {
+    function physical_group_class_ids(int $classId): array
+    {
+        $siblings = sibling_classes_for_class($classId);
+        $ids = [$classId];
+        foreach ($siblings as $s) {
+            $ids[] = (int)$s['id'];
+        }
+        return array_values(array_unique($ids));
+    }
+}
+
+if (!function_exists('sibling_assignments_for_assignment')) {
+    function sibling_assignments_for_assignment(array $assignment): array
+    {
+        $classId = (int)($assignment['class_id'] ?? 0);
+        $teacherId = (int)($assignment['teacher_id'] ?? 0);
+        $subjectId = (int)($assignment['subject_id'] ?? 0);
+        if ($classId <= 0 || $teacherId <= 0 || $subjectId <= 0) {
+            return [];
+        }
+        $siblings = sibling_classes_for_class($classId);
+        if (!$siblings) {
+            return [];
+        }
+        $siblingClassIds = array_map(fn($s) => (int)$s['id'], $siblings);
+        $placeholders = implode(',', array_fill(0, count($siblingClassIds), '?'));
+        $params = array_merge([$teacherId, $subjectId], $siblingClassIds);
+        try {
+            return fetch_all(
+                "SELECT ta.*, t.name AS teacher_name, c.name AS class_name, c.level AS class_level, c.physical_group, s.name AS subject_name
+                 FROM teaching_assignments ta
+                 JOIN teachers t ON t.id = ta.teacher_id
+                 JOIN classes c ON c.id = ta.class_id
+                 JOIN subjects s ON s.id = ta.subject_id
+                 WHERE ta.teacher_id = ? AND ta.subject_id = ? AND ta.class_id IN ($placeholders) AND ta.active = 1
+                 ORDER BY c.name",
+                $params
+            );
+        } catch (Throwable) {
+            return [];
+        }
+    }
+}
+
+
 

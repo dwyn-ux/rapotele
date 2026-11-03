@@ -886,11 +886,21 @@ function action_save_lesson_schedule(): void
     }
 
     $conflictTeacher = fetch_one(
-        'SELECT id FROM lesson_schedules WHERE teacher_id = ? AND day_of_week = ? AND period_no = ? AND id <> ?',
+        'SELECT ls.id, ls.class_id, ls.subject_id, c.physical_group
+         FROM lesson_schedules ls
+         JOIN classes c ON c.id = ls.class_id
+         WHERE ls.teacher_id = ? AND ls.day_of_week = ? AND ls.period_no = ? AND ls.id <> ?',
         [(int)$assignment['teacher_id'], $day, $period, $id]
     );
     if ($conflictTeacher) {
-        throw new RuntimeException('Guru sudah memiliki jadwal pada hari dan jam tersebut.');
+        $curClass = fetch_one('SELECT physical_group FROM classes WHERE id = ?', [(int)$assignment['class_id']]);
+        $isPhysicalGroupMatch = !empty($curClass['physical_group'])
+            && !empty($conflictTeacher['physical_group'])
+            && strcasecmp(trim((string)$curClass['physical_group']), trim((string)$conflictTeacher['physical_group'])) === 0
+            && (int)$conflictTeacher['subject_id'] === (int)$assignment['subject_id'];
+        if (!$isPhysicalGroupMatch) {
+            throw new RuntimeException('Guru sudah memiliki jadwal pada hari dan jam tersebut.');
+        }
     }
 
     $params = [
@@ -1533,12 +1543,22 @@ function action_save_schedule_grid(): void
             }
 
             $conflictTeacher = fetch_one(
-                'SELECT id FROM lesson_schedules WHERE teacher_id = ? AND day_of_week = ? AND period_no = ? AND id <> ?',
+                'SELECT ls.id, ls.class_id, ls.subject_id, c.physical_group
+                 FROM lesson_schedules ls
+                 JOIN classes c ON c.id = ls.class_id
+                 WHERE ls.teacher_id = ? AND ls.day_of_week = ? AND ls.period_no = ? AND ls.id <> ?',
                 [(int)$assignment['teacher_id'], $filterDay, $p, $current ? (int)$current['id'] : 0]
             );
             if ($conflictTeacher) {
-                $errors[] = "Guru sudah ada jadwal di jam ke-{$p}.";
-                continue;
+                $curClass = fetch_one('SELECT physical_group FROM classes WHERE id = ?', [(int)$assignment['class_id']]);
+                $isPhysicalGroupMatch = !empty($curClass['physical_group'])
+                    && !empty($conflictTeacher['physical_group'])
+                    && strcasecmp(trim((string)$curClass['physical_group']), trim((string)$conflictTeacher['physical_group'])) === 0
+                    && (int)$conflictTeacher['subject_id'] === (int)$assignment['subject_id'];
+                if (!$isPhysicalGroupMatch) {
+                    $errors[] = "Guru sudah ada jadwal di jam ke-{$p}.";
+                    continue;
+                }
             }
 
             if ($current) {

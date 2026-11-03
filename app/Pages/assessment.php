@@ -24,6 +24,17 @@ function require_student_in_assignment_class(int $studentId, array $assignment):
         'SELECT id FROM students WHERE id = ? AND class_id = ? AND active = 1',
         [$studentId, (int)$assignment['class_id']]
     );
+    if (!$student && function_exists('sibling_classes_for_class')) {
+        $siblingClasses = sibling_classes_for_class((int)$assignment['class_id']);
+        if ($siblingClasses) {
+            $classIds = array_map(fn($c) => (int)$c['id'], $siblingClasses);
+            $placeholders = implode(',', array_fill(0, count($classIds), '?'));
+            $student = fetch_one(
+                "SELECT id FROM students WHERE id = ? AND class_id IN ($placeholders) AND active = 1",
+                array_merge([$studentId], $classIds)
+            );
+        }
+    }
     if (!$student) {
         throw new RuntimeException('Siswa tidak termasuk kelas pembelajaran ini.');
     }
@@ -280,15 +291,25 @@ function page_grades(): void
         return;
     }
 
+    $siblingAssignments = function_exists('sibling_assignments_for_assignment') ? sibling_assignments_for_assignment($assignment) : [];
+    $allAssignments = array_merge([$assignment], $siblingAssignments);
+    $allClassIds = array_map(fn($a) => (int)$a['class_id'], $allAssignments);
+    $allAssignmentIds = array_map(fn($a) => (int)$a['id'], $allAssignments);
+    $isCombinedGroup = count($allAssignments) > 1;
+
     $tps = learning_objectives_for_assignment($assignment);
     $students = fetch_all(
-        'SELECT s.id, s.name, s.nis FROM students s WHERE s.class_id = ? AND s.active = 1 ORDER BY s.name',
-        [(int)$assignment['class_id']]
+        'SELECT s.id, s.name, s.nis, s.class_id, c.name AS class_name
+         FROM students s
+         JOIN classes c ON c.id = s.class_id
+         WHERE s.class_id IN (' . implode(',', array_fill(0, count($allClassIds), '?')) . ') AND s.active = 1
+         ORDER BY s.name',
+        $allClassIds
     );
 
     $existingGrades = fetch_all(
-        'SELECT * FROM grades WHERE assignment_id = ? AND assessment_type = ?',
-        [(int)$assignment['id'], $assessmentType]
+        'SELECT * FROM grades WHERE assignment_id IN (' . implode(',', array_fill(0, count($allAssignmentIds), '?')) . ') AND assessment_type = ?',
+        array_merge($allAssignmentIds, [$assessmentType])
     );
     $gradeMap = [];
     foreach ($existingGrades as $g) {
@@ -297,7 +318,23 @@ function page_grades(): void
     }
     ?>
     <section class="panel">
-        <h3><?= e($assignment['class_name']) ?> — <?= e($assignment['subject_name']) ?></h3>
+        <?php if ($isCombinedGroup): ?>
+            <div style="background: rgba(14, 165, 233, 0.08); border-left: 4px solid #0284c7; border-radius: 8px; padding: 10px 14px; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; font-size: 0.88rem; color: #0369a1;">
+                    <i data-lucide="users" style="width: 18px; height: 18px; flex-shrink: 0;"></i>
+                    <div>
+                        <strong>Kelas Gabungan KBM: <?= e($assignment['physical_group'] ?? 'Rombel Bersama') ?></strong>
+                        <div style="font-size: 0.8rem; color: #0284c7; margin-top: 2px;">
+                            Nilai otomatis terhubung ke <?= count($allAssignments) ?> rombel Dapodik: <strong><?= e(implode(' & ', array_map(fn($a) => $a['class_name'], $allAssignments))) ?></strong> (Total <?= count($students) ?> siswa)
+                        </div>
+                    </div>
+                </div>
+                <span class="badge" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-weight: 600;">Otomatis Sinkron 2 Kelas</span>
+            </div>
+            <h3><?= e($assignment['physical_group'] ?? $assignment['class_name']) ?> (Gabungan) — <?= e($assignment['subject_name']) ?></h3>
+        <?php else: ?>
+            <h3><?= e($assignment['class_name']) ?> — <?= e($assignment['subject_name']) ?></h3>
+        <?php endif; ?>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;">
             <?php foreach (assessment_type_options() as $typeKey => $typeLabel): ?>
                 <a class="button <?= $typeKey === $assessmentType ? 'primary' : '' ?>" href="<?= e(route_url('grades', ['assignment_id' => (int)$assignment['id'], 'type' => $typeKey])) ?>"><?= e($typeLabel) ?></a>
@@ -325,7 +362,7 @@ function page_grades(): void
                                     <?php $key = $student['id'] . '_' . $tp['id']; $g = $gradeMap[$key] ?? []; ?>
                                     <tr>
                                         <td><?= $i + 1 ?></td>
-                                        <td><?= e($student['name']) ?></td>
+                                        <td><?= e($student['name']) ?><?php if ($isCombinedGroup && !empty($student['class_name'])): ?> <span class="badge" style="font-size:0.7rem;padding:1px 6px;margin-left:4px;background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;font-weight:600;"><?= e($student['class_name']) ?></span><?php endif; ?></td>
                                         <td><?= e($student['nis']) ?></td>
                                         <td><input class="small-input" type="number" min="0" max="100" step="0.01" name="score[<?= e($student['id']) ?>]" value="<?= e($g['score'] ?? '') ?>"></td>
                                     </tr>
@@ -350,7 +387,7 @@ function page_grades(): void
                                 <?php $key = $student['id'] . '_0'; $g = $gradeMap[$key] ?? []; ?>
                                 <tr>
                                     <td><?= $i + 1 ?></td>
-                                    <td><?= e($student['name']) ?></td>
+                                    <td><?= e($student['name']) ?><?php if ($isCombinedGroup && !empty($student['class_name'])): ?> <span class="badge" style="font-size:0.7rem;padding:1px 6px;margin-left:4px;background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;font-weight:600;"><?= e($student['class_name']) ?></span><?php endif; ?></td>
                                     <td><?= e($student['nis']) ?></td>
                                     <td><input class="small-input" type="number" min="0" max="100" step="0.01" name="score[<?= e($student['id']) ?>]" value="<?= e($g['score'] ?? '') ?>"></td>
                                     <td><input type="text" name="description[<?= e($student['id']) ?>]" value="<?= e($g['description'] ?? '') ?>"></td>
@@ -397,45 +434,99 @@ function page_student_attendance(): void
         render_footer();
         return;
     }
+    $siblingAssignments = function_exists('sibling_assignments_for_assignment') ? sibling_assignments_for_assignment($assignment) : [];
+    $allAssignments = array_merge([$assignment], $siblingAssignments);
+    $allClassIds = array_map(fn($a) => (int)$a['class_id'], $allAssignments);
+    $allAssignmentIds = array_map(fn($a) => (int)$a['id'], $allAssignments);
+    $isCombinedGroup = count($allAssignments) > 1;
+
     $recordedMeetings = fetch_all(
         'SELECT s.meeting_no, s.date, COUNT(e.id) as student_count
          FROM student_attendance_sessions s
          LEFT JOIN student_attendance_entries e ON e.session_id = s.id
-         WHERE s.assignment_id = ?
-         GROUP BY s.id
+         WHERE s.assignment_id IN (' . implode(',', array_fill(0, count($allAssignmentIds), '?')) . ')
+         GROUP BY s.date, s.meeting_no
          ORDER BY s.meeting_no ASC',
-        [(int)$assignment['id']]
+        $allAssignmentIds
     );
 
-    $session = fetch_one('SELECT * FROM student_attendance_sessions WHERE assignment_id = ? AND date = ? AND meeting_no = ?', [(int)$assignment['id'], $date, $meetingNo]);
-    $teacherAttended = !empty($session['teacher_attended']);
-    $students = fetch_all(
-        'SELECT s.*, e.status, e.notes
-         FROM students s
-         LEFT JOIN student_attendance_entries e ON e.student_id = s.id AND e.session_id = ?
-         WHERE s.class_id = ? AND s.active = 1
-         ORDER BY s.name',
-        [(int)($session['id'] ?? 0), (int)$assignment['class_id']]
+    $sessions = fetch_all(
+        'SELECT * FROM student_attendance_sessions WHERE assignment_id IN (' . implode(',', array_fill(0, count($allAssignmentIds), '?')) . ') AND date = ? AND meeting_no = ?',
+        array_merge($allAssignmentIds, [$date, $meetingNo])
     );
+    $session = null;
+    foreach ($sessions as $s) {
+        if ((int)$s['assignment_id'] === (int)$assignment['id']) {
+            $session = $s;
+            break;
+        }
+    }
+    if (!$session && !empty($sessions)) {
+        $session = $sessions[0];
+    }
+    $sessionIds = array_values(array_filter(array_map(fn($s) => (int)$s['id'], $sessions)));
+
+    $teacherAttended = false;
+    foreach ($sessions as $s) {
+        if (!empty($s['teacher_attended'])) {
+            $teacherAttended = true;
+            if (empty($session['teacher_attended'])) {
+                $session['teacher_attended'] = $s['teacher_attended'];
+                $session['teacher_time_in'] = $s['teacher_time_in'] ?? null;
+                $session['teacher_status'] = $s['teacher_status'] ?? null;
+                $session['teacher_lat'] = $s['teacher_lat'] ?? null;
+                $session['teacher_lng'] = $s['teacher_lng'] ?? null;
+                $session['teacher_notes'] = $s['teacher_notes'] ?? null;
+                $session['teacher_attended_at'] = $s['teacher_attended_at'] ?? null;
+            }
+            break;
+        }
+    }
+
+    $entryMap = [];
+    if (!empty($sessionIds)) {
+        $entries = fetch_all(
+            'SELECT student_id, status, notes, updated_at FROM student_attendance_entries WHERE session_id IN (' . implode(',', array_fill(0, count($sessionIds), '?')) . ')',
+            $sessionIds
+        );
+        foreach ($entries as $ent) {
+            $entryMap[(int)$ent['student_id']] = $ent;
+        }
+    }
+
+    $students = fetch_all(
+        'SELECT s.*, c.name AS class_name
+         FROM students s
+         JOIN classes c ON c.id = s.class_id
+         WHERE s.class_id IN (' . implode(',', array_fill(0, count($allClassIds), '?')) . ') AND s.active = 1
+         ORDER BY s.name',
+        $allClassIds
+    );
+    foreach ($students as &$st) {
+        $sid = (int)$st['id'];
+        $st['status'] = $entryMap[$sid]['status'] ?? null;
+        $st['notes'] = $entryMap[$sid]['notes'] ?? '';
+    }
+    unset($st);
 
     $hasEntries = false;
     $summary = ['hadir' => 0, 'sakit' => 0, 'izin' => 0, 'alpa' => 0, 'terlambat' => 0];
     $totalEntries = 0;
     $lastUpdated = null;
-    if (!empty($session['id'])) {
+    if (!empty($sessionIds)) {
         $entryRows = fetch_all(
             'SELECT status, COUNT(*) as cnt, MAX(updated_at) as last_updated
              FROM student_attendance_entries
-             WHERE session_id = ?
+             WHERE session_id IN (' . implode(',', array_fill(0, count($sessionIds), '?')) . ')
              GROUP BY status',
-            [(int)$session['id']]
+            $sessionIds
         );
         foreach ($entryRows as $er) {
             $st = (string)$er['status'];
             $cnt = (int)$er['cnt'];
             $totalEntries += $cnt;
             if (isset($summary[$st])) {
-                $summary[$st] = $cnt;
+                $summary[$st] += $cnt;
             }
             if (!empty($er['last_updated']) && ($lastUpdated === null || $er['last_updated'] > $lastUpdated)) {
                 $lastUpdated = $er['last_updated'];
@@ -483,7 +574,15 @@ function page_student_attendance(): void
         <section class="panel">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 1rem;">
                 <div>
-                    <h3 style="margin: 0;"><?= e($assignment['class_name']) ?> &bull; <?= e($assignment['subject_name']) ?></h3>
+                    <?php if ($isCombinedGroup): ?>
+                        <div style="background: rgba(14, 165, 233, 0.08); border-left: 4px solid #0284c7; border-radius: 8px; padding: 6px 10px; margin-bottom: 8px; display: inline-flex; align-items: center; gap: 6px;">
+                            <i data-lucide="users" style="width: 15px; height: 15px; color: #0284c7;"></i>
+                            <span style="font-size: 0.82rem; color: #0369a1; font-weight: 600;">Rombel Fisik (Boarding): <?= e($assignment['physical_group'] ?? '') ?> &bull; <?= count($allAssignments) ?> Kelas: <?= e(implode(' & ', array_map(fn($a) => $a['class_name'], $allAssignments))) ?></span>
+                        </div>
+                        <h3 style="margin: 0;"><?= e($assignment['physical_group'] ?? $assignment['class_name']) ?> (Gabungan) &bull; <?= e($assignment['subject_name']) ?></h3>
+                    <?php else: ?>
+                        <h3 style="margin: 0;"><?= e($assignment['class_name']) ?> &bull; <?= e($assignment['subject_name']) ?></h3>
+                    <?php endif; ?>
                     <div style="font-size: 0.88rem; color: var(--text-muted); margin-top: 4px;">
                         Pertemuan ke-<strong><?= e($meetingNo) ?></strong> &bull; <?= e(date('d F Y', strtotime($date))) ?>
                     </div>
@@ -590,11 +689,16 @@ function page_student_attendance(): void
                                 <tr class="attendance-row" data-status="<?= e($student['status'] ?? 'hadir') ?>">
                                     <td class="cell-student">
                                         <div class="student-info">
-                                            <span class="student-name"><?= e($student['name']) ?></span>
-                                            <span class="student-nis">NIS: <?= e($student['nis']) ?></span>
+                                            <span class="student-name">
+                                                <?= e($student['name']) ?>
+                                                <?php if ($isCombinedGroup && !empty($student['class_name'])): ?>
+                                                    <span class="badge" style="font-size:0.7rem;padding:1px 6px;margin-left:4px;background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;font-weight:600;"><?= e($student['class_name']) ?></span>
+                                                <?php endif; ?>
+                                            </span>
+                                            <span class="student-nis">NIS: <?= e($student['nis']) ?><?php if ($isCombinedGroup && !empty($student['class_name'])): ?> &bull; <?= e($student['class_name']) ?><?php endif; ?></span>
                                         </div>
                                     </td>
-                                    <td class="cell-nis-desktop"><?= e($student['nis']) ?></td>
+                                    <td class="cell-nis-desktop"><?= e($student['nis']) ?><?php if ($isCombinedGroup && !empty($student['class_name'])): ?><br><small style="color:var(--text-muted);font-size:0.8rem;"><?= e($student['class_name']) ?></small><?php endif; ?></td>
                                     <td class="cell-status">
                                         <select name="status[<?= e($student['id']) ?>]" class="attendance-select">
                                             <?= options(allowed_statuses(), $student['status'] ?? 'hadir') ?>

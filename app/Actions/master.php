@@ -177,9 +177,11 @@ function action_save_class(): void
         return;
     }
     $reportName = trim((string)($_POST['report_name'] ?? ''));
+    $physicalGroup = trim((string)($_POST['physical_group'] ?? ''));
     $data = [
         trim((string)$_POST['name']),
         $reportName !== '' ? $reportName : null,
+        $physicalGroup !== '' ? $physicalGroup : null,
         trim((string)$_POST['grade']),
         strtoupper(trim((string)($_POST['level'] ?? ''))),
         trim((string)($_POST['major'] ?? '')),
@@ -191,12 +193,12 @@ function action_save_class(): void
     ];
     if ($id > 0) {
         execute_sql(
-            'UPDATE classes SET name = ?, report_name = ?, grade = ?, level = ?, major = ?, school_id = ?, homeroom_teacher_id = ?, academic_year = ?, active = ?, updated_at = ? WHERE id = ?',
+            'UPDATE classes SET name = ?, report_name = ?, physical_group = ?, grade = ?, level = ?, major = ?, school_id = ?, homeroom_teacher_id = ?, academic_year = ?, active = ?, updated_at = ? WHERE id = ?',
             array_merge($data, [$id])
         );
     } else {
         execute_sql(
-            'INSERT INTO classes (name, report_name, grade, level, major, school_id, homeroom_teacher_id, academic_year, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO classes (name, report_name, physical_group, grade, level, major, school_id, homeroom_teacher_id, academic_year, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             $data
         );
     }

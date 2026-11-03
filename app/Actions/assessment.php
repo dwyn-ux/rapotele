@@ -39,6 +39,23 @@ function action_save_grades(): void
         ];
     }
 
+    $siblingAssignments = function_exists('sibling_assignments_for_assignment') ? sibling_assignments_for_assignment($assignment) : [];
+    $allAssignments = array_merge([$assignment], $siblingAssignments);
+    $assignmentsByClassId = [];
+    foreach ($allAssignments as $a) {
+        $assignmentsByClassId[(int)$a['class_id']] = $a;
+    }
+
+    $studentIds = array_column($rows, 'student_id');
+    $studentClasses = [];
+    if (!empty($studentIds)) {
+        $stRows = fetch_all(
+            'SELECT id, class_id FROM students WHERE id IN (' . implode(',', array_fill(0, count($studentIds), '?')) . ')',
+            $studentIds
+        );
+        $studentClasses = array_column($stRows, 'class_id', 'id');
+    }
+
     $pdo = db();
     if (!$pdo->beginTransaction()) {
         throw new RuntimeException('Transaksi tidak dapat dimulai.');
@@ -48,7 +65,11 @@ function action_save_grades(): void
         $updatedAt = now_string();
         foreach ($rows as $row) {
             $studentId = (int)$row['student_id'];
-            $params = [(int)$assignment['id'], $studentId, $assessmentType];
+            $studentClassId = (int)($studentClasses[$studentId] ?? $assignment['class_id']);
+            $targetAssignment = $assignmentsByClassId[$studentClassId] ?? $assignment;
+            $targetAssignmentId = (int)$targetAssignment['id'];
+
+            $params = [$targetAssignmentId, $studentId, $assessmentType];
             $objectiveSql = 'learning_objective_id IS NULL';
             if ($learningObjectiveId !== null) {
                 $objectiveSql = 'learning_objective_id = ?';
@@ -66,7 +87,7 @@ function action_save_grades(): void
             } else {
                 execute_sql(
                     'INSERT INTO grades (assignment_id, student_id, assessment_type, learning_objective_id, score, created_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                    [(int)$assignment['id'], $studentId, $assessmentType, $learningObjectiveId, $row['score'], $userId, $updatedAt]
+                    [$targetAssignmentId, $studentId, $assessmentType, $learningObjectiveId, $row['score'], $userId, $updatedAt]
                 );
             }
         }
@@ -90,10 +111,18 @@ function action_save_student_attendance(): void
     $date = date_ymd($_POST['date'] ?? null);
     $meetingNo = positive_int_value(array_key_exists('meeting_no', $_POST) ? $_POST['meeting_no'] : 1, 'Nomor pertemuan tidak valid.');
 
-    // Check if teacher attendance is confirmed for this session
+    $siblingAssignments = function_exists('sibling_assignments_for_assignment') ? sibling_assignments_for_assignment($assignment) : [];
+    $allAssignments = array_merge([$assignment], $siblingAssignments);
+    $assignmentsByClassId = [];
+    foreach ($allAssignments as $a) {
+        $assignmentsByClassId[(int)$a['class_id']] = $a;
+    }
+    $allAssignmentIds = array_map(fn($a) => (int)$a['id'], $allAssignments);
+
+    // Check if teacher attendance is confirmed for any session in this group
     $session = fetch_one(
-        'SELECT id, teacher_attended FROM student_attendance_sessions WHERE assignment_id = ? AND date = ? AND meeting_no = ?',
-        [(int)$assignment['id'], $date, $meetingNo]
+        'SELECT id, teacher_attended, teacher_lat, teacher_lng, teacher_status, teacher_time_in, teacher_attended_at, teacher_notes FROM student_attendance_sessions WHERE assignment_id IN (' . implode(',', array_fill(0, count($allAssignmentIds), '?')) . ') AND date = ? AND meeting_no = ? AND teacher_attended = 1',
+        array_merge($allAssignmentIds, [$date, $meetingNo])
     );
     if (!is_admin() && (!$session || empty($session['teacher_attended']))) {
         throw new RuntimeException('Guru pengampu wajib melakukan konfirmasi kehadiran di kelas terlebih dahulu sebelum mengisi absensi siswa.');
@@ -132,15 +161,40 @@ function action_save_student_attendance(): void
         throw new RuntimeException('Transaksi tidak dapat dimulai.');
     }
     try {
-        $sessionId = save_attendance_session((int)$assignment['id'], $date, $meetingNo, $topic, (int)(current_user()['id'] ?? 0));
-        // Ensure teacher_attended is confirmed when saving student attendance
-        execute_sql('UPDATE student_attendance_sessions SET teacher_attended = 1 WHERE id = ? AND (teacher_attended IS NULL OR teacher_attended = 0)', [$sessionId]);
+        $studentIds = array_column($rows, 'student_id');
+        $studentClasses = [];
+        if (!empty($studentIds)) {
+            $stRows = fetch_all(
+                'SELECT id, class_id FROM students WHERE id IN (' . implode(',', array_fill(0, count($studentIds), '?')) . ')',
+                $studentIds
+            );
+            $studentClasses = array_column($stRows, 'class_id', 'id');
+        }
+
+        $sessionMap = [];
+        $userId = (int)(current_user()['id'] ?? 0);
+        foreach ($allAssignments as $asgn) {
+            $aid = (int)$asgn['id'];
+            $sid = save_attendance_session($aid, $date, $meetingNo, $topic, $userId);
+            execute_sql('UPDATE student_attendance_sessions SET teacher_attended = 1 WHERE id = ? AND (teacher_attended IS NULL OR teacher_attended = 0)', [$sid]);
+            if ($session && !empty($session['teacher_lat']) && !empty($session['teacher_lng'])) {
+                execute_sql(
+                    'UPDATE student_attendance_sessions SET teacher_lat = ?, teacher_lng = ?, teacher_status = ?, teacher_time_in = ?, teacher_attended_at = ?, teacher_notes = ? WHERE id = ? AND (teacher_lat IS NULL OR teacher_lat = 0)',
+                    [$session['teacher_lat'], $session['teacher_lng'], $session['teacher_status'] ?? 'hadir', $session['teacher_time_in'] ?? now_string(), $session['teacher_attended_at'] ?? now_string(), $session['teacher_notes'] ?? null, $sid]
+                );
+            }
+            $sessionMap[$aid] = $sid;
+        }
 
         foreach ($rows as $row) {
             $studentId = (int)$row['student_id'];
-            save_student_attendance_entry($sessionId, $studentId, (string)$row['status'], (string)$row['notes']);
+            $studentClassId = (int)($studentClasses[$studentId] ?? $assignment['class_id']);
+            $targetAssignment = $assignmentsByClassId[$studentClassId] ?? $assignment;
+            $targetSessionId = $sessionMap[(int)$targetAssignment['id']] ?? $sessionMap[(int)$assignment['id']];
+
+            save_student_attendance_entry($targetSessionId, $studentId, (string)$row['status'], (string)$row['notes']);
             if ($queueWhatsapp && $row['status'] !== 'hadir') {
-                $entry = fetch_one('SELECT id FROM student_attendance_entries WHERE session_id = ? AND student_id = ?', [$sessionId, $studentId]);
+                $entry = fetch_one('SELECT id FROM student_attendance_entries WHERE session_id = ? AND student_id = ?', [$targetSessionId, $studentId]);
                 if (!$entry) {
                     throw new RuntimeException('Data absensi tidak ditemukan.');
                 }
@@ -220,6 +274,26 @@ function action_checkin_teacher_classroom(): void
         );
     }
 
+    $siblingAssignments = function_exists('sibling_assignments_for_assignment') ? sibling_assignments_for_assignment($assignment) : [];
+    foreach ($siblingAssignments as $sib) {
+        $sibId = (int)$sib['id'];
+        $sibExisting = fetch_one(
+            'SELECT id FROM student_attendance_sessions WHERE assignment_id = ? AND date = ? AND meeting_no = ?',
+            [$sibId, $date, $meetingNo]
+        );
+        if ($sibExisting) {
+            execute_sql(
+                'UPDATE student_attendance_sessions SET teacher_attended = 1, teacher_status = ?, teacher_time_in = ?, teacher_notes = ?, teacher_attended_at = ?, teacher_lat = ?, teacher_lng = ?, updated_at = ? WHERE id = ?',
+                [$teacherStatus, $timeIn, $notes, $now, $lat, $lng, $now, (int)$sibExisting['id']]
+            );
+        } else {
+            execute_sql(
+                'INSERT INTO student_attendance_sessions (assignment_id, date, meeting_no, topic, teacher_attended, teacher_status, teacher_time_in, teacher_notes, teacher_attended_at, teacher_lat, teacher_lng, created_by, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [$sibId, $date, $meetingNo, 'Pertemuan ' . $meetingNo, $teacherStatus, $timeIn, $notes, $now, $lat, $lng, $userId, $now]
+            );
+        }
+    }
+
     // Synchronize with lesson_schedules & teacher_teaching_attendance if schedule exists
     if (table_exists('lesson_schedules') && table_exists('teacher_teaching_attendance')) {
         try {
@@ -283,6 +357,16 @@ function action_cancel_teacher_classroom(): void
         'UPDATE student_attendance_sessions SET teacher_attended = 0, teacher_time_in = NULL, teacher_notes = NULL, teacher_attended_at = NULL, updated_at = ? WHERE id = ?',
         [now_string(), $sessionId]
     );
+    $assignment = fetch_one('SELECT * FROM teaching_assignments WHERE id = ?', [(int)$session['assignment_id']]);
+    if ($assignment && function_exists('sibling_assignments_for_assignment')) {
+        $siblingAssignments = sibling_assignments_for_assignment($assignment);
+        foreach ($siblingAssignments as $sib) {
+            execute_sql(
+                'UPDATE student_attendance_sessions SET teacher_attended = 0, teacher_time_in = NULL, teacher_notes = NULL, teacher_attended_at = NULL, updated_at = ? WHERE assignment_id = ? AND date = ? AND meeting_no = ?',
+                [now_string(), (int)$sib['id'], $session['date'], (int)$session['meeting_no']]
+            );
+        }
+    }
     flash('success', 'Status kehadiran guru berhasil direset.');
     redirect_to('student-attendance', ['assignment_id' => (int)$session['assignment_id'], 'date' => $session['date'], 'meeting_no' => (int)$session['meeting_no']]);
 }
