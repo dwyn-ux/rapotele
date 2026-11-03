@@ -933,6 +933,31 @@ function action_save_lesson_schedule(): void
         );
     }
 
+    // Auto-sync sibling assignments in physical group (Option 1)
+    if (function_exists('sibling_assignments_for_assignment')) {
+        $siblingAssignments = sibling_assignments_for_assignment($assignment);
+        foreach ($siblingAssignments as $sib) {
+            $sibClassId = (int)$sib['class_id'];
+            $sibExisting = fetch_one(
+                'SELECT id, locked FROM lesson_schedules WHERE class_id = ? AND day_of_week = ? AND period_no = ?',
+                [$sibClassId, $day, $period]
+            );
+            if ($sibExisting) {
+                if ((int)$sibExisting['locked'] !== 1) {
+                    execute_sql(
+                        'UPDATE lesson_schedules SET assignment_id = ?, teacher_id = ?, class_id = ?, subject_id = ?, start_time = ?, end_time = ?, locked = ?, note = ?, generated_by = ?, updated_at = ? WHERE id = ?',
+                        [(int)$sib['id'], (int)$sib['teacher_id'], $sibClassId, (int)$sib['subject_id'], $startTime, $endTime, $locked, $note, (int)current_user()['id'], now_string(), (int)$sibExisting['id']]
+                    );
+                }
+            } else {
+                execute_sql(
+                    'INSERT INTO lesson_schedules (assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked, note, generated_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    [(int)$sib['id'], (int)$sib['teacher_id'], $sibClassId, (int)$sib['subject_id'], $day, $period, $startTime, $endTime, $locked, $note, (int)current_user()['id'], now_string(), now_string()]
+                );
+            }
+        }
+    }
+
     flash('success', 'Jadwal pelajaran tersimpan.');
     redirect_to('lesson-schedule');
 }
@@ -942,7 +967,21 @@ function action_delete_lesson_schedule(): void
     require_role(['admin']);
     schedule_require_tables();
 
-    execute_sql('DELETE FROM lesson_schedules WHERE id = ?', [(int)($_POST['id'] ?? 0)]);
+    $id = (int)($_POST['id'] ?? 0);
+    $sched = fetch_one('SELECT * FROM lesson_schedules WHERE id = ?', [$id]);
+    if ($sched) {
+        $assignment = schedule_assignment_by_id((int)$sched['assignment_id']);
+        if ($assignment && function_exists('sibling_assignments_for_assignment')) {
+            $siblings = sibling_assignments_for_assignment($assignment);
+            foreach ($siblings as $sib) {
+                execute_sql(
+                    'DELETE FROM lesson_schedules WHERE class_id = ? AND day_of_week = ? AND period_no = ? AND locked = 0',
+                    [(int)$sib['class_id'], (int)$sched['day_of_week'], (int)$sched['period_no']]
+                );
+            }
+        }
+        execute_sql('DELETE FROM lesson_schedules WHERE id = ?', [$id]);
+    }
     flash('success', 'Jadwal pelajaran dihapus.');
     redirect_to('lesson-schedule');
 }
@@ -1383,6 +1422,21 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                 <?php endforeach; ?>
             </select></label>
         </form>
+    <?php
+    $siblingClasses = function_exists('sibling_classes_for_class') && $filterClassId > 0 ? sibling_classes_for_class($filterClassId) : [];
+    $curClassGroup = function_exists('class_physical_group') && $filterClassId > 0 ? class_physical_group($filterClassId) : null;
+    if ($filterClassId > 0 && $curClassGroup && !empty($siblingClasses)):
+    ?>
+        <div style="background: rgba(14, 165, 233, 0.08); border-left: 4px solid #0284c7; border-radius: 8px; padding: 10px 14px; margin: 0 16px 12px; display: flex; align-items: center; gap: 10px; font-size: 0.88rem; color: #0369a1;">
+            <i data-lucide="link-2" style="width: 18px; height: 18px; flex-shrink: 0;"></i>
+            <div>
+                <strong>Kelas Gabungan KBM: <?= e($curClassGroup) ?></strong>
+                <div style="font-size: 0.8rem; color: #0284c7; margin-top: 2px;">
+                    Jadwal yang Anda atur pada kelas ini otomatis disinkronkan ke rombel pasangannya: <strong><?= e(implode(', ', array_map(fn($c) => $c['name'], $siblingClasses))) ?></strong>.
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
     <?php if ($filterClassId > 0 && $filterDay > 0 && !empty($assignmentsBySubject)): ?>
         <form method="post" class="schedule-grid-wrap">
             <?= csrf_field() ?>
@@ -1413,7 +1467,7 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                                         <?php foreach ($assignmentsBySubject as $subjectName => $teachers): ?>
                                             <optgroup label="<?= e($subjectName) ?>">
                                                 <?php foreach ($teachers as $t): ?>
-                                                    <option value="<?= e($t['id']) ?>" <?= ($cur && (int)$cur['assignment_id'] === (int)$t['id']) ? 'selected' : '' ?>><?= e($t['teacher']) ?></option>
+                                                    <option value="<?= e($t['id']) ?>" <?= ($cur && (int)$cur['assignment_id'] === (int)$t['id']) ? 'selected' : '' ?>><?= e($subjectName) ?> — <?= e($t['teacher']) ?></option>
                                                 <?php endforeach; ?>
                                             </optgroup>
                                         <?php endforeach; ?>
@@ -1502,6 +1556,13 @@ function action_save_schedule_grid(): void
                 $dbEnd = $customEnd ?? (string)$current['end_time'];
                 if (substr($dbStart, 0, 5) !== substr((string)$current['start_time'], 0, 5) || substr($dbEnd, 0, 5) !== substr((string)$current['end_time'], 0, 5)) {
                     execute_sql('UPDATE lesson_schedules SET start_time = ?, end_time = ?, updated_at = ? WHERE id = ?', [$dbStart, $dbEnd, now_string(), (int)$current['id']]);
+                    $curAsgn = schedule_assignment_by_id((int)$current['assignment_id']);
+                    if ($curAsgn && function_exists('sibling_assignments_for_assignment')) {
+                        $siblings = sibling_assignments_for_assignment($curAsgn);
+                        foreach ($siblings as $sib) {
+                            execute_sql('UPDATE lesson_schedules SET start_time = ?, end_time = ?, updated_at = ? WHERE class_id = ? AND day_of_week = ? AND period_no = ? AND locked = 0', [$dbStart, $dbEnd, now_string(), (int)$sib['class_id'], $filterDay, $p]);
+                        }
+                    }
                 }
             }
             continue;
@@ -1511,6 +1572,13 @@ function action_save_schedule_grid(): void
             if ((int)$current['locked'] === 1) {
                 $errors[] = "Jam ke-{$p} terkunci, tidak bisa dihapus.";
                 continue;
+            }
+            $curAsgn = schedule_assignment_by_id((int)$current['assignment_id']);
+            if ($curAsgn && function_exists('sibling_assignments_for_assignment')) {
+                $siblings = sibling_assignments_for_assignment($curAsgn);
+                foreach ($siblings as $sib) {
+                    execute_sql('DELETE FROM lesson_schedules WHERE class_id = ? AND day_of_week = ? AND period_no = ? AND locked = 0', [(int)$sib['class_id'], $filterDay, $p]);
+                }
             }
             execute_sql('DELETE FROM lesson_schedules WHERE id = ?', [(int)$current['id']]);
             $deleted++;
@@ -1571,6 +1639,31 @@ function action_save_schedule_grid(): void
                     'INSERT INTO lesson_schedules (assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked, generated_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)',
                     [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $filterDay, $p, $startTime, $endTime, (int)current_user()['id'], now_string(), now_string()]
                 );
+            }
+
+            // Auto-sync sibling classes in physical group (Option 1)
+            if (function_exists('sibling_assignments_for_assignment')) {
+                $siblings = sibling_assignments_for_assignment($assignment);
+                foreach ($siblings as $sib) {
+                    $sibClassId = (int)$sib['class_id'];
+                    $sibCurrent = fetch_one(
+                        'SELECT id, locked FROM lesson_schedules WHERE class_id = ? AND day_of_week = ? AND period_no = ?',
+                        [$sibClassId, $filterDay, $p]
+                    );
+                    if ($sibCurrent) {
+                        if ((int)$sibCurrent['locked'] !== 1) {
+                            execute_sql(
+                                'UPDATE lesson_schedules SET assignment_id = ?, teacher_id = ?, class_id = ?, subject_id = ?, start_time = ?, end_time = ?, updated_at = ? WHERE id = ?',
+                                [(int)$sib['id'], (int)$sib['teacher_id'], $sibClassId, (int)$sib['subject_id'], $startTime, $endTime, now_string(), (int)$sibCurrent['id']]
+                            );
+                        }
+                    } else {
+                        execute_sql(
+                            'INSERT INTO lesson_schedules (assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked, generated_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)',
+                            [(int)$sib['id'], (int)$sib['teacher_id'], $sibClassId, (int)$sib['subject_id'], $filterDay, $p, $startTime, $endTime, (int)current_user()['id'], now_string(), now_string()]
+                        );
+                    }
+                }
             }
             $saved++;
         }

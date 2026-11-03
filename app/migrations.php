@@ -266,6 +266,101 @@ function migrate_grade_schema(): void
     }
 }
 
+function migrate_lesson_schedule_schema(): void
+{
+    if (!table_exists('lesson_schedules')) {
+        return;
+    }
+
+    $pdo = db();
+    if (db_driver() === 'mysql') {
+        $indexRows = fetch_all(
+            "SELECT INDEX_NAME, NON_UNIQUE, SEQ_IN_INDEX, COLUMN_NAME
+             FROM INFORMATION_SCHEMA.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lesson_schedules'
+             ORDER BY INDEX_NAME, SEQ_IN_INDEX"
+        );
+        $indexes = [];
+        foreach ($indexRows as $row) {
+            $name = (string)$row['INDEX_NAME'];
+            $position = (int)$row['SEQ_IN_INDEX'];
+            $indexes[$name]['unique'] = (int)$row['NON_UNIQUE'] === 0;
+            $indexes[$name]['columns'][$position] = (string)$row['COLUMN_NAME'];
+        }
+        foreach ($indexes as $name => $index) {
+            ksort($index['columns']);
+            $columns = array_values($index['columns']);
+            if ($index['unique'] && $columns === ['teacher_id', 'day_of_week', 'period_no']) {
+                $pdo->exec('ALTER TABLE ' . db_identifier('lesson_schedules') . ' DROP INDEX ' . db_identifier($name));
+            }
+        }
+        return;
+    }
+
+    // SQLite
+    $indexRows = fetch_all('PRAGMA index_list(' . db_identifier('lesson_schedules') . ')');
+    $hasTeacherUnique = false;
+    foreach ($indexRows as $index) {
+        if ((int)$index['unique'] !== 1) {
+            continue;
+        }
+        $indexColumns = fetch_all('PRAGMA index_info(' . db_identifier((string)$index['name']) . ')');
+        $names = array_map(static fn (array $row): string => (string)$row['name'], $indexColumns);
+        if ($names === ['teacher_id', 'day_of_week', 'period_no']) {
+            $hasTeacherUnique = true;
+            break;
+        }
+    }
+
+    if (!$hasTeacherUnique) {
+        return;
+    }
+
+    $newTable = 'lesson_schedules_migration_new';
+    if (table_exists($newTable)) {
+        $pdo->exec('DROP TABLE ' . db_identifier($newTable));
+    }
+
+    $foreignKeys = (int)$pdo->query('PRAGMA foreign_keys')->fetchColumn();
+    if ($foreignKeys === 1) {
+        $pdo->exec('PRAGMA foreign_keys = OFF');
+    }
+    try {
+        $pdo->beginTransaction();
+        $pdo->exec("CREATE TABLE $newTable (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            assignment_id INT NOT NULL,
+            teacher_id INT NOT NULL,
+            class_id INT NOT NULL,
+            subject_id INT NOT NULL,
+            day_of_week INT NOT NULL,
+            period_no INT NOT NULL,
+            start_time TIME NULL,
+            end_time TIME NULL,
+            locked INT NOT NULL DEFAULT 0,
+            note TEXT NULL,
+            generated_by INT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (class_id, day_of_week, period_no)
+        )");
+
+        $pdo->exec("INSERT INTO $newTable SELECT id, assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked, note, generated_by, created_at, updated_at FROM lesson_schedules");
+        $pdo->exec("DROP TABLE lesson_schedules");
+        $pdo->exec("ALTER TABLE $newTable RENAME TO lesson_schedules");
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $exception;
+    } finally {
+        if ($foreignKeys === 1) {
+            $pdo->exec('PRAGMA foreign_keys = ON');
+        }
+    }
+}
+
 function migrations_fingerprint(): string
 {
     $hash = hash_file('sha256', __FILE__);
@@ -435,8 +530,7 @@ function run_migrations_locked(): void
             generated_by INT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE (class_id, day_of_week, period_no),
-            UNIQUE (teacher_id, day_of_week, period_no)
+            UNIQUE (class_id, day_of_week, period_no)
         )$engine",
 
         "CREATE TABLE IF NOT EXISTS lesson_schedule_reminder_logs (
@@ -1054,6 +1148,7 @@ function run_migrations_locked(): void
     migration_add_column('school_profile', 'regency', 'VARCHAR(120) NULL');
     migration_add_column('school_profile', 'province', 'VARCHAR(120) NULL');
 
+    migrate_lesson_schedule_schema();
     migrate_foreign_keys();
 
     // Sinkronisasi langsung Dapodik telah dihentikan. Hapus token dan URL lama
