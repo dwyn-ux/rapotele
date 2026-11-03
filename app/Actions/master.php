@@ -929,7 +929,7 @@ function action_import_bulk_validate(): void
     }
     $allTeachers = [];
     foreach (fetch_all('SELECT id, name FROM teachers WHERE active = 1') as $t) {
-        $norm = strtolower(preg_replace('/[^a-z0-9\s]/', '', (string)preg_replace('/\s*,\s*/', ' ', $t['name'])));
+        $norm = strtolower((string)preg_replace('/[^a-zA-Z0-9\s]/', '', (string)preg_replace('/\s*,\s*/', ' ', $t['name'])));
         $allTeachers[$norm] = (int)$t['id'];
     }
     $dayMap = ['senin' => 1, 'selasa' => 2, 'rabu' => 3, 'kamis' => 4, 'jumat' => 5, 'jum\'at' => 5, 'sabtu' => 6];
@@ -977,9 +977,10 @@ function action_import_bulk_validate(): void
         }
 
         $teacherId = null;
+        $cleanTeacher = strtolower((string)preg_replace('/[^a-zA-Z0-9\s]/', '', (string)preg_replace('/\s*,\s*/', ' ', $teacherName)));
         foreach ($allTeachers as $normName => $tid) {
             $tokens = preg_split('/\s+/', $normName) ?: [];
-            $searchTokens = preg_split('/\s+/', $teacherName) ?: [];
+            $searchTokens = preg_split('/\s+/', $cleanTeacher) ?: [];
             if ($tokens && $searchTokens && count(array_intersect($searchTokens, $tokens)) >= min(count($tokens), count($searchTokens))) {
                 $teacherId = $tid;
                 break;
