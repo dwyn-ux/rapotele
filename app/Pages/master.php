@@ -283,11 +283,24 @@ function page_school(): void
 
         var map = L.map('school-map').setView([lat, lng], initialZoom);
 
-        // OpenStreetMap tile layer (100% Free, No API Key Required)
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // Enterprise reliable basemaps (100% Free, No API Key, No 403 Rate-limit)
+        var streetLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
-        }).addTo(map);
+            attribution: '&copy; Esri, HERE, Garmin, USGS, OpenStreetMap'
+        });
+
+        var satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: '&copy; Esri, Maxar, Earthstar Geographics'
+        });
+
+        streetLayer.addTo(map);
+
+        // Layer Switcher (Peta Jalan / Foto Satelit)
+        L.control.layers({
+            "🗺️ Peta Jalan": streetLayer,
+            "🛰️ Foto Satelit": satelliteLayer
+        }, null, { position: 'topright' }).addTo(map);
 
         var icon = L.divIcon({
             html: '<svg width="28" height="42" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 0C5.6 0 0 5.6 0 12.5S12.5 41 12.5 41 25 19.4 25 12.5 19.4 0 12.5 0z" fill="#2563EB" stroke="#ffffff" stroke-width="1.5"/><circle cx="12.5" cy="12.5" r="5" fill="#fff"/></svg>',
