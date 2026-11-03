@@ -207,7 +207,7 @@ function render_header(string $title): void
             <header class="topbar">
                 <div class="topbar-left">
                     <button type="button" class="mobile-menu-button" data-sidebar-open aria-label="Buka menu" aria-controls="app-sidebar" aria-expanded="false">
-                        <span class="bottom-icon menu-lines"><span></span><span></span><span></span></span>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
                     </button>
                     <div class="topbar-breadcrumb">
                         <span><?= e($school['name'] ?? config('school.name')) ?></span>
@@ -272,24 +272,30 @@ function render_footer(): void
             </footer>
         </div><!-- .main -->
     </div><!-- .app-shell -->
+    <?php
+    $activePage = (string)($_GET['page'] ?? 'dashboard');
+    if ($activePage === 'school') {
+        $activePage = 'schools';
+    }
+    ?>
     <nav class="mobile-bottom-nav" aria-label="Navigasi cepat">
         <button type="button" class="mobile-bottom-item mobile-menu-button" data-sidebar-open aria-label="Buka menu" aria-controls="app-sidebar" aria-expanded="false">
-            <span class="bottom-icon menu-lines"><span></span><span></span><span></span></span>
-            <span>Menu</span>
+            <span class="mobile-bottom-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg></span>
+            <span class="mobile-bottom-label">Menu</span>
         </button>
-        <a class="mobile-bottom-item" href="<?= e(route_url('dashboard')) ?>">
-            <span class="bottom-icon home-icon"></span>
-            <span>Home</span>
+        <a class="mobile-bottom-item<?= $activePage === 'dashboard' ? ' active' : '' ?>" href="<?= e(route_url('dashboard')) ?>">
+            <span class="mobile-bottom-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+            <span class="mobile-bottom-label">Home</span>
         </a>
-        <a class="mobile-bottom-item" href="<?= e(route_url('profile')) ?>">
-            <span class="bottom-icon profile-icon"></span>
-            <span>Profil</span>
+        <a class="mobile-bottom-item<?= $activePage === 'profile' ? ' active' : '' ?>" href="<?= e(route_url('profile')) ?>">
+            <span class="mobile-bottom-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+            <span class="mobile-bottom-label">Profil</span>
         </a>
-        <form method="post" action="<?= e(route_url('logout')) ?>" class="mobile-bottom-form">
+        <form method="post" action="<?= e(route_url('logout')) ?>" class="mobile-bottom-form" onsubmit="return confirm('Yakin ingin keluar dari akun?');">
             <?= csrf_field() ?>
-            <button type="submit" class="mobile-bottom-item">
-                <span class="bottom-icon logout-icon"></span>
-                <span>Keluar</span>
+            <button type="submit" class="mobile-bottom-item logout-item" aria-label="Keluar dari akun">
+                <span class="mobile-bottom-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg></span>
+                <span class="mobile-bottom-label">Keluar</span>
             </button>
         </form>
     </nav>
