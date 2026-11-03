@@ -1492,13 +1492,51 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
         left: 0;
         background: var(--surface-secondary, #f8fafc) !important;
         z-index: 5;
-        min-width: 130px;
+        min-width: 172px;
+        width: 172px;
         text-align: center;
         font-weight: 600;
+        padding: 8px 6px;
+        box-sizing: border-box;
     }
     .schedule-matrix-table thead th.schedule-matrix-sticky-col {
         z-index: 15;
         background: #0f172a !important;
+        min-width: 172px;
+        width: 172px;
+    }
+    .schedule-matrix-time-box {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        margin-top: 4px;
+    }
+    .schedule-matrix-time-input {
+        width: 74px;
+        min-width: 74px;
+        height: 28px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 2px 4px;
+        border: 1px solid #cbd5e1;
+        border-radius: 5px;
+        text-align: center;
+        background: #ffffff;
+        color: #1e293b;
+        box-sizing: border-box;
+    }
+    .schedule-matrix-time-input:focus {
+        border-color: #0284c7;
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+    }
+    .schedule-matrix-time-input::-webkit-calendar-picker-indicator {
+        padding: 0;
+        margin: 0;
+        cursor: pointer;
+        opacity: 0.6;
+        transform: scale(0.85);
     }
     .schedule-matrix-cell {
         min-width: 180px;
@@ -1786,11 +1824,11 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                             ?>
                             <tr>
                                 <td class="schedule-matrix-sticky-col">
-                                    <div style="font-size:0.85rem;font-weight:700;color:var(--text);">Jam <?= $p ?></div>
-                                    <div style="display:flex;align-items:center;justify-content:center;gap:2px;margin-top:3px;">
-                                        <input type="time" name="slot_time[<?= $p ?>][start]" value="<?= e($defaultStart) ?>" style="font-size:0.72rem;padding:1px 3px;width:58px;border:1px solid #cbd5e1;border-radius:4px;text-align:center;">
-                                        <span style="font-size:0.7rem;color:var(--text-muted);">-</span>
-                                        <input type="time" name="slot_time[<?= $p ?>][end]" value="<?= e($defaultEnd) ?>" style="font-size:0.72rem;padding:1px 3px;width:58px;border:1px solid #cbd5e1;border-radius:4px;text-align:center;">
+                                    <div style="font-size:0.85rem;font-weight:700;color:var(--text);margin-bottom:2px;">Jam <?= $p ?></div>
+                                    <div class="schedule-matrix-time-box">
+                                        <input type="time" name="slot_time[<?= $p ?>][start]" value="<?= e($defaultStart) ?>" class="schedule-matrix-time-input">
+                                        <span style="font-size:0.75rem;color:var(--text-muted);">-</span>
+                                        <input type="time" name="slot_time[<?= $p ?>][end]" value="<?= e($defaultEnd) ?>" class="schedule-matrix-time-input">
                                     </div>
                                 </td>
                                 <?php foreach ($allClasses as $cls): ?>

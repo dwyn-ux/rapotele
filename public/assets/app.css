@@ -4184,3 +4184,47 @@ body.app-modal-open {
   }
 }
 
+/* ── Schedule Matrix Time Input Styling ──────────────────── */
+.schedule-matrix-sticky-col {
+  min-width: 172px !important;
+  width: 172px !important;
+}
+
+.schedule-matrix-time-box {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  margin-top: 4px !important;
+}
+
+.schedule-matrix-time-input {
+  width: 74px !important;
+  min-width: 74px !important;
+  height: 28px !important;
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  padding: 2px 4px !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 5px !important;
+  text-align: center !important;
+  background: #ffffff !important;
+  color: #1e293b !important;
+  box-sizing: border-box !important;
+}
+
+.schedule-matrix-time-input:focus {
+  border-color: #0284c7 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2) !important;
+}
+
+.schedule-matrix-time-input::-webkit-calendar-picker-indicator {
+  padding: 0 !important;
+  margin: 0 !important;
+  cursor: pointer !important;
+  opacity: 0.65 !important;
+  transform: scale(0.85) !important;
+}
+
+
