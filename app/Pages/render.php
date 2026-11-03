@@ -163,6 +163,15 @@ function render_header(string $title): void
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
         <link rel="stylesheet" href="<?= e(asset_version_url('assets/app.css')) ?>">
+        <script>
+            (function() {
+                try {
+                    if (window.innerWidth > 980 && localStorage.getItem('sidebar_collapsed') === '1') {
+                        document.documentElement.classList.add('sidebar-collapsed');
+                    }
+                } catch(e) {}
+            })();
+        </script>
     </head>
     <body>
     <div class="app-shell">
@@ -214,8 +223,8 @@ function render_header(string $title): void
         <div class="main">
             <header class="topbar">
                 <div class="topbar-left">
-                    <button type="button" class="mobile-menu-button" data-sidebar-open aria-label="Buka menu" aria-controls="app-sidebar" aria-expanded="false">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+                    <button type="button" class="sidebar-toggle-btn mobile-menu-button" id="sidebar-toggle" data-sidebar-toggle data-sidebar-open aria-label="Sembunyikan / Tampilkan Sidebar" title="Sembunyikan / Tampilkan Sidebar (Ctrl+B)">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="9" x2="9" y1="3" y2="21"/></svg>
                     </button>
                     <div class="topbar-breadcrumb">
                         <span><?= e($school['name'] ?? config('school.name')) ?></span>
