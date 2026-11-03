@@ -15,6 +15,7 @@
 /storage/backups/*
 /storage/reports/*
 /storage/rate-limit/*
+/storage/runtime-sessions/*
 /storage/uploads/*
 app/storage/backups/*
 app/storage/reports/*

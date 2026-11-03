@@ -395,7 +395,12 @@ function action_save_assignment(): void
     $semester = trim((string)($_POST['semester'] ?? ''));
 
     if ($academicYear === '' || $semester === '') {
-        flash('danger', 'Tahun ajaran dan semester wajib diisi.');
+        flash('danger', 'Tahun ajaran dan semester wajib diisi. Guru, mapel, dan minimal satu kelas wajib dipilih.');
+        redirect_to('assignments');
+    }
+
+    if ($teacherId <= 0 || $subjectId <= 0) {
+        flash('danger', 'Guru, mapel, dan minimal satu kelas wajib dipilih.');
         redirect_to('assignments');
     }
 
@@ -496,11 +501,11 @@ function action_save_assignment(): void
     }
 
     if (empty($savedClasses)) {
-        flash('danger', 'Tidak ada pembelajaran yang disimpan' . ($skippedClasses ? '. Kelas berikut tidak sesuai jenjang mapel: ' . implode(', ', $skippedClasses) : '.'));
+        flash('danger', 'Kelas tidak ditemukan atau tidak ada pembelajaran yang disimpan' . ($skippedClasses ? '. Kelas berikut tidak sesuai jenjang mapel: ' . implode(', ', $skippedClasses) : '.'));
         redirect_to('assignments');
     }
 
-    $msg = 'Data pembelajaran berhasil disimpan untuk ' . count($savedClasses) . ' kelas (' . implode(', ', $savedClasses) . ').';
+    $msg = 'Data pembelajaran tersimpan untuk ' . count($savedClasses) . ' kelas (' . implode(', ', $savedClasses) . ').';
     if ($createdCount > 0 && $updatedCount > 0) {
         $msg .= " ($createdCount baru, $updatedCount diperbarui)";
     }

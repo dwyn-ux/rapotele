@@ -53,13 +53,15 @@ $invalidExc = new InvalidArgumentException('Action tidak dikenal.');
 $msg = friendly_error($invalidExc);
 ok('InvalidArgumentException: sertakan class', str_contains($msg, 'InvalidArgumentException'), "got: $msg");
 
-// switch ke production mode (debug=false) untuk verifikasi fallback
-$GLOBALS['config']['debug'] = false;
 $pdoExc = new PDOException('SQLSTATE[23000]: duplicate key');
 $msg = friendly_error($pdoExc);
-ok('PDOException: sertakan class (prod mode)', str_contains($msg, 'PDOException'), "got: $msg");
-ok('PDOException: sertakan file:line (prod mode)', preg_match('/di .+\.php:\d+/', $msg) === 1, "got: $msg");
-ok('PDOException: sertakan fallback message (prod mode)', str_contains($msg, 'Terjadi kesalahan internal'), "got: $msg");
+ok('PDOException: sertakan class (debug mode)', str_contains($msg, 'PDOException'), "got: $msg");
+ok('PDOException: sertakan file:line (debug mode)', preg_match('/di .+\.php:\d+/', $msg) === 1, "got: $msg");
+
+// switch ke production mode (debug=false) untuk verifikasi fallback
+$GLOBALS['config']['debug'] = false;
+$msgProd = friendly_error($pdoExc);
+ok('PDOException: sertakan fallback message (prod mode)', str_contains($msgProd, 'Terjadi kesalahan internal'), "got: $msgProd");
 $GLOBALS['config']['debug'] = true;
 
 echo "\n== render_access_denied: halt caller di CLI ==\n";

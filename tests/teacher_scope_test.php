@@ -183,6 +183,7 @@ function ensure_assignment(int $teacherId, int $classId, int $subjectId): void
         [$teacherId, $classId, $subjectId]
     );
     if ($a) {
+        execute_sql('UPDATE teaching_assignments SET active = 1 WHERE id = ?', [(int)$a['id']]);
         return;
     }
     execute_sql(

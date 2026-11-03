@@ -65,7 +65,7 @@ try {
     ok('page_assignments renders without exception', true);
     ok('contains "Data Pembelajaran" header', str_contains($render, 'Data Pembelajaran') || str_contains($render, 'Input Pembelajaran') || str_contains($render, 'Tambah Pembelajaran'));
     ok('contains Guru dropdown', str_contains($render, 'name="teacher_id"'));
-    ok('contains Kelas dropdown', str_contains($render, 'name="class_id"'));
+    ok('contains Kelas dropdown', str_contains($render, 'name="class_id"') || str_contains($render, 'name="class_ids[]"'));
     ok('contains Mapel dropdown', str_contains($render, 'name="subject_id"'));
     ok('contains Jenjang filter', str_contains($render, 'id="asg-level"'));
     ok('contains action save_assignment', str_contains($render, 'save_assignment'));

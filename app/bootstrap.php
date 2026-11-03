@@ -91,6 +91,13 @@ if (PHP_SAPI !== 'cli' && session_status() !== PHP_SESSION_ACTIVE) {
 }
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
+    $runtimeSessionDir = APP_ROOT . '/storage/runtime-sessions';
+    if (!is_dir($runtimeSessionDir)) {
+        @mkdir($runtimeSessionDir, 0775, true);
+    }
+    if (is_dir($runtimeSessionDir) && is_writable($runtimeSessionDir)) {
+        @ini_set('session.save_path', $runtimeSessionDir);
+    }
     session_start();
 }
 
