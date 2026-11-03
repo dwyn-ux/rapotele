@@ -142,12 +142,12 @@ function action_save_teacher(): void
             execute_sql('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [password_hash($password, PASSWORD_DEFAULT), now_string(), (int)$existingUser['id']]);
             flash('success', 'Password guru berhasil diubah.');
         }
-    } else {
+    } elseif ($id <= 0 || $password !== '') {
         if ($username === '') {
             $username = unique_username(generate_username_from_name(trim((string)$_POST['name'])));
         }
         if ($password === '') {
-            throw new RuntimeException('Password wajib diisi saat membuat akun guru.');
+            throw new InvalidArgumentException('Password login wajib diisi saat membuat akun guru.');
         }
         validate_password_strength($password);
         $taken = fetch_one('SELECT id FROM users WHERE username = ?', [$username]);
@@ -307,9 +307,12 @@ function action_save_student(): void
             execute_sql('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [password_hash($password, PASSWORD_DEFAULT), now_string(), (int)$existingUser['id']]);
             flash('success', 'Password siswa berhasil diubah.');
         }
-    } elseif ($username !== '' || $password !== '') {
-        if ($username === '' || $password === '') {
-            throw new RuntimeException('Username dan password wajib diisi bersamaan untuk membuat akun siswa.');
+    } elseif ($password !== '') {
+        if ($username === '') {
+            $username = trim((string)($_POST['nisn'] ?? ''));
+        }
+        if ($username === '') {
+            throw new InvalidArgumentException('Username atau NISN wajib diisi untuk membuat akun siswa.');
         }
         validate_password_strength($password);
         $taken = fetch_one('SELECT id FROM users WHERE username = ?', [$username]);

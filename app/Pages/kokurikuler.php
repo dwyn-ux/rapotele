@@ -55,16 +55,47 @@ function page_data_ekskul(): void
 function ext_simple_form_start(string $action, array $edit, string $title, string $class = 'grid four'): void
 {
     $isOpen = (bool)$edit || isset($_GET['add']);
-    $button = '<button type="button" class="button primary input-panel-toggle" data-toggle-label="' . e('Tambah ' . $title) . '" data-close-label="Tutup Form">' . e($isOpen ? 'Tutup Form' : 'Tambah ' . $title) . '</button>';
-    echo '<section class="panel input-panel ' . ($isOpen ? 'is-open' : '') . '" id="form-data">';
-    panel_title(($edit ? 'Edit ' : 'Input ') . $title, '', $button);
-    echo '<div class="input-panel-body"><form method="post" enctype="multipart/form-data" class="' . e($class) . '">' . csrf_field()
-        . '<input type="hidden" name="action" value="' . e($action) . '"><input type="hidden" name="id" value="' . e($edit['id'] ?? 0) . '">';
+    ?>
+    <div class="crud-toolbar no-print">
+        <button type="button" class="button primary app-modal-trigger-add" data-title-add="<?= e('Tambah ' . $title) ?>">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <?= e('Tambah ' . $title) ?>
+        </button>
+    </div>
+
+    <div class="app-modal-backdrop <?= $isOpen ? 'is-open' : '' ?>" id="crud-modal-backdrop" <?= $isOpen ? '' : 'hidden' ?>>
+        <section class="panel input-panel app-modal-dialog" id="form-data" role="dialog" aria-modal="true" aria-labelledby="crud-modal-title">
+            <div class="app-modal-header">
+                <div class="app-modal-title-group">
+                    <div class="app-modal-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </div>
+                    <h2 id="crud-modal-title" data-default-title="<?= e(($edit ? 'Edit ' : 'Input ') . $title) ?>"><?= e(($edit ? 'Edit ' : 'Input ') . $title) ?></h2>
+                </div>
+                <button type="button" class="app-modal-close" aria-label="Tutup Form">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="input-panel-body app-modal-body" id="crud-modal-body">
+                <form method="post" enctype="multipart/form-data" class="<?= e($class) ?>">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="<?= e($action) ?>">
+                    <input type="hidden" name="id" value="<?= e($edit['id'] ?? 0) ?>">
+    <?php
 }
 
 function ext_simple_form_end(string $page): void
 {
-    echo '<div class="actions span-2"><button class="button primary">Simpan</button><a class="button" href="' . e(route_url($page)) . '">Reset</a></div></form></div></section>';
+    ?>
+                    <div class="actions span-2">
+                        <button class="button primary">Simpan</button>
+                        <a class="button app-modal-cancel" href="<?= e(route_url($page)) ?>">Reset</a>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </div>
+    <?php
 }
 
 function page_data_kelompok(): void

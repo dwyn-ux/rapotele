@@ -973,8 +973,8 @@ function page_students(): void
                 <label>Username Login <input type="text" name="username" value="<?= e($existingUser['username'] ?? '') ?>" readonly></label>
                 <label>Password Baru <input type="password" name="password" placeholder="Kosongkan jika tidak diganti"></label>
             <?php else: ?>
-                <label>Username Login <input type="text" name="username" value="<?= e($edit['nisn'] ?? '') ?>" placeholder="default: NISN siswa"></label>
-                <label>Password Login <input type="password" name="password" minlength="8" autocomplete="new-password" placeholder="Isi bersama username bila ingin membuat akun"></label>
+                <label>Username Login <input type="text" name="username" value="" placeholder="default: NISN siswa (opsional)"></label>
+                <label>Password Login <input type="password" name="password" minlength="8" autocomplete="new-password" placeholder="Isi bila ingin membuat akun login siswa"></label>
             <?php endif; ?>
             <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
             <div class="actions span-2"><button class="button primary">Simpan</button><a class="button" href="<?= e(route_url('students')) ?>">Reset</a></div>

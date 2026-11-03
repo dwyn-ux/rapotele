@@ -41,8 +41,25 @@ function route_url(string $page, array $params = []): string
     return app_url('index.php') . '?' . http_build_query($params);
 }
 
+function is_ajax_request(): bool
+{
+    return (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+        || (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json'))
+        || (!empty($_POST['_ajax']) && (string)$_POST['_ajax'] === '1');
+}
+
 function redirect_to(string $page, array $params = []): never
 {
+    if (is_ajax_request()) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'ok' => true,
+            'redirect' => route_url($page, $params),
+            'page' => $page,
+            'flash' => take_flash(),
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     header('Location: ' . route_url($page, $params));
     exit;
 }
@@ -119,6 +136,14 @@ function app_handle_post_request(): void
 {
     try {
         app_dispatch_post_action();
+        if (is_ajax_request()) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'ok' => true,
+                'flash' => take_flash(),
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
     } catch (Throwable $exception) {
         $status = ($exception instanceof InvalidArgumentException || $exception instanceof RuntimeException) ? 422 : 500;
         $cause = $exception;
@@ -136,6 +161,15 @@ function app_handle_post_request(): void
         $error = friendly_error($exception);
         if ($status === 500) {
             $error = 'Terjadi kesalahan internal. Silakan coba lagi atau hubungi admin.';
+        }
+        if (is_ajax_request()) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'ok' => false,
+                'error' => $error,
+                'status' => $status,
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
         }
         flash('danger', 'Gagal: ' . $error);
         redirect_to((string)($_GET['page'] ?? 'dashboard'));

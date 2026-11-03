@@ -92,21 +92,365 @@ document.addEventListener('DOMContentLoaded', () => {
         resize();
     });
 
-    /* ── Input Panel Toggle ──────────────────────────────── */
-    document.querySelectorAll('.input-panel-toggle').forEach((button) => {
-        button.addEventListener('click', () => {
-            const panel = button.closest('.input-panel');
-            if (!panel) {
+    /* ── App CRUD Modal Pop-up System ─────────────────────── */
+    window.openCrudModal = function(modalEl) {
+        if (!modalEl) modalEl = document.getElementById('crud-modal-backdrop') || document.querySelector('.app-modal-backdrop');
+        if (!modalEl) return;
+        modalEl.hidden = false;
+        modalEl.classList.remove('is-closing');
+        modalEl.classList.add('is-open');
+        document.body.classList.add('app-modal-open');
+        const firstInput = modalEl.querySelector('input:not([type="hidden"]), select, textarea');
+        if (firstInput) setTimeout(() => firstInput.focus(), 60);
+    };
+
+    window.closeCrudModal = function(modalEl) {
+        if (!modalEl) modalEl = document.getElementById('crud-modal-backdrop') || document.querySelector('.app-modal-backdrop');
+        if (!modalEl) return;
+        modalEl.classList.add('is-closing');
+        window.setTimeout(() => {
+            modalEl.hidden = true;
+            modalEl.classList.remove('is-open', 'is-closing');
+            document.body.classList.remove('app-modal-open');
+        }, 180);
+    };
+
+    function initModalFormScripts(container) {
+        container.querySelectorAll('script').forEach((oldScript) => {
+            const newScript = document.createElement('script');
+            Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+            newScript.textContent = oldScript.textContent;
+            oldScript.parentNode.replaceChild(newScript, oldScript);
+        });
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+        }
+    }
+
+    function applyTableSearch(input) {
+        if (!input) return;
+        const panel = input.closest('.table-panel');
+        if (!panel) return;
+        const tbody = panel.querySelector('tbody');
+        if (!tbody) return;
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const emptyRow = rows.find((r) => r.querySelector('.empty'));
+        const q = input.value.toLowerCase().trim();
+        let visible = 0;
+        rows.forEach((row) => {
+            if (row === emptyRow) return;
+            const text = row.textContent.toLowerCase();
+            const match = q === '' || text.includes(q);
+            row.style.display = match ? '' : 'none';
+            if (match) visible++;
+        });
+        if (emptyRow) emptyRow.style.display = visible === 0 ? '' : 'none';
+    }
+
+    function refreshCurrentTable() {
+        const searchInput = document.querySelector('.table-search-input');
+        const savedQuery = searchInput ? searchInput.value : '';
+
+        fetch(window.location.href, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(res => res.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newTableWrap = doc.querySelector('.table-panel .table-wrap');
+            const currentTableWrap = document.querySelector('.table-panel .table-wrap');
+
+            if (newTableWrap && currentTableWrap) {
+                currentTableWrap.innerHTML = newTableWrap.innerHTML;
+            }
+
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons();
+            }
+
+            if (searchInput) {
+                searchInput.value = savedQuery;
+                applyTableSearch(searchInput);
+            }
+        })
+        .catch(err => console.warn('Gagal me-refresh tabel:', err));
+    }
+
+    // Cache initial form content on page load
+    const initialModalBackdrop = document.getElementById('crud-modal-backdrop') || document.querySelector('.app-modal-backdrop');
+    if (initialModalBackdrop) {
+        const bodyEl = initialModalBackdrop.querySelector('#crud-modal-body, .app-modal-body');
+        const titleEl = initialModalBackdrop.querySelector('#crud-modal-title');
+        if (bodyEl && !initialModalBackdrop.classList.contains('is-open')) {
+            initialModalBackdrop.dataset.initialHtml = bodyEl.innerHTML;
+        }
+        if (titleEl) {
+            initialModalBackdrop.dataset.initialTitle = titleEl.textContent;
+        }
+        if (initialModalBackdrop.classList.contains('is-open') && !initialModalBackdrop.hasAttribute('hidden')) {
+            document.body.classList.add('app-modal-open');
+        }
+    }
+
+    // Trigger Tambah button -> Open modal with fresh form
+    document.addEventListener('click', (event) => {
+        const addBtn = event.target.closest('.app-modal-trigger-add, .input-panel-toggle');
+        if (!addBtn) return;
+        event.preventDefault();
+        const modalEl = document.getElementById('crud-modal-backdrop') || document.querySelector('.app-modal-backdrop');
+        if (!modalEl) return;
+
+        const titleEl = modalEl.querySelector('#crud-modal-title');
+        const bodyEl = modalEl.querySelector('#crud-modal-body, .app-modal-body');
+        const defaultTitle = addBtn.dataset.titleAdd || (titleEl ? titleEl.dataset.defaultTitle : '') || modalEl.dataset.initialTitle || 'Tambah Data';
+
+        if (titleEl) titleEl.textContent = defaultTitle;
+
+        if (modalEl.dataset.initialHtml && bodyEl) {
+            bodyEl.innerHTML = modalEl.dataset.initialHtml;
+            initModalFormScripts(bodyEl);
+        } else if (bodyEl) {
+            const form = bodyEl.querySelector('form');
+            if (form) form.reset();
+            const idInput = bodyEl.querySelector('input[name="id"]');
+            if (idInput) idInput.value = '0';
+        }
+
+        window.openCrudModal(modalEl);
+    });
+
+    // Trigger Edit button in table -> Load data & Open modal
+    document.addEventListener('click', (event) => {
+        const editLink = event.target.closest('a[data-crud-edit], .app-btn-edit, .table-panel table a[href*="edit="], .table-panel table a[href*="edit_reward="]');
+        if (!editLink) return;
+        if (editLink.hasAttribute('download') || editLink.target === '_blank') return;
+
+        const modalEl = document.getElementById('crud-modal-backdrop') || document.querySelector('.app-modal-backdrop');
+        if (!modalEl) return;
+
+        event.preventDefault();
+        const titleEl = modalEl.querySelector('#crud-modal-title');
+        const bodyEl = modalEl.querySelector('#crud-modal-body, .app-modal-body');
+
+        if (!modalEl.dataset.initialHtml && bodyEl) {
+            modalEl.dataset.initialHtml = bodyEl.innerHTML;
+        }
+
+        if (titleEl) titleEl.textContent = 'Memuat form edit...';
+        if (bodyEl) {
+            bodyEl.innerHTML = '<div class="app-modal-loading"><div class="app-spinner"></div><div>Mengambil data untuk diedit...</div></div>';
+        }
+
+        window.openCrudModal(modalEl);
+
+        fetch(editLink.href, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.text();
+        })
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newBody = doc.getElementById('crud-modal-body') || doc.querySelector('.app-modal-body') || doc.querySelector('.input-panel-body') || doc.querySelector('#form-data form');
+            const newTitle = doc.getElementById('crud-modal-title') || doc.querySelector('.panel-title h2');
+
+            if (newTitle && titleEl) {
+                titleEl.textContent = newTitle.textContent.trim();
+            } else if (titleEl) {
+                titleEl.textContent = 'Edit Data';
+            }
+
+            if (newBody && bodyEl) {
+                bodyEl.innerHTML = newBody.innerHTML;
+                initModalFormScripts(bodyEl);
+            } else {
+                throw new Error('Form tidak ditemukan pada halaman.');
+            }
+        })
+        .catch(err => {
+            if (bodyEl) {
+                bodyEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--danger);"><p>Gagal memuat form: ' + err.message + '</p><button type="button" class="button" onclick="closeCrudModal()">Tutup</button></div>';
+            }
+        });
+    });
+
+    // Close modal triggers
+    document.addEventListener('click', (event) => {
+        // Close button (X)
+        if (event.target.closest('.app-modal-close')) {
+            event.preventDefault();
+            window.closeCrudModal();
+            return;
+        }
+        // Cancel/Reset link inside modal
+        const cancelBtn = event.target.closest('#crud-modal-backdrop .app-modal-cancel, #crud-modal-backdrop a.button, .app-modal-backdrop a.button');
+        if (cancelBtn) {
+            const isSubmit = cancelBtn.type === 'submit' || cancelBtn.classList.contains('primary');
+            if (!isSubmit) {
+                event.preventDefault();
+                window.closeCrudModal();
                 return;
             }
-            panel.classList.toggle('is-open');
-            const isOpen = panel.classList.contains('is-open');
-            button.textContent = isOpen
-                ? (button.dataset.closeLabel || 'Tutup Form')
-                : (button.dataset.toggleLabel || 'Tambah');
-            if (isOpen) {
-                panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        // Backdrop click outside dialog
+        const modalBackdrop = event.target.closest('.app-modal-backdrop');
+        if (modalBackdrop && event.target === modalBackdrop) {
+            window.closeCrudModal(modalBackdrop);
+        }
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            const openModal = document.querySelector('.app-modal-backdrop.is-open:not([hidden])');
+            if (openModal) {
+                event.preventDefault();
+                window.closeCrudModal(openModal);
             }
+        }
+    });
+
+    // Form submission inside modal via AJAX (Save Tambah / Edit)
+    document.addEventListener('submit', (event) => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        const modalEl = form.closest('#crud-modal-backdrop, .app-modal-backdrop');
+        if (!modalEl) return;
+
+        event.preventDefault();
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const submitBtn = form.querySelector('button[type="submit"], .actions button.primary') || event.submitter;
+        const origBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="app-spinner" style="width:14px;height:14px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px;"></span> Menyimpan...';
+        }
+
+        const formData = new FormData(form);
+        formData.append('_ajax', '1');
+
+        fetch(form.action || window.location.href, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(async (res) => {
+            const contentType = res.headers.get('content-type') || '';
+            let data = null;
+            if (contentType.includes('application/json')) {
+                data = await res.json();
+            } else {
+                data = { ok: res.ok };
+            }
+            return { status: res.status, ok: res.ok, data };
+        })
+        .then(({ status, ok, data }) => {
+            if (!ok || (data && data.ok === false)) {
+                const errMsg = (data && data.error) ? data.error : 'Terjadi kesalahan saat menyimpan data.';
+                if (typeof window.showToast === 'function') {
+                    window.showToast(errMsg, 'danger');
+                } else {
+                    alert(errMsg);
+                }
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = origBtnHtml;
+                }
+                return;
+            }
+
+            // SUCCESS! Close modal and refresh table while keeping search intact
+            window.closeCrudModal(modalEl);
+
+            if (data && Array.isArray(data.flash) && data.flash.length > 0) {
+                data.flash.forEach(f => {
+                    const tone = (f.type === 'error' || f.type === 'danger') ? 'danger' : (f.type || 'success');
+                    if (typeof window.showToast === 'function') {
+                        window.showToast(f.message, tone);
+                    }
+                });
+            } else {
+                if (typeof window.showToast === 'function') {
+                    window.showToast('Data berhasil disimpan.', 'success');
+                }
+            }
+
+            refreshCurrentTable();
+        })
+        .catch(err => {
+            console.error(err);
+            if (typeof window.showToast === 'function') {
+                window.showToast('Gagal menghubungi server: ' + err.message, 'danger');
+            }
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = origBtnHtml;
+            }
+        });
+    });
+
+    // Delete row via AJAX (so deleting doesn't reload page and wipe search text)
+    document.addEventListener('submit', (event) => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        const isInTable = form.closest('.table-panel table, .row-actions');
+        const isDelete = form.classList.contains('app-form-delete') || form.querySelector('input[name="action"][value*="delete_"]');
+        if (!isInTable || !isDelete) return;
+
+        // If data-confirm is not yet approved, let confirm dialog handle it first
+        if (form.dataset.confirm && form.dataset.appConfirmApproved !== 'true') {
+            return;
+        }
+
+        event.preventDefault();
+        const row = form.closest('tr');
+        const formData = new FormData(form);
+        formData.append('_ajax', '1');
+
+        fetch(form.action || window.location.href, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(res => res.json().catch(() => ({ ok: res.ok })))
+        .then(data => {
+            if (data.ok === false) {
+                window.showToast(data.error || 'Gagal menghapus data.', 'danger');
+                return;
+            }
+            if (data.flash && Array.isArray(data.flash) && data.flash.length > 0) {
+                data.flash.forEach(f => window.showToast(f.message, (f.type === 'error' || f.type === 'danger') ? 'danger' : (f.type || 'success')));
+            } else {
+                window.showToast('Data berhasil dihapus.', 'success');
+            }
+            if (row) {
+                row.style.transition = 'opacity 0.22s, transform 0.22s';
+                row.style.opacity = '0';
+                row.style.transform = 'scale(0.96)';
+                setTimeout(() => {
+                    row.remove();
+                    const searchInput = document.querySelector('.table-search-input');
+                    if (searchInput) applyTableSearch(searchInput);
+                }, 220);
+            } else {
+                refreshCurrentTable();
+            }
+        })
+        .catch(err => {
+            window.showToast('Gagal menghapus: ' + err.message, 'danger');
         });
     });
 
@@ -156,24 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* ── Table Search ────────────────────────────────────── */
     document.querySelectorAll('.table-search-input').forEach((input) => {
-        const panel = input.closest('.table-panel');
-        if (!panel) return;
-        const tbody = panel.querySelector('tbody');
-        if (!tbody) return;
-        const rows = Array.from(tbody.querySelectorAll('tr'));
-        const emptyRow = rows.find((r) => r.querySelector('.empty'));
-        input.addEventListener('input', () => {
-            const q = input.value.toLowerCase().trim();
-            let visible = 0;
-            rows.forEach((row) => {
-                if (row === emptyRow) return;
-                const text = row.textContent.toLowerCase();
-                const match = q === '' || text.includes(q);
-                row.style.display = match ? '' : 'none';
-                if (match) visible++;
-            });
-            if (emptyRow) emptyRow.style.display = visible === 0 ? '' : 'none';
-        });
+        input.addEventListener('input', () => applyTableSearch(input));
     });
 
     /* ── User Dropdown ───────────────────────────────────── */

@@ -99,9 +99,9 @@ function row_actions(string $page, int $id, string $deleteAction): string
         return '<span class="hint">-</span>';
     }
     return '<div class="row-actions">'
-        . '<a class="button small" href="' . e(route_url($page, ['edit' => $id])) . '">'
+        . '<a class="button small app-btn-edit" data-crud-edit href="' . e(route_url($page, ['edit' => $id])) . '">'
         . '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit</a>'
-        . '<form method="post" data-confirm="Hapus data ini? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus data?" data-confirm-label="Ya, hapus" data-confirm-tone="danger">' . csrf_field()
+        . '<form method="post" class="app-form-delete" data-confirm="Hapus data ini? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus data?" data-confirm-label="Ya, hapus" data-confirm-tone="danger">' . csrf_field()
         . '<input type="hidden" name="action" value="' . e($deleteAction) . '"><input type="hidden" name="id" value="' . e($id) . '">'
         . '<button class="button small danger"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Hapus</button></form></div>';
 }
