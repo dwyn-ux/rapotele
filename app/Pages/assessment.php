@@ -397,6 +397,16 @@ function page_student_attendance(): void
         render_footer();
         return;
     }
+    $recordedMeetings = fetch_all(
+        'SELECT s.meeting_no, s.date, COUNT(e.id) as student_count
+         FROM student_attendance_sessions s
+         LEFT JOIN student_attendance_entries e ON e.session_id = s.id
+         WHERE s.assignment_id = ?
+         GROUP BY s.id
+         ORDER BY s.meeting_no ASC',
+        [(int)$assignment['id']]
+    );
+
     $session = fetch_one('SELECT * FROM student_attendance_sessions WHERE assignment_id = ? AND date = ? AND meeting_no = ?', [(int)$assignment['id'], $date, $meetingNo]);
     $teacherAttended = !empty($session['teacher_attended']);
     $students = fetch_all(
@@ -407,6 +417,32 @@ function page_student_attendance(): void
          ORDER BY s.name',
         [(int)($session['id'] ?? 0), (int)$assignment['class_id']]
     );
+
+    $hasEntries = false;
+    $summary = ['hadir' => 0, 'sakit' => 0, 'izin' => 0, 'alpa' => 0, 'terlambat' => 0];
+    $totalEntries = 0;
+    $lastUpdated = null;
+    if (!empty($session['id'])) {
+        $entryRows = fetch_all(
+            'SELECT status, COUNT(*) as cnt, MAX(updated_at) as last_updated
+             FROM student_attendance_entries
+             WHERE session_id = ?
+             GROUP BY status',
+            [(int)$session['id']]
+        );
+        foreach ($entryRows as $er) {
+            $st = (string)$er['status'];
+            $cnt = (int)$er['cnt'];
+            $totalEntries += $cnt;
+            if (isset($summary[$st])) {
+                $summary[$st] = $cnt;
+            }
+            if (!empty($er['last_updated']) && ($lastUpdated === null || $er['last_updated'] > $lastUpdated)) {
+                $lastUpdated = $er['last_updated'];
+            }
+        }
+        $hasEntries = ($totalEntries > 0);
+    }
 
     if ($teacherAttended): ?>
         <div class="panel" style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid var(--success, #10b981); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
@@ -442,7 +478,82 @@ function page_student_attendance(): void
         </div>
 
         <section class="panel">
-            <h3><?= e($assignment['class_name']) ?> - <?= e($assignment['subject_name']) ?></h3>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 1rem;">
+                <div>
+                    <h3 style="margin: 0;"><?= e($assignment['class_name']) ?> &bull; <?= e($assignment['subject_name']) ?></h3>
+                    <div style="font-size: 0.88rem; color: var(--text-muted); margin-top: 4px;">
+                        Pertemuan ke-<strong><?= e($meetingNo) ?></strong> &bull; <?= e(date('d F Y', strtotime($date))) ?>
+                    </div>
+                    <?php if (!empty($recordedMeetings)): ?>
+                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
+                            <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">Riwayat:</span>
+                            <?php foreach ($recordedMeetings as $rm): ?>
+                                <?php $isCurrent = ((int)$rm['meeting_no'] === (int)$meetingNo && $rm['date'] === $date); ?>
+                                <a href="<?= e(route_url('student-attendance', ['assignment_id' => (int)$assignment['id'], 'date' => $rm['date'], 'meeting_no' => (int)$rm['meeting_no']])) ?>"
+                                   style="text-decoration: none; padding: 2px 8px; border-radius: 999px; font-weight: 600; font-size: 11px; border: 1px solid <?= $isCurrent ? '#10b981' : '#cbd5e1' ?>; background: <?= $isCurrent ? '#dcfce7' : '#ffffff' ?>; color: <?= $isCurrent ? '#15803d' : '#475569' ?>; display: inline-flex; align-items: center; gap: 3px;">
+                                    <span>P-<?= (int)$rm['meeting_no'] ?> (<?= e(date('d/m', strtotime($rm['date']))) ?>)</span>
+                                    <?php if ((int)$rm['student_count'] > 0): ?>
+                                        <span style="color: #16a34a; font-weight: 700;">✓</span>
+                                    <?php endif; ?>
+                                </a>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                <div>
+                    <?php if ($hasEntries): ?>
+                        <span class="badge ok" style="font-size: 0.85rem; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px; background: #dcfce7; color: #15803d; border: 1px solid #86efac; border-radius: 999px;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            Sudah Diabsen
+                        </span>
+                    <?php else: ?>
+                        <span class="badge" style="font-size: 0.85rem; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 999px;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            Belum Diabsen
+                        </span>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <?php if ($hasEntries): ?>
+                <div class="attendance-banner saved" style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 12px; padding: 12px 16px; margin-bottom: 1.25rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <div style="font-size: 0.88rem; color: #166534;">
+                            <div style="font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                                <span>Status: Data Absensi Sudah Tersimpan</span>
+                                <?php if ($lastUpdated): ?>
+                                    <span style="font-weight: 400; opacity: 0.85;">(Diperbarui: <?= e(date('d/m/Y H:i', strtotime($lastUpdated))) ?> WIB)</span>
+                                <?php endif; ?>
+                            </div>
+                            <div style="margin-top: 2px; font-size: 0.82rem; color: #15803d;">
+                                ✏️ <em>Bisa diedit kapan saja</em> — langsung sesuaikan status/catatan siswa di bawah, lalu klik <strong>"Perbarui Absensi Siswa"</strong>.
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                            <span style="font-size: 0.8rem; font-weight: 700; background: #dcfce7; color: #15803d; padding: 3px 9px; border-radius: 999px; border: 1px solid #bbf7d0;">Hadir: <?= $summary['hadir'] ?></span>
+                            <?php if ($summary['sakit'] > 0): ?>
+                                <span style="font-size: 0.8rem; font-weight: 700; background: #fef3c7; color: #92400e; padding: 3px 9px; border-radius: 999px; border: 1px solid #fde68a;">Sakit: <?= $summary['sakit'] ?></span>
+                            <?php endif; ?>
+                            <?php if ($summary['izin'] > 0): ?>
+                                <span style="font-size: 0.8rem; font-weight: 700; background: #dbeafe; color: #1e40af; padding: 3px 9px; border-radius: 999px; border: 1px solid #bfdbfe;">Izin: <?= $summary['izin'] ?></span>
+                            <?php endif; ?>
+                            <?php if ($summary['alpa'] > 0): ?>
+                                <span style="font-size: 0.8rem; font-weight: 700; background: #fee2e2; color: #991b1b; padding: 3px 9px; border-radius: 999px; border: 1px solid #fecaca;">Alpa: <?= $summary['alpa'] ?></span>
+                            <?php endif; ?>
+                            <?php if ($summary['terlambat'] > 0): ?>
+                                <span style="font-size: 0.8rem; font-weight: 700; background: #ffedd5; color: #9a3412; padding: 3px 9px; border-radius: 999px; border: 1px solid #fed7aa;">Terlambat: <?= $summary['terlambat'] ?></span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            <?php else: ?>
+                <div class="attendance-banner unsaved" style="background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 12px; padding: 12px 16px; margin-bottom: 1.25rem;">
+                    <div style="font-size: 0.88rem; color: #475569;">
+                        <strong>Pertemuan ini belum pernah disimpan.</strong> Silakan atur kehadiran siswa di bawah, lalu klik <strong>"Simpan Absensi Siswa"</strong>.
+                    </div>
+                </div>
+            <?php endif; ?>
+
             <form method="post">
                 <?= csrf_field() ?><input type="hidden" name="action" value="save_student_attendance">
                 <input type="hidden" name="assignment_id" value="<?= e($assignment['id']) ?>">
@@ -473,7 +584,7 @@ function page_student_attendance(): void
                         </thead>
                         <tbody>
                             <?php foreach ($students as $student): ?>
-                                <tr class="attendance-row">
+                                <tr class="attendance-row" data-status="<?= e($student['status'] ?? 'hadir') ?>">
                                     <td class="cell-student">
                                         <div class="student-info">
                                             <span class="student-name"><?= e($student['name']) ?></span>
@@ -494,7 +605,12 @@ function page_student_attendance(): void
                         </tbody>
                     </table>
                 </div>
-                <div class="actions" style="margin-top: 16px;"><button class="button primary" style="width: 100%; max-width: 260px; height: 42px; font-weight: 600;">Simpan Absensi Siswa</button></div>
+                                <div class="actions" style="margin-top: 18px;">
+                    <button class="button primary" style="width: 100%; max-width: 280px; height: 44px; font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        <?= $hasEntries ? 'Perbarui Absensi Siswa' : 'Simpan Absensi Siswa' ?>
+                    </button>
+                </div>
             </form>
             <script>
             document.addEventListener('DOMContentLoaded', function () {
@@ -503,9 +619,23 @@ function page_student_attendance(): void
                     btn.addEventListener('click', function () {
                         document.querySelectorAll('.attendance-select').forEach(function (sel) {
                             sel.value = 'hadir';
+                            var row = sel.closest('.attendance-row');
+                            if (row) {
+                                row.setAttribute('data-status', 'hadir');
+                            }
                         });
                     });
                 }
+
+                // Realtime row color feedback on select change
+                document.querySelectorAll('.attendance-select').forEach(function (sel) {
+                    sel.addEventListener('change', function () {
+                        var row = sel.closest('.attendance-row');
+                        if (row) {
+                            row.setAttribute('data-status', sel.value);
+                        }
+                    });
+                });
             });
             </script>
         </section>
@@ -578,7 +708,7 @@ function page_student_attendance(): void
                     </thead>
                     <tbody>
                         <?php foreach ($students as $student): ?>
-                            <tr class="attendance-row">
+                            <tr class="attendance-row" data-status="<?= e($student['status'] ?? 'hadir') ?>">
                                 <td class="cell-student">
                                     <div class="student-info">
                                         <span class="student-name"><?= e($student['name']) ?></span>

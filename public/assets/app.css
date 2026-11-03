@@ -3942,3 +3942,20 @@ body.app-dialog-open { overflow: hidden; }
     gap: 6px !important;
   }
 }
+/* Attendance Card Status Highlighting */
+.attendance-row[data-status="sakit"] {
+  border-color: #f59e0b !important;
+  background: #fffdf5 !important;
+}
+.attendance-row[data-status="izin"] {
+  border-color: #3b82f6 !important;
+  background: #f8faff !important;
+}
+.attendance-row[data-status="alpa"] {
+  border-color: #ef4444 !important;
+  background: #fff5f5 !important;
+}
+.attendance-row[data-status="terlambat"] {
+  border-color: #f97316 !important;
+  background: #fff8f3 !important;
+}
