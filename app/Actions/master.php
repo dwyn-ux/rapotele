@@ -206,6 +206,53 @@ function action_save_class(): void
     redirect_to('classes');
 }
 
+function action_merge_kbm_classes(): void
+{
+    require_role(['admin']);
+    $groupName = trim((string)($_POST['group_name'] ?? ''));
+    $classIds = $_POST['class_ids'] ?? [];
+    if ($groupName === '') {
+        flash('error', 'Nama rombel fisik lapangan (KBM) wajib diisi.');
+        redirect_to('gabung-kelas');
+        return;
+    }
+    if (!is_array($classIds) || count($classIds) < 2) {
+        flash('error', 'Pilih minimal 2 kelas untuk digabung dalam 1 kelompok KBM.');
+        redirect_to('gabung-kelas');
+        return;
+    }
+    $cleanIds = array_filter(array_map('intval', $classIds));
+    if (count($cleanIds) < 2) {
+        flash('error', 'Pilihan kelas tidak valid.');
+        redirect_to('gabung-kelas');
+        return;
+    }
+    $placeholders = implode(',', array_fill(0, count($cleanIds), '?'));
+    execute_sql(
+        "UPDATE classes SET physical_group = ?, updated_at = ? WHERE id IN ($placeholders)",
+        array_merge([$groupName, now_string()], $cleanIds)
+    );
+    flash('success', "Berhasil menggabungkan " . count($cleanIds) . " kelas ke dalam rombel KBM '{$groupName}'.");
+    redirect_to('gabung-kelas');
+}
+
+function action_unmerge_kbm_classes(): void
+{
+    require_role(['admin']);
+    $groupName = trim((string)($_POST['group_name'] ?? ''));
+    if ($groupName === '') {
+        flash('error', 'Kelompok KBM tidak valid.');
+        redirect_to('gabung-kelas');
+        return;
+    }
+    execute_sql(
+        'UPDATE classes SET physical_group = NULL, updated_at = ? WHERE physical_group = ?',
+        [now_string(), $groupName]
+    );
+    flash('success', "Penggabungan rombel KBM '{$groupName}' berhasil dilepas.");
+    redirect_to('gabung-kelas');
+}
+
 function action_save_student(): void
 {
     require_role(['admin']);

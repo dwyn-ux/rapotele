@@ -659,6 +659,20 @@ function page_classes(): void
     $schools = fetch_all('SELECT id, name FROM school_profile ORDER BY name');
     $rows = fetch_all('SELECT c.*, t.name AS teacher_name, sp.name AS school_name FROM classes c LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id LEFT JOIN school_profile sp ON sp.id = c.school_id ORDER BY sp.name, c.grade, c.name');
     render_header('Data Kelas');
+    ?>
+    <div style="background: rgba(14, 165, 233, 0.08); border-left: 4px solid #0284c7; border-radius: 8px; padding: 10px 14px; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 0.88rem; color: #0369a1;">
+            <i data-lucide="link-2" style="width: 18px; height: 18px; flex-shrink: 0;"></i>
+            <div>
+                <strong>Sekolah Boarding / Kelas Paralel?</strong>
+                <span style="color: #0284c7;">Jika beberapa rombel Dapodik diajar bersamaan dalam 1 ruangan fisik, Anda bisa menggabungkannya secara cepat.</span>
+            </div>
+        </div>
+        <a href="<?= e(route_url('gabung-kelas')) ?>" class="button small secondary" style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600; text-decoration: none;">
+            <i data-lucide="users" style="width: 14px; height: 14px;"></i> Buka Menu Gabung Kelas
+        </a>
+    </div>
+    <?php
     input_panel_start($edit ? 'Edit Kelas' : 'Input Kelas', 'Tambah Kelas', (bool)$edit || isset($_GET['add']));
     ?>
         <form method="post" class="grid two form-body">
@@ -720,6 +734,156 @@ function page_classes(): void
         ?><td><?= e($row['school_name'] ?? '-') ?></td><td><strong><?= e($row['name']) ?></strong><?php if (!empty($row['report_name']) && $row['report_name'] !== $row['name']): ?><br><small style="color:var(--text-muted);font-size:0.82em;display:inline-flex;align-items:center;gap:3px;margin-top:2px;" title="Nama yang dicetak pada lembar rapor"><i data-lucide="printer" style="width:11px;height:11px"></i> Rapor: <strong><?= e($row['report_name']) ?></strong></small><?php endif; ?><?php if (!empty($row['physical_group'])): ?><br><small style="color:#0284c7;font-size:0.82em;display:inline-flex;align-items:center;gap:3px;margin-top:2px;" title="Digabung dalam KBM fisik/lapangan"><i data-lucide="users" style="width:11px;height:11px"></i> KBM: <strong><?= e($row['physical_group']) ?></strong></small><?php endif; ?></td><td><?= e($row['grade']) ?></td><td><?= e($row['level'] ?? '-') ?></td><td><?= e($row['major'] ?? '-') ?></td><td><?= e($row['teacher_name']) ?></td><td><?= e($count) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('classes', (int)$row['id'], 'delete_class') ?></td><?php
     }, '', true); ?>
     <?php render_footer();
+}
+
+function page_gabung_kelas(): void
+{
+    require_role(['admin']);
+
+    $classes = fetch_all(
+        'SELECT c.*, sp.name AS school_name, t.name AS teacher_name, 
+         (SELECT COUNT(*) FROM students s WHERE s.class_id = c.id AND s.active = 1) AS student_count
+         FROM classes c 
+         LEFT JOIN school_profile sp ON sp.id = c.school_id 
+         LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id
+         WHERE c.active = 1 
+         ORDER BY sp.name, c.grade, c.name'
+    );
+
+    $groupedClasses = [];
+    foreach ($classes as $c) {
+        $pg = trim((string)($c['physical_group'] ?? ''));
+        if ($pg !== '') {
+            $groupedClasses[$pg][] = $c;
+        }
+    }
+
+    render_header('Gabung Kelas KBM (Boarding)');
+    ?>
+    <section class="panel" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap;">
+            <div style="background: rgba(37, 99, 235, 0.1); color: #2563eb; width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <i data-lucide="link-2" style="width: 24px; height: 24px;"></i>
+            </div>
+            <div style="flex: 1; min-width: 280px;">
+                <h3 style="margin: 0 0 6px;">Penggabungan Rombel KBM (Boarding School / Paralel)</h3>
+                <p style="margin: 0; color: var(--text-muted); font-size: 0.9rem; line-height: 1.5;">
+                    Fitur ini digunakan bila di lapangan (boarding/pesantren) beberapa rombel Dapodik belajar bersama dalam <strong>1 ruang fisik KBM yang sama</strong> (misal <strong>X E1</strong> dan <strong>X E2</strong> digabung menjadi kelas lapangan <strong>X E</strong>).
+                </p>
+                <div style="margin-top: 10px; display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.85rem; color: #1e40af;">
+                    <span>✓ <strong>Cetak Rapor Tetap Sesuai Dapodik</strong> (Lembar fisik & TTD Wali Kelas masing-masing tidak berubah)</span>
+                    <span>✓ <strong>Guru Cukup Absen & Input Nilai 1 Kali</strong> (Otomatis tersalurkan ke masing-masing rombel)</span>
+                    <span>✓ <strong>Jadwal Pelajaran Bebas Bentrok Jam</strong></span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Form Gabung Kelas Baru -->
+    <section class="panel" style="margin-bottom: 1.5rem;">
+        <h4 style="margin: 0 0 1rem; display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="plus-circle" style="width: 18px; height: 18px; color: var(--primary);"></i>
+            Gabungkan Kelas KBM Baru
+        </h4>
+        <form method="post" class="form-body">
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="merge_kbm_classes">
+
+            <div class="grid two" style="margin-bottom: 1rem;">
+                <label>
+                    <span class="field-icon"><i data-lucide="tag"></i> Nama Rombel Fisik Lapangan (KBM Bersama) <span style="color:#c00">*</span></span>
+                    <input type="text" name="group_name" required placeholder="Contoh: X E (untuk rombel X E1 & X E2)">
+                    <small style="color: var(--text-muted); font-size: 0.8rem; display: block; margin-top: 3px;">
+                        Nama ruangan/kelas fisik yang digunakan guru saat KBM harian di lapangan.
+                    </small>
+                </label>
+            </div>
+
+            <div style="margin-bottom: 1.25rem;">
+                <span style="font-size: 0.9rem; font-weight: 600; display: block; margin-bottom: 8px;">
+                    Pilih Minimal 2 Kelas yang Ingin Digabung: <span style="color:#c00">*</span>
+                </span>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; max-height: 280px; overflow-y: auto; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-secondary);">
+                    <?php foreach ($classes as $c): ?>
+                        <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 0.88rem; cursor: pointer; padding: 6px 10px; background: #fff; border: 1px solid var(--border); border-radius: 6px;">
+                            <input type="checkbox" name="class_ids[]" value="<?= (int)$c['id'] ?>">
+                            <span style="flex: 1;">
+                                <strong><?= e($c['name']) ?></strong>
+                                <small style="color: var(--text-muted); display: block; font-size: 0.78rem;">
+                                    Tingkat <?= e($c['grade']) ?> &bull; <?= e($c['student_count']) ?> Siswa &bull; Wali: <?= e($c['teacher_name'] ?? '-') ?>
+                                    <?php if (!empty($c['physical_group'])): ?>
+                                        <span style="color: #0284c7; font-weight: 600;">(Saat ini: <?= e($c['physical_group']) ?>)</span>
+                                    <?php endif; ?>
+                                </small>
+                            </span>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button type="submit" class="button primary" style="display: inline-flex; align-items: center; gap: 6px;">
+                    <i data-lucide="link-2" style="width: 16px; height: 16px;"></i>
+                    Gabungkan Kelas Terpilih
+                </button>
+                <a href="<?= e(route_url('classes')) ?>" class="button">Kembali ke Data Kelas</a>
+            </div>
+        </form>
+    </section>
+
+    <!-- Daftar Kelas yang Sedang Digabung -->
+    <section class="panel">
+        <h4 style="margin: 0 0 1rem; display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="list" style="width: 18px; height: 18px; color: var(--primary);"></i>
+            Daftar Rombel KBM yang Sedang Digabung (<?= count($groupedClasses) ?> Kelompok)
+        </h4>
+        <?php if (empty($groupedClasses)): ?>
+            <p class="empty" style="padding: 1.5rem; text-align: center; color: var(--text-muted);">
+                Belum ada kelas yang digabung. Silakan pilih kelas pada form di atas untuk menggabungkan rombel KBM.
+            </p>
+        <?php else: ?>
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+                <?php foreach ($groupedClasses as $groupName => $gClasses): ?>
+                    <?php 
+                        $totalSiswa = array_sum(array_column($gClasses, 'student_count'));
+                    ?>
+                    <div style="border: 1px solid var(--border); border-left: 4px solid #0284c7; border-radius: 8px; padding: 14px 18px; background: #fff; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 1.1rem; font-weight: 700; color: #0369a1;">
+                                    <?= e($groupName) ?>
+                                </span>
+                                <span class="badge" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-weight: 600;">
+                                    <?= count($gClasses) ?> Rombel Dapodik &bull; Total <?= $totalSiswa ?> Siswa
+                                </span>
+                            </div>
+                            <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                                <span style="font-size: 0.82rem; color: var(--text-muted);">Rombel Tergabung:</span>
+                                <?php foreach ($gClasses as $gc): ?>
+                                    <span style="font-size: 0.82rem; padding: 3px 10px; border-radius: 999px; background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; display: inline-flex; align-items: center; gap: 4px;">
+                                        <strong><?= e($gc['name']) ?></strong> (<?= e($gc['student_count']) ?> siswa &bull; Wali: <?= e($gc['teacher_name'] ?? '-') ?>)
+                                    </span>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <div>
+                            <form method="post" style="margin: 0;" onsubmit="return confirm('Lepas penggabungan rombel KBM <?= e(addslashes($groupName)) ?>? Kelas-kelas di dalamnya akan kembali berdiri mandiri.');">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="action" value="unmerge_kbm_classes">
+                                <input type="hidden" name="group_name" value="<?= e($groupName) ?>">
+                                <button type="submit" class="button small danger" style="display: inline-flex; align-items: center; gap: 4px;">
+                                    <i data-lucide="unlink" style="width: 14px; height: 14px;"></i>
+                                    Lepas Gabungan
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </section>
+    <?php
+    render_footer();
 }
 
 function page_students(): void

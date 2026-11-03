@@ -14,6 +14,7 @@ function render_header(string $title): void
             'teachers' => ['Data Guru', 'teachers', 'users'],
             'students' => ['Data Siswa', 'students', 'graduation-cap'],
             'classes' => ['Data Kelas', 'classes', 'school'],
+            'gabung-kelas' => ['Gabung Kelas (Boarding)', 'gabung-kelas', 'link-2'],
             'subjects' => ['Data Mapel', 'subjects', 'book-open'],
             'assignments' => ['Data Pembelajaran', 'assignments', 'file-text'],
             'data-ekskul' => ['Data Ekskul', 'data-ekskul', 'trophy'],
@@ -100,7 +101,7 @@ function render_header(string $title): void
 
     if (!is_admin()) {
         foreach ([
-            'update-data', 'teachers', 'classes', 'subjects', 'data-ekskul', 'data-kelompok',
+            'update-data', 'teachers', 'classes', 'gabung-kelas', 'subjects', 'data-ekskul', 'data-kelompok',
             'gabung-mapel', 'data-mapping', 'data-logo-ttd', 'tanggal-rapor', 'foto-siswa',
             'tema-kokurikuler', 'kegiatan-kokurikuler', 'kelompok-kokurikuler', 'input-kelulusan',
             'import-nomor-ijazah', 'setting-transkrip', 'setting-skl', 'mapping-mapel-skl',

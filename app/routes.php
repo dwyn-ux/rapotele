@@ -21,6 +21,7 @@ return [
         'teachers' => 'page_teachers',
         'students' => 'page_students',
         'classes' => 'page_classes',
+        'gabung-kelas' => 'page_gabung_kelas',
         'subjects' => 'page_subjects',
         'assignments' => 'page_assignments',
         'data-ekskul' => 'page_data_ekskul',

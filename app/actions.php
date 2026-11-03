@@ -9,6 +9,8 @@ return [
     'delete_teacher' => fn (): mixed => action_delete('teachers', 'teachers'),
     'save_class' => 'action_save_class',
     'delete_class' => fn (): mixed => action_delete('classes', 'classes'),
+    'merge_kbm_classes' => 'action_merge_kbm_classes',
+    'unmerge_kbm_classes' => 'action_unmerge_kbm_classes',
     'save_student' => 'action_save_student',
     'delete_student' => fn (): mixed => action_delete('students', 'students'),
     'save_subject' => 'action_save_subject',
