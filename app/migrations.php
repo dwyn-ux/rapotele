@@ -1030,6 +1030,8 @@ function run_migrations_locked(): void
     migration_add_column('student_attendance_sessions', 'teacher_time_in', 'TIME NULL');
     migration_add_column('student_attendance_sessions', 'teacher_notes', 'TEXT NULL');
     migration_add_column('student_attendance_sessions', 'teacher_attended_at', 'DATETIME NULL');
+    migration_add_column('student_attendance_sessions', 'teacher_lat', 'DECIMAL(10,8) NULL');
+    migration_add_column('student_attendance_sessions', 'teacher_lng', 'DECIMAL(11,8) NULL');
     if (table_exists('student_attendance_sessions') && table_exists('student_attendance_entries')) {
         try {
             execute_sql("UPDATE student_attendance_sessions SET teacher_attended = 1 WHERE (teacher_attended IS NULL OR teacher_attended = 0) AND id IN (SELECT DISTINCT session_id FROM student_attendance_entries)");

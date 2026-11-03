@@ -456,6 +456,9 @@ function page_student_attendance(): void
                         Guru: <strong><?= e($assignment['teacher_name'] ?? 'Guru Pengampu') ?></strong> &bull;
                         Jam Masuk: <strong><?= e(substr((string)($session['teacher_time_in'] ?? '-'), 0, 5)) ?></strong> &bull;
                         Status: <strong><?= e(ucfirst((string)($session['teacher_status'] ?? 'Hadir'))) ?></strong>
+                        <?php if (!empty($session['teacher_lat']) && !empty($session['teacher_lng'])): ?>
+                            &bull; <span style="display: inline-flex; align-items: center; gap: 3px; font-weight: 600;">📍 Lokasi Terverifikasi</span>
+                        <?php endif; ?>
                         <?php if (!empty($session['teacher_notes'])): ?>
                             &bull; Catatan: <em><?= e($session['teacher_notes']) ?></em>
                         <?php endif; ?>
@@ -652,12 +655,14 @@ function page_student_attendance(): void
                     <p style="margin: 0 0 14px 0; color: #78350f; font-size: 0.92rem; line-height: 1.45;">
                         Sebelum melakukan absensi santri/siswa pada <strong><?= e($assignment['class_name']) ?> &bull; <?= e($assignment['subject_name']) ?></strong> (Pertemuan <?= e($meetingNo) ?>), <strong>guru pengampu wajib melakukan absen hadir di kelas</strong> terlebih dahulu.
                     </p>
-                    <form method="post" class="grid four" style="align-items: flex-end; gap: 12px; margin: 0;">
+                    <form method="post" id="form-teacher-classroom" class="grid four" style="align-items: flex-end; gap: 12px; margin: 0;">
                         <?= csrf_field() ?>
                         <input type="hidden" name="action" value="checkin_teacher_classroom">
                         <input type="hidden" name="assignment_id" value="<?= e($assignment['id']) ?>">
                         <input type="hidden" name="date" value="<?= e($date) ?>">
                         <input type="hidden" name="meeting_no" value="<?= e($meetingNo) ?>">
+                        <input type="hidden" name="lat" id="classroom-lat">
+                        <input type="hidden" name="lng" id="classroom-lng">
                         <label style="margin: 0;">
                             <span style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px; color: #92400e;">Status Kehadiran</span>
                             <select name="teacher_status">
@@ -674,11 +679,42 @@ function page_student_attendance(): void
                             <input type="text" name="teacher_notes" placeholder="Materi / info pengganti">
                         </label>
                         <div style="margin: 0;">
-                            <button type="submit" class="button primary" style="width: 100%; height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; background: #d97706; border-color: #d97706;">
+                            <button type="submit" id="classroom-checkin-btn" class="button primary" style="width: 100%; height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; background: #d97706; border-color: #d97706;">
                                 <i data-lucide="check-circle"></i> Hadir di Kelas
                             </button>
                         </div>
                     </form>
+                    <div id="classroom-geo-status" style="margin-top: 10px; font-size: 0.83rem; display: flex; align-items: center; gap: 6px; color: #92400e; font-weight: 500;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+                        <span>Mendeteksi lokasi GPS Anda...</span>
+                    </div>
+                    <script>
+                    document.addEventListener('DOMContentLoaded', function () {
+                        var geoStatus = document.getElementById('classroom-geo-status');
+                        var latInput = document.getElementById('classroom-lat');
+                        var lngInput = document.getElementById('classroom-lng');
+                        if (!geoStatus || !latInput || !lngInput) return;
+
+                        if (!navigator.geolocation) {
+                            geoStatus.innerHTML = '<span style="color:#b91c1c;">⚠️ Browser tidak mendukung Geolocation GPS.</span>';
+                            return;
+                        }
+
+                        navigator.geolocation.getCurrentPosition(
+                            function (pos) {
+                                var lat = pos.coords.latitude;
+                                var lng = pos.coords.longitude;
+                                latInput.value = lat;
+                                lngInput.value = lng;
+                                geoStatus.innerHTML = '<span style="color:#15803d; font-weight:600; display:inline-flex; align-items:center; gap:4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Lokasi terdeteksi (' + lat.toFixed(5) + ', ' + lng.toFixed(5) + ')</span>';
+                            },
+                            function (err) {
+                                geoStatus.innerHTML = '<span style="color:#b91c1c;">⚠️ Gagal mendeteksi lokasi: ' + err.message + '. Pastikan GPS aktif dan izin lokasi diizinkan di browser.</span>';
+                            },
+                            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                        );
+                    });
+                    </script>
                 </div>
             </div>
         </section>
