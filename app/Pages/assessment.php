@@ -450,19 +450,64 @@ function page_student_attendance(): void
                 <input type="hidden" name="meeting_no" value="<?= e($meetingNo) ?>">
                 <label>Topik Pertemuan <input type="text" name="topic" value="<?= e($session['topic'] ?? '') ?>" placeholder="Misal: Pecahan sederhana"></label>
                 <label class="checkbox"><input type="checkbox" name="queue_whatsapp_absence" value="1"> Tambahkan WA untuk siswa selain hadir</label>
-                <div class="table-wrap">
-                    <table><thead><tr><th>Nama Siswa</th><th>NIS</th><th>Status</th><th>Catatan</th></tr></thead><tbody>
-                        <?php foreach ($students as $student): ?>
-                            <tr>
-                                <td><?= e($student['name']) ?></td><td><?= e($student['nis']) ?></td>
-                                <td><select name="status[<?= e($student['id']) ?>]"><?= options(allowed_statuses(), $student['status'] ?? 'hadir') ?></select></td>
-                                <td><input type="text" name="notes[<?= e($student['id']) ?>]" value="<?= e($student['notes']) ?>"></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody></table>
+                <div class="attendance-actions-bar" style="display: flex; justify-content: space-between; align-items: center; margin: 16px 0 12px; flex-wrap: wrap; gap: 8px;">
+                    <div style="font-size: 0.88rem; color: var(--text-muted); font-weight: 500;">
+                        Daftar Siswa (<strong><?= count($students) ?> Siswa</strong>)
+                    </div>
+                    <div>
+                        <button type="button" class="button small secondary" id="btn-set-all-hadir" style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.82rem; padding: 5px 12px; border-radius: var(--radius-md);">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg>
+                            Set Semua Hadir
+                        </button>
+                    </div>
                 </div>
-                <div class="actions"><button class="button primary">Simpan Absensi Siswa</button></div>
+                <div class="table-wrap attendance-table-wrap">
+                    <table class="attendance-table">
+                        <thead>
+                            <tr>
+                                <th>Nama Siswa</th>
+                                <th class="cell-nis-desktop">NIS</th>
+                                <th>Status</th>
+                                <th>Catatan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($students as $student): ?>
+                                <tr class="attendance-row">
+                                    <td class="cell-student">
+                                        <div class="student-info">
+                                            <span class="student-name"><?= e($student['name']) ?></span>
+                                            <span class="student-nis">NIS: <?= e($student['nis']) ?></span>
+                                        </div>
+                                    </td>
+                                    <td class="cell-nis-desktop"><?= e($student['nis']) ?></td>
+                                    <td class="cell-status">
+                                        <select name="status[<?= e($student['id']) ?>]" class="attendance-select">
+                                            <?= options(allowed_statuses(), $student['status'] ?? 'hadir') ?>
+                                        </select>
+                                    </td>
+                                    <td class="cell-notes">
+                                        <input type="text" name="notes[<?= e($student['id']) ?>]" value="<?= e($student['notes']) ?>" placeholder="Catatan (opsional)" class="attendance-notes-input">
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="actions" style="margin-top: 16px;"><button class="button primary" style="width: 100%; max-width: 260px; height: 42px; font-weight: 600;">Simpan Absensi Siswa</button></div>
             </form>
+            <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                var btn = document.getElementById('btn-set-all-hadir');
+                if (btn) {
+                    btn.addEventListener('click', function () {
+                        document.querySelectorAll('.attendance-select').forEach(function (sel) {
+                            sel.value = 'hadir';
+                        });
+                    });
+                }
+            });
+            </script>
         </section>
     <?php else: ?>
         <section class="panel" style="border: 2px solid #f59e0b; background: #fffbeb; border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem;">
@@ -521,16 +566,36 @@ function page_student_attendance(): void
                 </div>
             </div>
             <h3><?= e($assignment['class_name']) ?> - <?= e($assignment['subject_name']) ?></h3>
-            <div class="table-wrap" style="opacity: 0.35;">
-                <table><thead><tr><th>Nama Siswa</th><th>NIS</th><th>Status</th><th>Catatan</th></tr></thead><tbody>
-                    <?php foreach ($students as $student): ?>
+            <div class="table-wrap attendance-table-wrap" style="opacity: 0.35;">
+                <table class="attendance-table">
+                    <thead>
                         <tr>
-                            <td><?= e($student['name']) ?></td><td><?= e($student['nis']) ?></td>
-                            <td><select disabled><option>hadir</option></select></td>
-                            <td><input type="text" disabled></td>
+                            <th>Nama Siswa</th>
+                            <th class="cell-nis-desktop">NIS</th>
+                            <th>Status</th>
+                            <th>Catatan</th>
                         </tr>
-                    <?php endforeach; ?>
-                </tbody></table>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($students as $student): ?>
+                            <tr class="attendance-row">
+                                <td class="cell-student">
+                                    <div class="student-info">
+                                        <span class="student-name"><?= e($student['name']) ?></span>
+                                        <span class="student-nis">NIS: <?= e($student['nis']) ?></span>
+                                    </div>
+                                </td>
+                                <td class="cell-nis-desktop"><?= e($student['nis']) ?></td>
+                                <td class="cell-status">
+                                    <select class="attendance-select" disabled><option>hadir</option></select>
+                                </td>
+                                <td class="cell-notes">
+                                    <input type="text" class="attendance-notes-input" disabled>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
             </div>
         </section>
     <?php endif;

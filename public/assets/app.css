@@ -3750,3 +3750,195 @@ body.app-dialog-open { overflow: hidden; }
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+/* ── Attendance Table & Mobile Responsive Cards ────────── */
+.attendance-table-wrap {
+  width: 100%;
+}
+
+.attendance-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 600px;
+}
+
+.attendance-table th,
+.attendance-table td {
+  padding: 10px 14px;
+  vertical-align: middle;
+}
+
+.attendance-table .student-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.attendance-table .student-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.attendance-table .student-nis {
+  display: none;
+}
+
+.attendance-select {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.attendance-select:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-lighter);
+}
+
+.attendance-notes-input {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  font-size: 13px;
+  color: var(--text);
+  transition: border-color var(--transition-fast);
+}
+
+.attendance-notes-input:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-lighter);
+}
+
+/* Status colors in dropdown */
+.attendance-select option[value="hadir"] { color: #166534; font-weight: 600; }
+.attendance-select option[value="sakit"] { color: #854d0e; font-weight: 600; }
+.attendance-select option[value="izin"] { color: #1e40af; font-weight: 600; }
+.attendance-select option[value="alpa"] { color: #991b1b; font-weight: 600; }
+.attendance-select option[value="terlambat"] { color: #c2410c; font-weight: 600; }
+
+@media (max-width: 768px) {
+  .attendance-table-wrap {
+    overflow-x: visible !important;
+  }
+
+  .attendance-table {
+    min-width: 0 !important;
+    width: 100% !important;
+    display: block !important;
+    border: none !important;
+  }
+
+  .attendance-table thead {
+    display: none !important;
+  }
+
+  .attendance-table tbody {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  .attendance-row {
+    display: grid !important;
+    grid-template-columns: 125px 1fr !important;
+    gap: 8px !important;
+    background: #ffffff !important;
+    border: 1px solid rgba(226, 232, 240, 0.95) !important;
+    border-radius: 14px !important;
+    padding: 12px 14px !important;
+    box-shadow: 0 2px 6px -1px rgba(15, 23, 42, 0.05) !important;
+    transition: all 0.2s ease !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+  }
+
+  .attendance-row:focus-within {
+    border-color: var(--primary) !important;
+    box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.12) !important;
+  }
+
+  .attendance-row td {
+    display: block !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  .attendance-row .cell-student {
+    grid-column: 1 / -1 !important;
+  }
+
+  .attendance-table .student-info {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .attendance-table .student-name {
+    font-size: 13.5px !important;
+    font-weight: 700 !important;
+    color: var(--text) !important;
+    line-height: 1.35 !important;
+    word-break: break-word !important;
+  }
+
+  .attendance-table .student-nis {
+    display: inline-flex !important;
+    align-items: center !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: #475569 !important;
+    background: #f1f5f9 !important;
+    padding: 2px 8px !important;
+    border-radius: 999px !important;
+    letter-spacing: 0.02em !important;
+    flex-shrink: 0 !important;
+  }
+
+  .attendance-row .cell-nis-desktop {
+    display: none !important;
+  }
+
+  .attendance-row .cell-status {
+    grid-column: 1 !important;
+  }
+
+  .attendance-row .cell-notes {
+    grid-column: 2 !important;
+    min-width: 0 !important;
+  }
+
+  .attendance-select {
+    font-size: 12.5px !important;
+    height: 38px !important;
+    padding: 0 6px !important;
+  }
+
+  .attendance-notes-input {
+    font-size: 12.5px !important;
+    height: 38px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .attendance-row {
+    grid-template-columns: 110px 1fr !important;
+    padding: 10px 12px !important;
+    gap: 6px !important;
+  }
+}
