@@ -25,25 +25,31 @@ function render_header(string $title): void
             'foto-siswa' => ['Foto Siswa', 'foto-siswa', 'camera'],
             'import-bulk' => ['Import Bulk (CSV)', 'import-bulk', 'upload'],
         ],
-        'Kokurikuler' => [
-            'tema-kokurikuler' => ['Daftar Tema', 'tema-kokurikuler', 'palette'],
-            'kegiatan-kokurikuler' => ['Kegiatan Kokurikuler', 'kegiatan-kokurikuler', 'target'],
-            'kelompok-kokurikuler' => ['Kelompok Kokurikuler', 'kelompok-kokurikuler', 'users'],
+        'Jadwal & Pembelajaran' => [
+            'lesson-schedule' => ['Jadwal Pelajaran', 'lesson-schedule', 'calendar-days'],
+            'journals' => ['Jurnal Harian', 'journals', 'book'],
+        ],
+        'Presensi & Absensi' => [
+            'student-attendance' => ['Absensi Siswa/Mapel', 'student-attendance', 'clipboard-check'],
+            'teacher-attendance-self' => ['Absensi Kehadiran Guru', 'teacher-attendance-self', 'clock'],
+            'teacher-attendance' => ['Rekap Absensi Mengajar', 'teacher-attendance', 'check-square'],
         ],
         'Penilaian' => [
             'data-tp' => ['Tujuan Pembelajaran', 'data-tp', 'compass'],
             'status-penilaian' => ['Status Penilaian', 'status-penilaian', 'bar-chart'],
             'grades' => ['Input Nilai', 'grades', 'pencil'],
             'deskripsi-nilai' => ['Deskripsi Nilai', 'deskripsi-nilai', 'file-text'],
-            'student-attendance' => ['Absensi Siswa/Mapel', 'student-attendance', 'clipboard-check'],
-            'teacher-attendance' => ['Absensi Mengajar', 'teacher-attendance', 'check-square'],
-            'teacher-attendance-self' => ['Absensi Kehadiran Guru', 'teacher-attendance-self', 'clock'],
-            'lesson-schedule' => ['Jadwal Pelajaran', 'lesson-schedule', 'calendar-days'],
-            'journals' => ['Jurnal Harian', 'journals', 'book'],
-            'violations' => ['Pelanggaran Siswa', 'violations', 'alert-triangle'],
-            'violation-rules' => ['Pasal & SP', 'violation-rules', 'book-open'],
             'input-nilai-ekskul' => ['Input Nilai Ekskul', 'input-nilai-ekskul', 'award'],
             'naik-kelas' => ['Keterangan Naik Kelas', 'naik-kelas', 'arrow-up-circle'],
+        ],
+        'Kokurikuler' => [
+            'tema-kokurikuler' => ['Daftar Tema', 'tema-kokurikuler', 'palette'],
+            'kegiatan-kokurikuler' => ['Kegiatan Kokurikuler', 'kegiatan-kokurikuler', 'target'],
+            'kelompok-kokurikuler' => ['Kelompok Kokurikuler', 'kelompok-kokurikuler', 'users'],
+        ],
+        'Kedisiplinan & BK' => [
+            'violations' => ['Pelanggaran Siswa', 'violations', 'alert-triangle'],
+            'violation-rules' => ['Pasal & SP', 'violation-rules', 'book-open'],
         ],
         'Cetak Rapor' => [
             'cetak-pelengkap-rapor' => ['Cetak Biodata', 'cetak-pelengkap-rapor', 'file-text'],
@@ -108,12 +114,13 @@ function render_header(string $title): void
         }
     } else {
         $menuGroups['Pengaturan']['users'] = ['Data Pengguna', 'users', 'shield'];
-        if (!function_exists('is_bk') || !is_bk()) {
-            foreach ($menuGroups as &$groupItems) {
-                unset($groupItems['violations']);
-            }
-            unset($groupItems);
+    }
+
+    if (!function_exists('is_bk') || !is_bk()) {
+        foreach ($menuGroups as &$groupItems) {
+            unset($groupItems['violations']);
         }
+        unset($groupItems);
     }
     $menuGroups['Pengaturan']['profile'] = ['Profil Pengguna', 'profile', 'user'];
 
