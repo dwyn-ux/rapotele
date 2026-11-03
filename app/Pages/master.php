@@ -172,7 +172,7 @@ function page_school(): void
                 <div class="school-form-grid three-col">
                     <div class="school-form-group">
                         <label class="school-label">Radius Absensi (meter)</label>
-                        <input type="number" min="0" class="school-input" name="attendance_radius_meters" value="<?= e($school['attendance_radius_meters'] ?? '500') ?>" placeholder="500">
+                        <input type="number" min="0" class="school-input" name="attendance_radius_meters" id="school_radius" value="<?= e($school['attendance_radius_meters'] ?? '500') ?>" placeholder="500">
                     </div>
                     <div class="school-form-group">
                         <label class="school-label">Jam Pelajaran Normal (menit)</label>
@@ -232,9 +232,15 @@ function page_school(): void
                 </div>
 
                 <!-- Map -->
-                <div class="school-subsection-divider">
-                    <span>Peta Lokasi Sekolah</span>
-                    <small>(klik peta untuk set lokasi)</small>
+                <div class="school-subsection-divider" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <span>Peta Lokasi Sekolah</span>
+                        <small>(klik atau geser pin untuk set titik koordinat)</small>
+                    </div>
+                    <button type="button" id="btn-detect-school-location" class="button small secondary" style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.8rem; padding: 4px 10px; border-radius: var(--radius-md);">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+                        Gunakan Lokasi Saya Saat Ini
+                    </button>
                 </div>
                 <div class="school-map-wrap">
                     <div id="school-map"></div>
@@ -266,24 +272,117 @@ function page_school(): void
 
     <script>
     (function(){
-        var lat = parseFloat(document.getElementById('school_lat').value) || -2.5;
-        var lng = parseFloat(document.getElementById('school_lng').value) || 118.0;
-        var map = L.map('school-map').setView([lat, lng], 13);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+        var latInput = document.getElementById('school_lat');
+        var lngInput = document.getElementById('school_lng');
+        var radiusInput = document.getElementById('school_radius');
+
+        var hasCoord = (latInput.value.trim() !== '' && lngInput.value.trim() !== '');
+        var lat = parseFloat(latInput.value) || -2.5;
+        var lng = parseFloat(lngInput.value) || 118.0;
+        var initialZoom = hasCoord ? 16 : 5;
+
+        var map = L.map('school-map').setView([lat, lng], initialZoom);
+
+        // OpenStreetMap tile layer (100% Free, No API Key Required)
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
         }).addTo(map);
-        var icon = L.divIcon({html:'<svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 0C5.6 0 0 5.6 0 12.5S12.5 41 12.5 41 25 19.4 25 12.5 19.4 0 12.5 0z" fill="#2563EB"/><circle cx="12.5" cy="12.5" r="5" fill="#fff"/></svg>', className:'', iconSize:[25,41], iconAnchor:[12,41]});
-        var marker = (document.getElementById('school_lat').value && document.getElementById('school_lng').value)
-            ? L.marker([lat, lng], {icon:icon}).addTo(map) : null;
-        map.on('click', function(e){
-            var mlat = e.latlng.lat.toFixed(8);
-            var mlng = e.latlng.lng.toFixed(8);
-            document.getElementById('school_lat').value = mlat;
-            document.getElementById('school_lng').value = mlng;
-            if(marker){ marker.setLatLng(e.latlng); }
-            else { marker = L.marker(e.latlng, {icon:icon}).addTo(map); }
+
+        var icon = L.divIcon({
+            html: '<svg width="28" height="42" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 0C5.6 0 0 5.6 0 12.5S12.5 41 12.5 41 25 19.4 25 12.5 19.4 0 12.5 0z" fill="#2563EB" stroke="#ffffff" stroke-width="1.5"/><circle cx="12.5" cy="12.5" r="5" fill="#fff"/></svg>',
+            className: '',
+            iconSize: [28, 42],
+            iconAnchor: [14, 42]
         });
-        setTimeout(function(){ map.invalidateSize(); }, 200);
+
+        var marker = hasCoord ? L.marker([lat, lng], {icon: icon, draggable: true}).addTo(map) : null;
+        var radiusCircle = null;
+
+        function updateRadiusCircle(pos) {
+            var r = parseInt(radiusInput ? radiusInput.value : 500, 10) || 500;
+            if (radiusCircle) {
+                radiusCircle.setLatLng(pos);
+                radiusCircle.setRadius(r);
+            } else {
+                radiusCircle = L.circle(pos, {
+                    radius: r,
+                    color: '#2563eb',
+                    fillColor: '#3b82f6',
+                    fillOpacity: 0.15,
+                    weight: 1.5
+                }).addTo(map);
+            }
+        }
+
+        if (hasCoord) {
+            updateRadiusCircle([lat, lng]);
+        }
+
+        function setCoordinates(cLat, cLng, zoomTo) {
+            latInput.value = cLat.toFixed(8);
+            lngInput.value = cLng.toFixed(8);
+            if (marker) {
+                marker.setLatLng([cLat, cLng]);
+            } else {
+                marker = L.marker([cLat, cLng], {icon: icon, draggable: true}).addTo(map);
+                marker.on('dragend', function(e){
+                    var pos = e.target.getLatLng();
+                    setCoordinates(pos.lat, pos.lng, false);
+                });
+            }
+            updateRadiusCircle([cLat, cLng]);
+            if (zoomTo) {
+                map.setView([cLat, cLng], 17);
+            }
+        }
+
+        if (marker) {
+            marker.on('dragend', function(e){
+                var pos = e.target.getLatLng();
+                setCoordinates(pos.lat, pos.lng, false);
+            });
+        }
+
+        map.on('click', function(e){
+            setCoordinates(e.latlng.lat, e.latlng.lng, false);
+        });
+
+        if (radiusInput) {
+            radiusInput.addEventListener('input', function() {
+                if (marker) {
+                    updateRadiusCircle(marker.getLatLng());
+                }
+            });
+        }
+
+        // "Gunakan Lokasi Saya Saat Ini" button
+        var btnDetect = document.getElementById('btn-detect-school-location');
+        if (btnDetect && navigator.geolocation) {
+            btnDetect.addEventListener('click', function() {
+                var originalHtml = btnDetect.innerHTML;
+                btnDetect.disabled = true;
+                btnDetect.textContent = 'Mencari lokasi GPS...';
+                navigator.geolocation.getCurrentPosition(
+                    function(pos) {
+                        var ulat = pos.coords.latitude;
+                        var ulng = pos.coords.longitude;
+                        setCoordinates(ulat, ulng, true);
+                        btnDetect.disabled = false;
+                        btnDetect.innerHTML = '<span style="color:#15803d; font-weight:600;">✓ Lokasi Terpasang!</span>';
+                        setTimeout(function() { btnDetect.innerHTML = originalHtml; }, 3000);
+                    },
+                    function(err) {
+                        btnDetect.disabled = false;
+                        btnDetect.textContent = 'Gagal: ' + err.message;
+                        setTimeout(function() { btnDetect.innerHTML = originalHtml; }, 3000);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            });
+        }
+
+        setTimeout(function(){ map.invalidateSize(); }, 250);
     })();
     </script>
     <?php
