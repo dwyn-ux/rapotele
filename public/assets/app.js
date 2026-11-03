@@ -99,6 +99,14 @@ document.addEventListener('DOMContentLoaded', () => {
         modalEl.hidden = false;
         modalEl.classList.remove('is-closing');
         modalEl.classList.add('is-open');
+        const dialog = modalEl.querySelector('.app-modal-dialog') || modalEl;
+        dialog.classList.add('is-open');
+        const bodyEl = modalEl.querySelector('#crud-modal-body, .app-modal-body');
+        if (bodyEl) {
+            bodyEl.style.display = 'block';
+            bodyEl.style.visibility = 'visible';
+            bodyEl.style.opacity = '1';
+        }
         document.body.classList.add('app-modal-open');
         const firstInput = modalEl.querySelector('input:not([type="hidden"]), select, textarea');
         if (firstInput) setTimeout(() => firstInput.focus(), 60);
@@ -209,8 +217,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (modalEl.dataset.initialHtml && bodyEl) {
             bodyEl.innerHTML = modalEl.dataset.initialHtml;
+            bodyEl.style.display = 'block';
+            bodyEl.style.visibility = 'visible';
+            bodyEl.style.opacity = '1';
             initModalFormScripts(bodyEl);
         } else if (bodyEl) {
+            bodyEl.style.display = 'block';
+            bodyEl.style.visibility = 'visible';
+            bodyEl.style.opacity = '1';
             const form = bodyEl.querySelector('form');
             if (form) form.reset();
             const idInput = bodyEl.querySelector('input[name="id"]');
@@ -240,6 +254,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (titleEl) titleEl.textContent = 'Memuat form edit...';
         if (bodyEl) {
             bodyEl.innerHTML = '<div class="app-modal-loading"><div class="app-spinner"></div><div>Mengambil data untuk diedit...</div></div>';
+            bodyEl.style.display = 'block';
+            bodyEl.style.visibility = 'visible';
+            bodyEl.style.opacity = '1';
         }
 
         window.openCrudModal(modalEl);
@@ -265,6 +282,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (newBody && bodyEl) {
                 bodyEl.innerHTML = newBody.innerHTML;
+                bodyEl.style.display = 'block';
+                bodyEl.style.visibility = 'visible';
+                bodyEl.style.opacity = '1';
                 initModalFormScripts(bodyEl);
             } else {
                 throw new Error('Form tidak ditemukan pada halaman.');

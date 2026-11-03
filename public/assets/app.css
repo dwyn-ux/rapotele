@@ -1021,7 +1021,7 @@ img { max-width: 100%; height: auto; }
   letter-spacing: -0.2px;
 }
 
-.input-panel:not(.is-open) .input-panel-body { display: none; }
+.input-panel:not(.app-modal-dialog):not(.is-open) .input-panel-body { display: none; }
 
 /* ── Buttons ────────────────────────────────────────────────── */
 .button {
@@ -4072,7 +4072,13 @@ body.app-modal-open {
   color: var(--text);
 }
 
-.app-modal-body {
+.app-modal-body,
+.app-modal-dialog .input-panel-body,
+.app-modal-backdrop .input-panel-body,
+#crud-modal-body {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
   padding: 20px;
   overflow-y: auto;
   max-height: calc(88vh - 100px);

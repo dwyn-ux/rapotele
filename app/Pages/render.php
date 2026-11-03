@@ -362,7 +362,7 @@ function input_panel_start(string $title, string $addLabel, bool $open = false):
     </div>
 
     <div class="app-modal-backdrop <?= $open ? 'is-open' : '' ?>" id="crud-modal-backdrop" <?= $open ? '' : 'hidden' ?>>
-        <section class="panel input-panel app-modal-dialog" id="form-data" role="dialog" aria-modal="true" aria-labelledby="crud-modal-title">
+        <section class="panel app-modal-dialog is-open" id="form-data" role="dialog" aria-modal="true" aria-labelledby="crud-modal-title">
             <div class="app-modal-header">
                 <div class="app-modal-title-group">
                     <div class="app-modal-icon">
@@ -374,7 +374,7 @@ function input_panel_start(string $title, string $addLabel, bool $open = false):
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
             </div>
-            <div class="input-panel-body app-modal-body" id="crud-modal-body">
+            <div class="app-modal-body" id="crud-modal-body">
     <?php
 }
 
