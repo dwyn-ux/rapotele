@@ -508,6 +508,11 @@ function run_migrations_locked(): void
             date DATE NOT NULL,
             meeting_no INT NOT NULL DEFAULT 1,
             topic VARCHAR(255) NULL,
+            teacher_attended $bool NOT NULL DEFAULT 0,
+            teacher_status VARCHAR(24) NOT NULL DEFAULT 'hadir',
+            teacher_time_in TIME NULL,
+            teacher_notes TEXT NULL,
+            teacher_attended_at DATETIME NULL,
             created_by INT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -1019,6 +1024,17 @@ function run_migrations_locked(): void
     migration_add_column('extracurricular_scores', 'sakit', 'INT NULL DEFAULT 0');
     migration_add_column('extracurricular_scores', 'izin', 'INT NULL DEFAULT 0');
     migration_add_column('extracurricular_scores', 'alpa', 'INT NULL DEFAULT 0');
+
+    migration_add_column('student_attendance_sessions', 'teacher_attended', migration_bool() . ' NOT NULL DEFAULT 0');
+    migration_add_column('student_attendance_sessions', 'teacher_status', "VARCHAR(24) NOT NULL DEFAULT 'hadir'");
+    migration_add_column('student_attendance_sessions', 'teacher_time_in', 'TIME NULL');
+    migration_add_column('student_attendance_sessions', 'teacher_notes', 'TEXT NULL');
+    migration_add_column('student_attendance_sessions', 'teacher_attended_at', 'DATETIME NULL');
+    if (table_exists('student_attendance_sessions') && table_exists('student_attendance_entries')) {
+        try {
+            execute_sql("UPDATE student_attendance_sessions SET teacher_attended = 1 WHERE (teacher_attended IS NULL OR teacher_attended = 0) AND id IN (SELECT DISTINCT session_id FROM student_attendance_entries)");
+        } catch (Throwable) {}
+    }
 
     migration_add_column('school_profile', 'short_days', 'VARCHAR(64) NULL');
     migration_add_column('school_profile', 'regular_period_minutes', 'INT NULL DEFAULT 35');

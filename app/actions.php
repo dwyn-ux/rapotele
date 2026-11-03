@@ -22,6 +22,8 @@ return [
     'save_deskripsi_nilai' => 'action_save_deskripsi_nilai',
     'generate_deskripsi_nilai' => 'action_generate_deskripsi_nilai',
     'save_student_attendance' => 'action_save_student_attendance',
+    'checkin_teacher_classroom' => 'action_checkin_teacher_classroom',
+    'cancel_teacher_classroom' => 'action_cancel_teacher_classroom',
     'save_teacher_attendance' => 'action_save_teacher_attendance',
     'save_teacher_attendance_self' => 'action_save_teacher_attendance_self',
     'save_promotion' => 'action_save_promotion',

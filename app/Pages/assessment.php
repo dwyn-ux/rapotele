@@ -398,6 +398,7 @@ function page_student_attendance(): void
         return;
     }
     $session = fetch_one('SELECT * FROM student_attendance_sessions WHERE assignment_id = ? AND date = ? AND meeting_no = ?', [(int)$assignment['id'], $date, $meetingNo]);
+    $teacherAttended = !empty($session['teacher_attended']);
     $students = fetch_all(
         'SELECT s.*, e.status, e.notes
          FROM students s
@@ -406,31 +407,133 @@ function page_student_attendance(): void
          ORDER BY s.name',
         [(int)($session['id'] ?? 0), (int)$assignment['class_id']]
     );
-    ?>
-    <section class="panel">
-        <h3><?= e($assignment['class_name']) ?> - <?= e($assignment['subject_name']) ?></h3>
-        <form method="post">
-            <?= csrf_field() ?><input type="hidden" name="action" value="save_student_attendance">
-            <input type="hidden" name="assignment_id" value="<?= e($assignment['id']) ?>">
-            <input type="hidden" name="date" value="<?= e($date) ?>">
-            <input type="hidden" name="meeting_no" value="<?= e($meetingNo) ?>">
-            <label>Topik Pertemuan <input type="text" name="topic" value="<?= e($session['topic'] ?? '') ?>" placeholder="Misal: Pecahan sederhana"></label>
-            <label class="checkbox"><input type="checkbox" name="queue_whatsapp_absence" value="1"> Tambahkan WA untuk siswa selain hadir</label>
-            <div class="table-wrap">
+
+    if ($teacherAttended): ?>
+        <div class="panel" style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid var(--success, #10b981); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="background: #10b981; color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i data-lucide="user-check" style="width: 20px; height: 20px;"></i>
+                </div>
+                <div>
+                    <div style="font-weight: 700; color: #065f46; font-size: 1rem;">Guru Terkonfirmasi Hadir di Kelas</div>
+                    <div style="font-size: 0.88rem; color: #047857; margin-top: 2px;">
+                        Guru: <strong><?= e($assignment['teacher_name'] ?? 'Guru Pengampu') ?></strong> &bull;
+                        Jam Masuk: <strong><?= e(substr((string)($session['teacher_time_in'] ?? '-'), 0, 5)) ?></strong> &bull;
+                        Status: <strong><?= e(ucfirst((string)($session['teacher_status'] ?? 'Hadir'))) ?></strong>
+                        <?php if (!empty($session['teacher_notes'])): ?>
+                            &bull; Catatan: <em><?= e($session['teacher_notes']) ?></em>
+                        <?php endif; ?>
+                        <?php if (!empty($session['teacher_attended_at'])): ?>
+                            &bull; <span style="opacity: 0.85;">Dikonfirmasi <?= e(substr($session['teacher_attended_at'], 11, 5)) ?> WIB</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            <?php if (is_admin()): ?>
+                <form method="post" style="margin: 0;" onsubmit="return confirm('Reset status kehadiran guru untuk pertemuan ini? Form siswa akan terkunci kembali.');">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="cancel_teacher_classroom">
+                    <input type="hidden" name="session_id" value="<?= (int)$session['id'] ?>">
+                    <button type="submit" class="button small danger" style="display: inline-flex; align-items: center; gap: 4px;">
+                        <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i> Reset Hadir Guru
+                    </button>
+                </form>
+            <?php endif; ?>
+        </div>
+
+        <section class="panel">
+            <h3><?= e($assignment['class_name']) ?> - <?= e($assignment['subject_name']) ?></h3>
+            <form method="post">
+                <?= csrf_field() ?><input type="hidden" name="action" value="save_student_attendance">
+                <input type="hidden" name="assignment_id" value="<?= e($assignment['id']) ?>">
+                <input type="hidden" name="date" value="<?= e($date) ?>">
+                <input type="hidden" name="meeting_no" value="<?= e($meetingNo) ?>">
+                <label>Topik Pertemuan <input type="text" name="topic" value="<?= e($session['topic'] ?? '') ?>" placeholder="Misal: Pecahan sederhana"></label>
+                <label class="checkbox"><input type="checkbox" name="queue_whatsapp_absence" value="1"> Tambahkan WA untuk siswa selain hadir</label>
+                <div class="table-wrap">
+                    <table><thead><tr><th>Nama Siswa</th><th>NIS</th><th>Status</th><th>Catatan</th></tr></thead><tbody>
+                        <?php foreach ($students as $student): ?>
+                            <tr>
+                                <td><?= e($student['name']) ?></td><td><?= e($student['nis']) ?></td>
+                                <td><select name="status[<?= e($student['id']) ?>]"><?= options(allowed_statuses(), $student['status'] ?? 'hadir') ?></select></td>
+                                <td><input type="text" name="notes[<?= e($student['id']) ?>]" value="<?= e($student['notes']) ?>"></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody></table>
+                </div>
+                <div class="actions"><button class="button primary">Simpan Absensi Siswa</button></div>
+            </form>
+        </section>
+    <?php else: ?>
+        <section class="panel" style="border: 2px solid #f59e0b; background: #fffbeb; border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem;">
+            <div style="display: flex; align-items: flex-start; gap: 14px;">
+                <div style="background: #fde68a; color: #b45309; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i data-lucide="user-check" style="width: 24px; height: 24px;"></i>
+                </div>
+                <div style="flex: 1;">
+                    <h4 style="margin: 0 0 6px 0; color: #92400e; font-size: 1.15rem; font-weight: 700;">
+                        Konfirmasi Kehadiran Guru di Kelas
+                    </h4>
+                    <p style="margin: 0 0 14px 0; color: #78350f; font-size: 0.92rem; line-height: 1.45;">
+                        Sebelum melakukan absensi santri/siswa pada <strong><?= e($assignment['class_name']) ?> &bull; <?= e($assignment['subject_name']) ?></strong> (Pertemuan <?= e($meetingNo) ?>), <strong>guru pengampu wajib melakukan absen hadir di kelas</strong> terlebih dahulu.
+                    </p>
+                    <form method="post" class="grid four" style="align-items: flex-end; gap: 12px; margin: 0;">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="action" value="checkin_teacher_classroom">
+                        <input type="hidden" name="assignment_id" value="<?= e($assignment['id']) ?>">
+                        <input type="hidden" name="date" value="<?= e($date) ?>">
+                        <input type="hidden" name="meeting_no" value="<?= e($meetingNo) ?>">
+                        <label style="margin: 0;">
+                            <span style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px; color: #92400e;">Status Kehadiran</span>
+                            <select name="teacher_status">
+                                <option value="hadir" selected>Hadir Mengajar</option>
+                                <option value="inval">Guru Pengganti (Inval)</option>
+                            </select>
+                        </label>
+                        <label style="margin: 0;">
+                            <span style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px; color: #92400e;">Jam Masuk Kelas</span>
+                            <input type="time" name="teacher_time_in" value="<?= date('H:i') ?>" required>
+                        </label>
+                        <label style="margin: 0;">
+                            <span style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px; color: #92400e;">Catatan (Opsional)</span>
+                            <input type="text" name="teacher_notes" placeholder="Materi / info pengganti">
+                        </label>
+                        <div style="margin: 0;">
+                            <button type="submit" class="button primary" style="width: 100%; height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; background: #d97706; border-color: #d97706;">
+                                <i data-lucide="check-circle"></i> Hadir di Kelas
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" style="position: relative; overflow: hidden; min-height: 240px;">
+            <div style="position: absolute; inset: 0; background: rgba(255, 255, 255, 0.78); backdrop-filter: blur(2px); z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; text-align: center;">
+                <div style="background: white; border: 1px solid var(--border, #e2e8f0); border-radius: 12px; padding: 1.5rem 2rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); max-width: 440px;">
+                    <div style="background: #fef3c7; color: #d97706; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto;">
+                        <i data-lucide="lock" style="width: 24px; height: 24px;"></i>
+                    </div>
+                    <h4 style="margin: 0 0 8px 0; color: var(--text, #1e293b); font-size: 1.1rem; font-weight: 700;">Form Absensi Siswa Terkunci</h4>
+                    <p style="margin: 0; color: var(--text-muted, #64748b); font-size: 0.9rem; line-height: 1.5;">
+                        Silakan klik tombol <strong>"Hadir di Kelas"</strong> di atas terlebih dahulu agar daftar presensi siswa terbuka dan bisa diisi.
+                    </p>
+                </div>
+            </div>
+            <h3><?= e($assignment['class_name']) ?> - <?= e($assignment['subject_name']) ?></h3>
+            <div class="table-wrap" style="opacity: 0.35;">
                 <table><thead><tr><th>Nama Siswa</th><th>NIS</th><th>Status</th><th>Catatan</th></tr></thead><tbody>
                     <?php foreach ($students as $student): ?>
                         <tr>
                             <td><?= e($student['name']) ?></td><td><?= e($student['nis']) ?></td>
-                            <td><select name="status[<?= e($student['id']) ?>]"><?= options(allowed_statuses(), $student['status'] ?? 'hadir') ?></select></td>
-                            <td><input type="text" name="notes[<?= e($student['id']) ?>]" value="<?= e($student['notes']) ?>"></td>
+                            <td><select disabled><option>hadir</option></select></td>
+                            <td><input type="text" disabled></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody></table>
             </div>
-            <div class="actions"><button class="button primary">Simpan Absensi</button></div>
-        </form>
-    </section>
-    <?php
+        </section>
+    <?php endif;
     render_footer();
 }
 

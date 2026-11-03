@@ -89,6 +89,16 @@ function action_save_student_attendance(): void
     $assignment = require_assignment_access((int)$_POST['assignment_id']);
     $date = date_ymd($_POST['date'] ?? null);
     $meetingNo = positive_int_value(array_key_exists('meeting_no', $_POST) ? $_POST['meeting_no'] : 1, 'Nomor pertemuan tidak valid.');
+
+    // Check if teacher attendance is confirmed for this session
+    $session = fetch_one(
+        'SELECT id, teacher_attended FROM student_attendance_sessions WHERE assignment_id = ? AND date = ? AND meeting_no = ?',
+        [(int)$assignment['id'], $date, $meetingNo]
+    );
+    if (!is_admin() && (!$session || empty($session['teacher_attended']))) {
+        throw new RuntimeException('Guru pengampu wajib melakukan konfirmasi kehadiran di kelas terlebih dahulu sebelum mengisi absensi siswa.');
+    }
+
     $topicValue = $_POST['topic'] ?? 'Absensi';
     if (!is_scalar($topicValue) && $topicValue !== null) {
         throw new InvalidArgumentException('Topik pertemuan tidak valid.');
@@ -123,6 +133,9 @@ function action_save_student_attendance(): void
     }
     try {
         $sessionId = save_attendance_session((int)$assignment['id'], $date, $meetingNo, $topic, (int)(current_user()['id'] ?? 0));
+        // Ensure teacher_attended is confirmed when saving student attendance
+        execute_sql('UPDATE student_attendance_sessions SET teacher_attended = 1 WHERE id = ? AND (teacher_attended IS NULL OR teacher_attended = 0)', [$sessionId]);
+
         foreach ($rows as $row) {
             $studentId = (int)$row['student_id'];
             save_student_attendance_entry($sessionId, $studentId, (string)$row['status'], (string)$row['notes']);
@@ -153,6 +166,86 @@ function action_save_student_attendance(): void
 
     flash('success', 'Absensi siswa tersimpan.');
     redirect_to('student-attendance', ['assignment_id' => (int)$assignment['id'], 'date' => $date, 'meeting_no' => $meetingNo]);
+}
+
+function action_checkin_teacher_classroom(): void
+{
+    require_role(['admin', 'guru']);
+    $assignmentId = positive_int_value($_POST['assignment_id'] ?? 0, 'Pembelajaran tidak valid.');
+    $assignment = require_assignment_access($assignmentId);
+    $date = date_ymd($_POST['date'] ?? null);
+    $meetingNo = positive_int_value($_POST['meeting_no'] ?? 1, 'Nomor pertemuan tidak valid.');
+    $teacherStatus = allowed_status_value($_POST['teacher_status'] ?? 'hadir', ['hadir' => 'Hadir Mengajar', 'inval' => 'Guru Pengganti (Inval)'], 'Status guru tidak valid.');
+    $timeIn = trim((string)($_POST['teacher_time_in'] ?? date('H:i')));
+    $notes = trim((string)($_POST['teacher_notes'] ?? ''));
+    $userId = (int)(current_user()['id'] ?? 0);
+    $now = now_string();
+
+    $existing = fetch_one(
+        'SELECT id FROM student_attendance_sessions WHERE assignment_id = ? AND date = ? AND meeting_no = ?',
+        [(int)$assignment['id'], $date, $meetingNo]
+    );
+
+    if ($existing) {
+        execute_sql(
+            'UPDATE student_attendance_sessions SET teacher_attended = 1, teacher_status = ?, teacher_time_in = ?, teacher_notes = ?, teacher_attended_at = ?, updated_at = ? WHERE id = ?',
+            [$teacherStatus, $timeIn, $notes, $now, $now, (int)$existing['id']]
+        );
+    } else {
+        execute_sql(
+            'INSERT INTO student_attendance_sessions (assignment_id, date, meeting_no, topic, teacher_attended, teacher_status, teacher_time_in, teacher_notes, teacher_attended_at, created_by, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)',
+            [(int)$assignment['id'], $date, $meetingNo, 'Pertemuan ' . $meetingNo, $teacherStatus, $timeIn, $notes, $now, $userId, $now]
+        );
+    }
+
+    // Synchronize with lesson_schedules & teacher_teaching_attendance if schedule exists
+    if (table_exists('lesson_schedules') && table_exists('teacher_teaching_attendance')) {
+        try {
+            $dayOfWeek = teacher_teaching_day_for_date($date);
+            $schedule = fetch_one(
+                'SELECT id FROM lesson_schedules WHERE assignment_id = ? AND day_of_week = ? ORDER BY period_no LIMIT 1',
+                [(int)$assignment['id'], $dayOfWeek]
+            );
+            if ($schedule) {
+                $existingTta = fetch_one(
+                    'SELECT id FROM teacher_teaching_attendance WHERE schedule_id = ? AND date = ?',
+                    [(int)$schedule['id'], $date]
+                );
+                if ($existingTta) {
+                    execute_sql(
+                        'UPDATE teacher_teaching_attendance SET assignment_id = ?, teacher_id = ?, class_id = ?, subject_id = ?, status = ?, time_in = ?, notes = ?, recorded_by = ?, updated_at = ? WHERE id = ?',
+                        [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], 'hadir', $timeIn, $notes, $userId, $now, (int)$existingTta['id']]
+                    );
+                } else {
+                    execute_sql(
+                        'INSERT INTO teacher_teaching_attendance (schedule_id, assignment_id, teacher_id, class_id, subject_id, date, status, time_in, notes, recorded_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        [(int)$schedule['id'], (int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $date, 'hadir', $timeIn, $notes, $userId, $now]
+                    );
+                }
+            }
+        } catch (Throwable) {
+            // Silently continue if schedule sync is not strictly applicable
+        }
+    }
+
+    flash('success', 'Kehadiran guru di kelas berhasil dikonfirmasi. Form absensi siswa sekarang dapat diisi.');
+    redirect_to('student-attendance', ['assignment_id' => (int)$assignment['id'], 'date' => $date, 'meeting_no' => $meetingNo]);
+}
+
+function action_cancel_teacher_classroom(): void
+{
+    require_role(['admin']);
+    $sessionId = positive_int_value($_POST['session_id'] ?? 0, 'Sesi tidak valid.');
+    $session = fetch_one('SELECT * FROM student_attendance_sessions WHERE id = ?', [$sessionId]);
+    if (!$session) {
+        throw new RuntimeException('Sesi absensi tidak ditemukan.');
+    }
+    execute_sql(
+        'UPDATE student_attendance_sessions SET teacher_attended = 0, teacher_time_in = NULL, teacher_notes = NULL, teacher_attended_at = NULL, updated_at = ? WHERE id = ?',
+        [now_string(), $sessionId]
+    );
+    flash('success', 'Status kehadiran guru berhasil direset.');
+    redirect_to('student-attendance', ['assignment_id' => (int)$session['assignment_id'], 'date' => $session['date'], 'meeting_no' => (int)$session['meeting_no']]);
 }
 
 function action_save_teacher_attendance(): void
