@@ -78,7 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
               controller: controller,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
-                hintText: 'https://raport.smpmuhashidiq.sch.id',
+                hintText: 'https://raport.smpmuashidiq.sch.id',
                 labelText: 'Base URL Server',
                 prefixIcon: Icon(Icons.link_rounded),
               ),
@@ -90,11 +90,11 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 ActionChip(
                   label: const Text('Production', style: TextStyle(fontSize: 11)),
-                  onPressed: () => controller.text = 'https://raport.smpmuhashidiq.sch.id',
+                  onPressed: () => controller.text = 'https://raport.smpmuashidiq.sch.id',
                 ),
                 ActionChip(
-                  label: const Text('Localhost:8000', style: TextStyle(fontSize: 11)),
-                  onPressed: () => controller.text = 'http://10.0.2.2:8000',
+                  label: const Text('USB Reverse (localhost:8000)', style: TextStyle(fontSize: 11)),
+                  onPressed: () => controller.text = 'http://localhost:8000',
                 ),
               ],
             ),

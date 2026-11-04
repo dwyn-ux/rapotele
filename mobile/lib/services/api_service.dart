@@ -7,7 +7,7 @@ import '../models/notification_item.dart';
 import '../models/schedule_item.dart';
 
 class ApiService {
-  static const String _defaultBaseUrl = 'https://raport.smpmuhashidiq.sch.id';
+  static const String _defaultBaseUrl = 'https://raport.smpmuashidiq.sch.id';
   static const String _keyBaseUrl = 'server_base_url';
   static const String _keyToken = 'auth_token';
   static const String _keyUser = 'cached_user';
@@ -21,6 +21,7 @@ class ApiService {
   String? _token;
   UserModel? _currentUser;
   SchoolModel? _currentSchool;
+  String? _workingEndpointPrefix; // caches working path format (e.g. '/api.php' or '/public/api.php')
 
   String get baseUrl => _baseUrl;
   String? get token => _token;
@@ -30,7 +31,19 @@ class ApiService {
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    _baseUrl = prefs.getString(_keyBaseUrl) ?? _defaultBaseUrl;
+    final savedBase = prefs.getString(_keyBaseUrl);
+    if (savedBase != null && savedBase.isNotEmpty) {
+      // Fix potential typo from earlier builds
+      if (savedBase.contains('smpmuhashidiq')) {
+        _baseUrl = savedBase.replaceAll('smpmuhashidiq', 'smpmuashidiq');
+        await prefs.setString(_keyBaseUrl, _baseUrl);
+      } else {
+        _baseUrl = savedBase;
+      }
+    } else {
+      _baseUrl = _defaultBaseUrl;
+    }
+
     _token = prefs.getString(_keyToken);
 
     final userJsonStr = prefs.getString(_keyUser);
@@ -54,6 +67,7 @@ class ApiService {
       cleanUrl = cleanUrl.substring(0, cleanUrl.length - 1);
     }
     _baseUrl = cleanUrl;
+    _workingEndpointPrefix = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyBaseUrl, _baseUrl);
   }
@@ -90,11 +104,43 @@ class ApiService {
     await prefs.remove(_keyUser);
   }
 
-  Uri _buildUri(String action, [Map<String, String>? queryParams]) {
+  List<Uri> _candidateUris(String action, [Map<String, String>? queryParams]) {
     final params = {'action': action, ...?queryParams};
-    // Support URLs with /public or root
-    final endpoint = _baseUrl.endsWith('/public') ? '$_baseUrl/api.php' : '$_baseUrl/public/api.php';
-    return Uri.parse(endpoint).replace(queryParameters: params);
+
+    // If we already know the working format, put it first
+    final candidates = <String>[];
+    if (_workingEndpointPrefix != null) {
+      candidates.add('$_baseUrl$_workingEndpointPrefix');
+    }
+
+    if (_baseUrl.endsWith('/public')) {
+      candidates.add('$_baseUrl/api.php');
+      candidates.add('$_baseUrl/index.php?page=api');
+    } else {
+      candidates.add('$_baseUrl/public/api.php');
+      candidates.add('$_baseUrl/api.php');
+      candidates.add('$_baseUrl/public/index.php?page=api');
+      candidates.add('$_baseUrl/index.php?page=api');
+    }
+
+    final uris = <Uri>[];
+    final seen = <String>{};
+
+    for (var cand in candidates) {
+      if (seen.add(cand)) {
+        if (cand.contains('?')) {
+          final parts = cand.split('?');
+          final basePart = parts[0];
+          final queryPart = Uri.splitQueryString(parts[1]);
+          final mergedParams = {...queryPart, ...params};
+          uris.add(Uri.parse(basePart).replace(queryParameters: mergedParams));
+        } else {
+          uris.add(Uri.parse(cand).replace(queryParameters: params));
+        }
+      }
+    }
+
+    return uris;
   }
 
   Map<String, String> _headers() {
@@ -109,19 +155,72 @@ class ApiService {
     return headers;
   }
 
+  Future<http.Response> _executeWithFallback(
+    String action, {
+    Map<String, String>? queryParams,
+    String? body,
+    bool isPost = false,
+  }) async {
+    final uris = _candidateUris(action, queryParams);
+    http.Response? lastResponse;
+    Object? lastError;
+
+    for (var uri in uris) {
+      try {
+        final client = http.Client();
+        final request = http.Request(isPost ? 'POST' : 'GET', uri);
+        request.headers.addAll(_headers());
+        request.followRedirects = false; // Don't silently follow redirect to HTML login page
+
+        if (isPost && body != null) {
+          request.body = body;
+        }
+
+        final streamed = await client.send(request).timeout(const Duration(seconds: 10));
+        final response = await http.Response.fromStream(streamed);
+
+        // If returned valid JSON (not 301/302 redirect and not HTML)
+        if (response.statusCode != 301 &&
+            response.statusCode != 302 &&
+            !response.body.trim().startsWith('<') &&
+            response.headers['content-type']?.contains('json') == true) {
+          // Remember working path prefix
+          final pathAndQuery = uri.path + (uri.queryParameters.containsKey('page') ? '?page=api' : '');
+          final prefix = pathAndQuery.replaceFirst(RegExp(r'\?action=.*$'), '');
+          _workingEndpointPrefix = prefix.isNotEmpty ? prefix : null;
+          return response;
+        }
+
+        lastResponse = response;
+      } catch (e) {
+        lastError = e;
+      }
+    }
+
+    if (lastResponse != null) {
+      return lastResponse;
+    }
+    throw lastError ?? Exception('Gagal menghubungi server.');
+  }
+
   Future<Map<String, dynamic>> login(String username, String password) async {
-    final uri = _buildUri('login');
     try {
-      final response = await http
-          .post(
-            uri,
-            headers: _headers(),
-            body: jsonEncode({
-              'username': username,
-              'password': password,
-            }),
-          )
-          .timeout(const Duration(seconds: 15));
+      final response = await _executeWithFallback(
+        'login',
+        isPost: true,
+        body: jsonEncode({
+          'username': username,
+          'password': password,
+        }),
+      );
+
+      // Check if redirected to HTML
+      if (response.statusCode == 301 || response.statusCode == 302 || response.body.trim().startsWith('<')) {
+        return {
+          'success': false,
+          'message': 'Server mengalihkan ke halaman login web. Pastikan file API sudah terupdate di server atau periksa URL server.',
+        };
+      }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode == 200 && data['ok'] == true) {
@@ -134,14 +233,13 @@ class ApiService {
         return {'success': false, 'message': data['message'] ?? 'Login gagal'};
       }
     } catch (e) {
-      return {'success': false, 'message': 'Gagal terhubung ke server: $e'};
+      return {'success': false, 'message': 'Gagal terhubung ke server ($baseUrl): $e'};
     }
   }
 
   Future<Map<String, dynamic>> getWhatsAppFeed({int limit = 40}) async {
-    final uri = _buildUri('whatsapp_feed', {'limit': limit.toString()});
     try {
-      final response = await http.get(uri, headers: _headers()).timeout(const Duration(seconds: 15));
+      final response = await _executeWithFallback('whatsapp_feed', queryParams: {'limit': limit.toString()});
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         if (data['ok'] == true) {
@@ -164,11 +262,12 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> sendWhatsAppQueue({int limit = 30}) async {
-    final uri = _buildUri('send_whatsapp_queue');
     try {
-      final response = await http
-          .post(uri, headers: _headers(), body: jsonEncode({'limit': limit}))
-          .timeout(const Duration(seconds: 30));
+      final response = await _executeWithFallback(
+        'send_whatsapp_queue',
+        isPost: true,
+        body: jsonEncode({'limit': limit}),
+      );
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       return {
@@ -183,9 +282,8 @@ class ApiService {
   }
 
   Future<List<NotificationItem>> getNotifications() async {
-    final uri = _buildUri('notifications');
     try {
-      final response = await http.get(uri, headers: _headers()).timeout(const Duration(seconds: 15));
+      final response = await _executeWithFallback('notifications');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         if (data['ok'] == true) {
@@ -200,9 +298,8 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getMySchedule() async {
-    final uri = _buildUri('my_schedule');
     try {
-      final response = await http.get(uri, headers: _headers()).timeout(const Duration(seconds: 15));
+      final response = await _executeWithFallback('my_schedule');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         if (data['ok'] == true) {
@@ -225,9 +322,8 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> triggerScheduleReminders() async {
-    final uri = _buildUri('trigger_schedule_reminders');
     try {
-      final response = await http.post(uri, headers: _headers()).timeout(const Duration(seconds: 20));
+      final response = await _executeWithFallback('trigger_schedule_reminders', isPost: true);
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       return {
         'success': data['ok'] == true,
@@ -238,4 +334,3 @@ class ApiService {
     }
   }
 }
-
