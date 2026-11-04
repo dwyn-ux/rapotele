@@ -206,6 +206,10 @@ function mobile_api_dispatch(): void
                 mobile_api_handle_save_student_attendance();
                 break;
 
+            case 'teacher_class_checkin':
+                mobile_api_handle_teacher_class_checkin();
+                break;
+
             case 'journals':
                 mobile_api_handle_journals();
                 break;
@@ -826,13 +830,59 @@ function mobile_api_handle_students_for_attendance(): void
         [$sessionId, (int)$assignment['class_id']]
     );
 
+    $teacherCheckedIn = !empty($session['teacher_attended']) && (int)$session['teacher_attended'] === 1;
+
     mobile_api_response(true, [
         'assignment' => $assignment,
         'date' => $date,
         'meeting_no' => $meetingNo,
         'session' => $session,
         'students' => $students,
+        'teacher_checked_in' => $teacherCheckedIn,
+        'teacher_time_in' => $session['teacher_time_in'] ?? null,
+        'teacher_status' => $session['teacher_status'] ?? 'hadir',
     ]);
+}
+
+function mobile_api_handle_teacher_class_checkin(): void
+{
+    $user = mobile_api_require_auth();
+    $assignmentId = (int)($_POST['assignment_id'] ?? 0);
+    $date = date_ymd($_POST['date'] ?? date('Y-m-d'));
+    $meetingNo = max(1, (int)($_POST['meeting_no'] ?? 1));
+    $status = trim((string)($_POST['status'] ?? 'hadir'));
+    $timeIn = date('H:i:s');
+
+    if ($assignmentId <= 0) {
+        mobile_api_response(false, [], 'assignment_id wajib diisi.', 422);
+    }
+
+    $session = fetch_one(
+        'SELECT id, teacher_attended, teacher_time_in FROM student_attendance_sessions WHERE assignment_id = ? AND date = ? AND meeting_no = ?',
+        [$assignmentId, $date, $meetingNo]
+    );
+
+    $now = now_string();
+    if ($session) {
+        execute_sql(
+            'UPDATE student_attendance_sessions SET teacher_attended = 1, teacher_status = ?, teacher_time_in = ?, updated_at = ? WHERE id = ?',
+            [$status, $timeIn, $now, (int)$session['id']]
+        );
+        $sessionId = (int)$session['id'];
+    } else {
+        execute_sql(
+            'INSERT INTO student_attendance_sessions (assignment_id, date, meeting_no, topic, teacher_attended, teacher_status, teacher_time_in, created_by, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)',
+            [$assignmentId, $date, $meetingNo, 'Presensi KBM', $status, $timeIn, (int)$user['id'], $now]
+        );
+        $sessionId = (int)db()->lastInsertId();
+    }
+
+    mobile_api_response(true, [
+        'session_id' => $sessionId,
+        'teacher_checked_in' => true,
+        'teacher_time_in' => $timeIn,
+        'teacher_status' => $status,
+    ], 'Absen masuk kelas berhasil dicatat pukul ' . substr($timeIn, 0, 5));
 }
 
 function mobile_api_handle_save_student_attendance(): void
@@ -850,9 +900,14 @@ function mobile_api_handle_save_student_attendance(): void
     }
 
     $session = fetch_one(
-        'SELECT id FROM student_attendance_sessions WHERE assignment_id = ? AND date = ? AND meeting_no = ?',
+        'SELECT id, teacher_attended, teacher_time_in FROM student_attendance_sessions WHERE assignment_id = ? AND date = ? AND meeting_no = ?',
         [$assignmentId, $date, $meetingNo]
     );
+
+    // Rule: Guru TIDAK BISA absen siswa sebelum absen masuk kelas
+    if (!$session || empty($session['teacher_attended']) || (int)$session['teacher_attended'] !== 1) {
+        mobile_api_response(false, ['require_teacher_checkin' => true], 'Guru belum melakukan absensi masuk kelas. Silakan lakukan absen masuk kelas terlebih dahulu sebelum mengabsen siswa.', 403);
+    }
 
     $pdo = db();
     if (!$pdo->beginTransaction()) {

@@ -150,27 +150,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   // App Emblem
                   Center(
                     child: Container(
-                      width: 84,
-                      height: 84,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
                         borderRadius: BorderRadius.circular(22),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF2563EB).withValues(alpha: 0.3),
+                            color: Colors.black.withValues(alpha: 0.12),
                             blurRadius: 18,
-                            offset: const Offset(0, 8),
+                            offset: const Offset(0, 6),
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.school_rounded,
-                        color: Colors.white,
-                        size: 46,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(22),
+                        child: Image.asset(
+                          'assets/logo.png',
+                          width: 96,
+                          height: 96,
+                          fit: BoxFit.contain,
+                        ),
                       ),
                     ),
                   ),

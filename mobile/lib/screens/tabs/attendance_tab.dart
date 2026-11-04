@@ -22,7 +22,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
   late TabController _tabController;
   final _api = ApiService();
 
-  // Teacher attendance state
+  // 1. Teacher Daily Attendance (Harian Sekolah)
   bool _isLoadingTeacher = false;
   TeacherAttendanceModel? _teacherAttendance;
   String _teacherStatus = 'hadir';
@@ -30,10 +30,14 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
   DateTime _currentTime = DateTime.now();
   Timer? _timer;
 
-  // Student attendance state
+  // 2. Teacher Class Attendance & Student Attendance (Masuk Kelas & Siswa)
   bool _isLoadingAssignments = false;
   bool _isLoadingStudents = false;
   bool _isSavingStudents = false;
+  bool _isTeacherInClass = false;
+  String? _teacherClassTimeIn;
+  bool _isCheckingInClass = false;
+
   List<TeachingAssignmentModel> _assignments = [];
   TeachingAssignmentModel? _selectedAssignment;
   DateTime _selectedDate = DateTime.now();
@@ -83,7 +87,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
     return '${days[dt.weekday]}, ${dt.day} ${months[dt.month]} ${dt.year}';
   }
 
-  // ================= TEACHER ATTENDANCE LOGIC =================
+  // ================= 1. TEACHER DAILY ATTENDANCE (HARIAN) =================
   Future<void> _loadTeacherAttendance() async {
     setState(() => _isLoadingTeacher = true);
     final res = await _api.getTeacherAttendance(date: _formatDateYmd(_selectedDate));
@@ -125,7 +129,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
     }
   }
 
-  // ================= STUDENT ATTENDANCE LOGIC =================
+  // ================= 2. TEACHER CLASS & STUDENT ATTENDANCE =================
   Future<void> _loadAssignments() async {
     setState(() => _isLoadingAssignments = true);
     final list = await _api.getTeachingAssignments();
@@ -155,18 +159,74 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
         _isLoadingStudents = false;
         if (res['success'] == true) {
           _students = (res['students'] as List<StudentAttendanceItem>?) ?? [];
+          _isTeacherInClass = res['teacher_checked_in'] == true;
+          _teacherClassTimeIn = res['teacher_time_in']?.toString();
           final sess = res['session'] as Map<String, dynamic>?;
           if (sess != null && sess['topic'] != null && sess['topic'].toString().isNotEmpty) {
             _topicController.text = sess['topic'].toString();
           }
         } else {
           _students = [];
+          _isTeacherInClass = false;
+          _teacherClassTimeIn = null;
         }
       });
     }
   }
 
+  Future<void> _submitTeacherClassCheckIn() async {
+    if (_selectedAssignment == null) return;
+    setState(() => _isCheckingInClass = true);
+
+    final res = await _api.teacherClassCheckIn(
+      assignmentId: _selectedAssignment!.id,
+      date: _formatDateYmd(_selectedDate),
+      meetingNo: _meetingNo,
+      status: 'hadir',
+    );
+
+    if (mounted) {
+      setState(() => _isCheckingInClass = false);
+      if (res['success'] == true) {
+        setState(() {
+          _isTeacherInClass = true;
+          _teacherClassTimeIn = res['teacher_time_in'] ??
+              '${_formatTimeDigits(_currentTime.hour)}:${_formatTimeDigits(_currentTime.minute)}:${_formatTimeDigits(_currentTime.second)}';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    res['message'] ?? 'Absen masuk kelas berhasil. Presensi siswa sekarang aktif.',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF16A34A),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res['message'] ?? 'Gagal absen masuk kelas'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _saveStudentAttendance() async {
+    if (!_isTeacherInClass) {
+      _showMustCheckInDialog();
+      return;
+    }
+
     if (_selectedAssignment == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Pilih kelas pembelajaran terlebih dahulu')),
@@ -193,6 +253,12 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
 
     if (mounted) {
       setState(() => _isSavingStudents = false);
+      if (res['require_teacher_checkin'] == true) {
+        setState(() => _isTeacherInClass = false);
+        _showMustCheckInDialog();
+        return;
+      }
+
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -222,7 +288,44 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
     }
   }
 
+  void _showMustCheckInDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.lock_clock_rounded, color: Color(0xFFD97706)),
+            SizedBox(width: 8),
+            Text('Absen Masuk Kelas Wajib'),
+          ],
+        ),
+        content: const Text(
+          'Bapak/Ibu Guru belum melakukan absensi masuk kelas untuk sesi ini. Silakan tekan tombol "Absen Masuk Kelas Sekarang" terlebih dahulu sebelum mendata kehadiran siswa.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _submitTeacherClassCheckIn();
+            },
+            icon: const Icon(Icons.login_rounded),
+            label: const Text('Absen Masuk Kelas Sekarang'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _setAllStudentsStatus(String status) {
+    if (!_isTeacherInClass) {
+      _showMustCheckInDialog();
+      return;
+    }
     setState(() {
       for (var s in _students) {
         s.status = status;
@@ -236,32 +339,49 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Presensi & Kehadiran',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset('assets/logo.png', width: 28, height: 28, fit: BoxFit.contain),
+            ),
+            const SizedBox(width: 8),
+            const Flexible(
+              child: Text(
+                'Presensi & Kehadiran',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
           indicatorWeight: 3,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           tabs: const [
-            Tab(icon: Icon(Icons.person_pin), text: 'Presensi Guru'),
-            Tab(icon: Icon(Icons.groups), text: 'Presensi Siswa'),
+            Tab(icon: Icon(Icons.person_pin, size: 20), text: 'Presensi Guru (Harian)'),
+            Tab(icon: Icon(Icons.groups, size: 20), text: 'Presensi Siswa & Kelas'),
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildTeacherTab(theme),
-          _buildStudentTab(theme),
-        ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              _buildTeacherTab(theme, constraints),
+              _buildStudentTab(theme, constraints),
+            ],
+          );
+        },
       ),
     );
   }
 
-  // ================= VIEW: TEACHER TAB =================
-  Widget _buildTeacherTab(ThemeData theme) {
+  // ================= VIEW: 1. TEACHER TAB (HARIAN SEKOLAH) =================
+  Widget _buildTeacherTab(ThemeData theme, BoxConstraints constraints) {
     final user = _api.currentUser;
     final timeStr =
         '${_formatTimeDigits(_currentTime.hour)}:${_formatTimeDigits(_currentTime.minute)}:${_formatTimeDigits(_currentTime.second)}';
@@ -272,7 +392,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
     return RefreshIndicator(
       onRefresh: _loadTeacherAttendance,
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         children: [
           // Teacher Profile Card
           Card(
@@ -283,9 +403,9 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
               child: Row(
                 children: [
                   CircleAvatar(
-                    radius: 30,
+                    radius: 28,
                     backgroundColor: theme.colorScheme.primaryContainer,
-                    child: Icon(Icons.person, size: 36, color: theme.colorScheme.primary),
+                    child: Icon(Icons.person, size: 34, color: theme.colorScheme.primary),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -294,12 +414,14 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
                       children: [
                         Text(
                           user?.name ?? 'Guru Pengajar',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
                           'User: @${user?.username ?? '-'}  •  Role: ${user?.role.toUpperCase() ?? 'GURU'}',
-                          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -313,43 +435,47 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
           // Digital Clock & Status Banner
           Card(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             color: theme.colorScheme.primary.withValues(alpha: 0.06),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
               child: Column(
                 children: [
-                  Text(
-                    timeStr,
-                    style: TextStyle(
-                      fontSize: 42,
-                      fontWeight: FontWeight.w800,
-                      color: theme.colorScheme.primary,
-                      letterSpacing: 2,
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      timeStr,
+                      style: TextStyle(
+                        fontSize: 38,
+                        fontWeight: FontWeight.w800,
+                        color: theme.colorScheme.primary,
+                        letterSpacing: 2,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
-                    'Waktu Indonesia Barat (WIB)',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    'Waktu Indonesia Barat (WIB) • Presensi Harian Sekolah',
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
                   // Status Indicator Badges
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       _statusBadge(
-                        label: 'Masuk: ${hasIn ? _teacherAttendance!.timeIn!.substring(0, 5) : '--:--'}',
+                        label: 'Datang: ${hasIn ? _teacherAttendance!.timeIn!.substring(0, 5) : '--:--'}',
                         isActive: hasIn,
                         color: Colors.green,
                         icon: Icons.login,
                       ),
-                      const SizedBox(width: 12),
                       _statusBadge(
                         label: 'Pulang: ${hasOut ? _teacherAttendance!.timeOut!.substring(0, 5) : '--:--'}',
                         isActive: hasOut,
@@ -362,7 +488,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
           // Attendance Form & Buttons
           Card(
@@ -374,12 +500,13 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Status Kehadiran Hari Ini',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    'Pilih Status Kehadiran Hari Ini',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
+                    runSpacing: 8,
                     children: [
                       ChoiceChip(
                         label: const Text('Hadir'),
@@ -409,12 +536,12 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
                     controller: _teacherNotesController,
                     decoration: InputDecoration(
                       labelText: 'Catatan / Lokasi / Keterangan',
-                      hintText: 'Contoh: Presensi mandiri / Mengajar di kelas',
+                      hintText: 'Contoh: Hadir di sekolah / Mengajar KBM',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
 
                   // Action Buttons
                   Row(
@@ -424,24 +551,30 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
                           onPressed: _isLoadingTeacher ? null : () => _submitTeacherCheckIn('checkin'),
                           style: FilledButton.styleFrom(
                             backgroundColor: Colors.green.shade600,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                          icon: const Icon(Icons.login),
-                          label: Text(hasIn ? 'Update Datang' : 'Check-In Masuk'),
+                          icon: const Icon(Icons.login, size: 18),
+                          label: Text(
+                            hasIn ? 'Update Datang' : 'Check-In Masuk',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: FilledButton.icon(
                           onPressed: _isLoadingTeacher ? null : () => _submitTeacherCheckIn('checkout'),
                           style: FilledButton.styleFrom(
                             backgroundColor: Colors.blue.shade700,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                          icon: const Icon(Icons.logout),
-                          label: Text(hasOut ? 'Update Pulang' : 'Check-Out Pulang'),
+                          icon: const Icon(Icons.logout, size: 18),
+                          label: Text(
+                            hasOut ? 'Update Pulang' : 'Check-Out Pulang',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ),
                     ],
@@ -463,7 +596,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
     required IconData icon,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
         color: isActive ? color.withValues(alpha: 0.12) : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(20),
@@ -475,12 +608,12 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: isActive ? color : Colors.grey),
+          Icon(icon, size: 15, color: isActive ? color : Colors.grey),
           const SizedBox(width: 6),
           Text(
             label,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: FontWeight.bold,
               color: isActive ? color : Colors.grey.shade700,
             ),
@@ -490,8 +623,8 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
     );
   }
 
-  // ================= VIEW: STUDENT TAB =================
-  Widget _buildStudentTab(ThemeData theme) {
+  // ================= VIEW: 2. STUDENT TAB (PRESENSI KELAS & SISWA) =================
+  Widget _buildStudentTab(ThemeData theme, BoxConstraints constraints) {
     if (_isLoadingAssignments) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -507,7 +640,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
               const SizedBox(height: 16),
               const Text(
                 'Belum Ada Penugasan Pembelajaran',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Text(
@@ -535,9 +668,9 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
 
     return Column(
       children: [
-        // Filter Header
+        // Filter Header & Controls
         Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
           color: theme.colorScheme.surface,
           child: Column(
             children: [
@@ -556,7 +689,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
                     child: Text(
                       a.displayName,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                     ),
                   );
                 }).toList(),
@@ -587,12 +720,12 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
                       },
                       style: OutlinedButton.styleFrom(
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
-                      icon: const Icon(Icons.calendar_today, size: 16),
+                      icon: const Icon(Icons.calendar_today, size: 15),
                       label: Text(
                         _formatDateYmd(_selectedDate),
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -600,7 +733,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
                   Expanded(
                     flex: 2,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.grey.shade400),
                         borderRadius: BorderRadius.circular(12),
@@ -609,7 +742,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('Pert: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                          Text('$_meetingNo', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                          Text('$_meetingNo', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                           Row(
                             children: [
                               InkWell(
@@ -639,6 +772,10 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
               ),
               const SizedBox(height: 8),
 
+              // MANDATORY TEACHER CLASS CHECK-IN BANNER
+              _buildTeacherClassStatusBanner(theme),
+              const SizedBox(height: 6),
+
               // Quick Bulk Actions (Set All Hadir)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -648,10 +785,21 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                   TextButton.icon(
-                    onPressed: _students.isEmpty ? null : () => _setAllStudentsStatus('hadir'),
+                    onPressed: (!_isTeacherInClass || _students.isEmpty) ? null : () => _setAllStudentsStatus('hadir'),
                     style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
-                    icon: const Icon(Icons.done_all, size: 16, color: Colors.green),
-                    label: const Text('Set Semua Hadir', style: TextStyle(color: Colors.green, fontSize: 13)),
+                    icon: Icon(
+                      Icons.done_all,
+                      size: 16,
+                      color: _isTeacherInClass ? Colors.green : Colors.grey,
+                    ),
+                    label: Text(
+                      'Set Semua Hadir',
+                      style: TextStyle(
+                        color: _isTeacherInClass ? Colors.green : Colors.grey,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -673,7 +821,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
                       ),
                     )
                   : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 120),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
                       itemCount: _students.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (ctx, idx) {
@@ -686,6 +834,105 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
         // Sticky Bottom Save Panel
         _buildBottomSavePanel(hadirCount, sakitCount, izinCount, alfaCount),
       ],
+    );
+  }
+
+  /// Banner requirement: Guru belum bisa absen siswa sebelum absen masuk kelas
+  Widget _buildTeacherClassStatusBanner(ThemeData theme) {
+    if (_isTeacherInClass) {
+      final timeDisplay = _teacherClassTimeIn != null && _teacherClassTimeIn!.length >= 5
+          ? _teacherClassTimeIn!.substring(0, 5)
+          : 'Tercatat';
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0FDF4),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFBBF7D0)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Guru Sudah Absen Masuk Kelas',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF166534)),
+                  ),
+                  Text(
+                    'Pukul $timeDisplay WIB • Presensi siswa aktif',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF15803D)),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDCFCE7),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'AKTIF',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF166534)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFDE68A)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.lock_clock_rounded, color: Color(0xFFD97706), size: 18),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Absensi Siswa Terkunci: Wajib Absen Masuk Kelas',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF92400E)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Bapak/Ibu Guru wajib absen masuk kelas terlebih dahulu sesuai jadwal sebelum mendata presensi siswa.',
+            style: TextStyle(fontSize: 11, color: Color(0xFF78350F)),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _isCheckingInClass ? null : _submitTeacherClassCheckIn,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFD97706),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: _isCheckingInClass
+                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Icon(Icons.login_rounded, size: 16),
+              label: Text(
+                _isCheckingInClass ? 'Mencatat Kehadiran...' : 'Absen Masuk Kelas Sekarang',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -702,7 +949,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
             Row(
               children: [
                 CircleAvatar(
-                  radius: 14,
+                  radius: 13,
                   backgroundColor: Colors.blue.shade50,
                   child: Text(
                     '$index',
@@ -716,33 +963,37 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
                     children: [
                       Text(
                         student.name,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        'NIS: ${student.nis.isNotEmpty ? student.nis : '-'} • ${student.gender == 'L' ? 'Laki-laki' : 'Perempuan'}',
+                        'NIS: ${student.nis.isNotEmpty ? student.nis : '-'} • ${student.gender == 'L' ? 'L' : 'P'}',
                         style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                       ),
                     ],
                   ),
                 ),
+                if (!_isTeacherInClass)
+                  const Icon(Icons.lock_rounded, size: 16, color: Color(0xFFD97706)),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
 
             // Status selection chips
             Row(
               children: [
-                _attendanceChip(student, 'hadir', 'H (Hadir)', Colors.green),
+                _attendanceChip(student, 'hadir', 'H', Colors.green),
                 const SizedBox(width: 6),
-                _attendanceChip(student, 'sakit', 'S (Sakit)', Colors.blue),
+                _attendanceChip(student, 'sakit', 'S', Colors.blue),
                 const SizedBox(width: 6),
-                _attendanceChip(student, 'izin', 'I (Izin)', Colors.orange),
+                _attendanceChip(student, 'izin', 'I', Colors.orange),
                 const SizedBox(width: 6),
-                _attendanceChip(student, 'alfa', 'A (Alfa)', Colors.red),
+                _attendanceChip(student, 'alfa', 'A', Colors.red),
               ],
             ),
 
-            if (student.status != 'hadir') ...[
+            if (_isTeacherInClass && student.status != 'hadir') ...[
               const SizedBox(height: 8),
               TextField(
                 onChanged: (val) => student.notes = val,
@@ -766,29 +1017,43 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
     final isSelected = student.status == code;
     return Expanded(
       child: InkWell(
-        onTap: () {
-          setState(() {
-            student.status = code;
-          });
-        },
+        onTap: !_isTeacherInClass
+            ? () => _showMustCheckInDialog()
+            : () {
+                setState(() {
+                  student.status = code;
+                });
+              },
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 7),
           decoration: BoxDecoration(
-            color: isSelected ? color : color.withValues(alpha: 0.08),
+            color: !_isTeacherInClass
+                ? Colors.grey.shade100
+                : isSelected
+                    ? color
+                    : color.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isSelected ? color : color.withValues(alpha: 0.3),
+              color: !_isTeacherInClass
+                  ? Colors.grey.shade300
+                  : isSelected
+                      ? color
+                      : color.withValues(alpha: 0.3),
               width: isSelected ? 1.5 : 1.0,
             ),
           ),
           alignment: Alignment.center,
           child: Text(
-            label.split(' ')[0], // 'H', 'S', 'I', 'A'
+            label, // 'H', 'S', 'I', 'A'
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
-              color: isSelected ? Colors.white : color,
+              color: !_isTeacherInClass
+                  ? Colors.grey.shade400
+                  : isSelected
+                      ? Colors.white
+                      : color,
             ),
           ),
         ),
@@ -798,7 +1063,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
 
   Widget _buildBottomSavePanel(int hadir, int sakit, int izin, int alfa) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -824,14 +1089,14 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
                 _countBadge('Alfa', alfa, Colors.red),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
 
             // WA Notification Checkbox
             Row(
               children: [
                 SizedBox(
-                  height: 24,
-                  width: 24,
+                  height: 22,
+                  width: 22,
                   child: Checkbox(
                     value: _queueWhatsapp,
                     onChanged: (val) => setState(() => _queueWhatsapp = val ?? true),
@@ -840,30 +1105,36 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
-                    'Kirim notifikasi WA ke Wali Siswa tidak hadir',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                    'Kirim WA otomatis ke wali santri tidak hadir',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
 
             // Save Button
             SizedBox(
               width: double.infinity,
-              height: 48,
+              height: 46,
               child: FilledButton.icon(
-                onPressed: _isSavingStudents ? null : _saveStudentAttendance,
+                onPressed: (!_isTeacherInClass || _isSavingStudents)
+                    ? (!_isTeacherInClass ? _showMustCheckInDialog : null)
+                    : _saveStudentAttendance,
                 style: FilledButton.styleFrom(
-                  backgroundColor: Colors.blue.shade700,
+                  backgroundColor: _isTeacherInClass ? Colors.blue.shade700 : Colors.grey.shade400,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 icon: _isSavingStudents
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Icon(Icons.save),
+                    : Icon(_isTeacherInClass ? Icons.save : Icons.lock_rounded, size: 18),
                 label: Text(
-                  _isSavingStudents ? 'Menyimpan...' : 'Simpan Presensi Kelas',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  _isSavingStudents
+                      ? 'Menyimpan...'
+                      : _isTeacherInClass
+                          ? 'Simpan Presensi Kelas'
+                          : 'Terkunci (Absen Masuk Kelas Dahulu)',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
               ),
             ),
@@ -885,7 +1156,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
         const SizedBox(width: 4),
         Text(
           '$label: $count',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color.shade800 ?? color),
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color.shade800 ?? color),
         ),
       ],
     );
@@ -895,4 +1166,3 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
 extension ColorShade on Color {
   Color? get shade800 => this is MaterialColor ? (this as MaterialColor)[800] : this;
 }
-

@@ -177,7 +177,7 @@ class _DashboardTabState extends State<DashboardTab> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.school_outlined, color: Colors.white70, size: 16),
+                        ClipRRect(borderRadius: BorderRadius.circular(6), child: Image.asset('assets/logo.png', width: 22, height: 22, fit: BoxFit.contain)),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(

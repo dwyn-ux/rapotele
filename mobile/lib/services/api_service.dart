@@ -472,12 +472,47 @@ class ApiService {
             'assignment': assignment,
             'date': decoded['date']?.toString() ?? '',
             'meeting_no': decoded['meeting_no'] is int ? decoded['meeting_no'] : int.tryParse(decoded['meeting_no']?.toString() ?? '1') ?? 1,
+            'teacher_checked_in': decoded['teacher_checked_in'] == true,
+            'teacher_time_in': decoded['teacher_time_in']?.toString(),
+            'teacher_status': decoded['teacher_status']?.toString() ?? 'hadir',
           };
         }
       }
       return {'success': false, 'message': 'Gagal mengambil data siswa.'};
     } catch (e) {
       return {'success': false, 'message': 'Error presensi siswa: $e'};
+    }
+  }
+
+  /// Teacher check-in to class session according to schedule / assignment
+  Future<Map<String, dynamic>> teacherClassCheckIn({
+    required int assignmentId,
+    required String date,
+    required int meetingNo,
+    String status = 'hadir',
+  }) async {
+    try {
+      final response = await _executeWithFallback(
+        'teacher_class_checkin',
+        isPost: true,
+        body: jsonEncode({
+          'assignment_id': assignmentId,
+          'date': date,
+          'meeting_no': meetingNo,
+          'status': status,
+        }),
+      );
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return {
+          'success': decoded['ok'] == true,
+          'message': decoded['message']?.toString() ?? 'Absen masuk kelas berhasil.',
+          'teacher_time_in': decoded['teacher_time_in']?.toString(),
+        };
+      }
+      return {'success': false, 'message': 'Respons server tidak valid.'};
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal absen masuk kelas: $e'};
     }
   }
 

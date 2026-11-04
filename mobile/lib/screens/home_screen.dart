@@ -151,14 +151,14 @@ class _HomeScreenState extends State<HomeScreen> {
               elevation: 0.5,
               title: Row(
                 children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2563EB),
-                      borderRadius: BorderRadius.circular(8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset(
+                      'assets/logo.png',
+                      width: 34,
+                      height: 34,
+                      fit: BoxFit.contain,
                     ),
-                    child: const Icon(Icons.school_rounded, color: Colors.white, size: 20),
                   ),
                   const SizedBox(width: 10),
                   const Column(
