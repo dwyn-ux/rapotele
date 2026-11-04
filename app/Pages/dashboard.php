@@ -262,8 +262,8 @@ function page_live_monitor_feed(): void
     $date = date('Y-m-d');
     $timeNow = date('H:i');
 
-    // Fetch all active classes
-    $classes = fetch_all('SELECT id, name, level FROM classes ORDER BY level, name');
+    // Fetch all active classes in proper natural school order (SMP 7-9 then SMA 10-12)
+    $classes = fetch_all('SELECT id, name, grade, level, display_order FROM classes ORDER BY display_order ASC, CAST(grade AS INTEGER) ASC, name ASC');
 
     // Fetch all schedules for today
     $schedules = fetch_all(
@@ -628,25 +628,83 @@ function render_live_monitoring_widget(): void
         cursor: pointer;
     }
 
-    /* Cards Grid (Compact 5 columns x 2 rows for 10 classes) */
-    .live-cards-grid {
-        display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-        gap: 10px;
-        padding: 14px;
+    /* Cards Container */
+    .live-cards-container {
+        padding: 14px 18px;
         background: #f8fafc;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
     }
-    @media (max-width: 1300px) {
-        .live-cards-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    /* Level Section */
+    .live-level-section {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .live-level-title-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 2px 2px;
+    }
+    .live-level-pill {
+        font-size: 0.72rem;
+        font-weight: 800;
+        padding: 2px 8px;
+        border-radius: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .pill-smp {
+        background: #0284c7;
+        color: #ffffff;
+    }
+    .pill-sma {
+        background: #7c3aed;
+        color: #ffffff;
+    }
+    .live-level-title-text {
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #334155;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+    }
+    .live-level-line {
+        flex: 1;
+        height: 1px;
+        background: #e2e8f0;
+    }
+
+    /* Subgrids for SMP (6 classes) and SMA (4 classes) */
+    .live-cards-row {
+        display: grid;
+        gap: 10px;
+    }
+    .live-cards-row.grid-smp {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+    .live-cards-row.grid-sma {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    @media (max-width: 1400px) {
+        .live-cards-row.grid-smp { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .live-cards-row.grid-sma { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     }
     @media (max-width: 1024px) {
-        .live-cards-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .live-cards-row.grid-smp { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .live-cards-row.grid-sma { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 768px) {
-        .live-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .live-cards-row.grid-smp { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .live-cards-row.grid-sma { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 480px) {
-        .live-cards-grid { grid-template-columns: 1fr; }
+        .live-cards-row.grid-smp { grid-template-columns: 1fr; }
+        .live-cards-row.grid-sma { grid-template-columns: 1fr; }
     }
 
     /* Compact Class Card */
@@ -662,6 +720,7 @@ function render_live_monitoring_widget(): void
         gap: 8px;
         transition: transform 0.15s ease, box-shadow 0.15s ease;
         min-height: 155px;
+        box-sizing: border-box;
     }
     .live-class-card:hover {
         transform: translateY(-2px);
@@ -745,6 +804,8 @@ function render_live_monitoring_widget(): void
         font-weight: 700;
         width: 100%;
         box-sizing: border-box;
+        height: 24px;
+        justify-content: center;
     }
     .live-status-pill.pill-alert {
         background: #fee2e2;
@@ -940,17 +1001,25 @@ function render_live_monitoring_widget(): void
         border-color: #334155 !important;
         color: #f8fafc !important;
     }
-    .live-monitor-panel.is-fullscreen .live-cards-grid {
+    .live-monitor-panel.is-fullscreen .live-cards-container {
         flex: 1 !important;
         height: auto !important;
-        max-height: none !important;
-        padding: 10px 16px !important;
+        padding: 10px 18px !important;
         background: #0b1120 !important;
-        display: grid !important;
-        grid-template-columns: repeat(5, 1fr) !important;
-        grid-template-rows: repeat(2, 1fr) !important;
-        gap: 10px !important;
         overflow: hidden !important;
+        justify-content: space-evenly !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-level-title-text {
+        color: #cbd5e1 !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-level-line {
+        background: #334155 !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-cards-row.grid-smp {
+        grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-cards-row.grid-sma {
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
     }
     .live-monitor-panel.is-fullscreen .live-class-card {
         height: 100% !important;
@@ -1063,9 +1132,9 @@ function render_live_monitoring_widget(): void
             </div>
         </div>
 
-        <!-- Cards Container Grid -->
-        <div class="live-cards-grid" id="live-cards-container">
-            <div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: #64748b;">
+        <!-- Cards Container (Structured by School Units) -->
+        <div class="live-cards-container" id="live-cards-container">
+            <div style="text-align: center; padding: 2rem; color: #64748b;">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: livePulseAnim 1s infinite; margin-bottom: 6px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                 <div>Memuat pemantauan kelas...</div>
             </div>
@@ -1165,6 +1234,118 @@ function render_live_monitoring_widget(): void
             if (currentVal) periodSelect.value = currentVal;
         }
 
+        function renderCardHtml(card, targetPeriod) {
+            // Determine slot to show
+            var slot = null;
+            var isLiveCurrent = false;
+
+            if (selectedPeriod === 'current') {
+                if (card.current_slot) {
+                    slot = card.current_slot;
+                    isLiveCurrent = true;
+                } else if (card.next_slot) {
+                    slot = card.next_slot;
+                } else if (card.latest_slot) {
+                    slot = card.latest_slot;
+                }
+            } else if (targetPeriod && card.slots && card.slots[targetPeriod]) {
+                slot = card.slots[targetPeriod];
+            }
+
+            // Determine Card State: Alert (Red), Present (Green), Neutral (Slate)
+            var cardClass = 'status-neutral';
+            var statusPill = '';
+            var teacherName = '-';
+            var subjectName = '-';
+            var periodLabel = 'Tidak ada KBM';
+            var studentStats = { hadir: 0, sakit: 0, izin: 0, alpa: 0 };
+            var attUrl = '#';
+
+            if (slot) {
+                teacherName = slot.teacher_name || '-';
+                subjectName = slot.subject_name || '-';
+                periodLabel = 'Jam ' + slot.period_no + ' &bull; ' + slot.start_time;
+                studentStats = slot.student_stats || { hadir: 0, sakit: 0, izin: 0, alpa: 0 };
+                attUrl = slot.attendance_url || '#';
+
+                if (slot.is_checked_in) {
+                    cardClass = 'status-present';
+                    var inTime = slot.checkin_time ? ' (' + slot.checkin_time.substring(0, 5) + ')' : '';
+                    var gpsIcon = slot.has_gps ? ' ' + svgPin : '';
+                    statusPill = '<div class="live-status-pill pill-present">' +
+                        svgCheck +
+                        '<span>GURU HADIR' + inTime + gpsIcon + '</span>' +
+                        '</div>';
+                } else if (slot.time_status === 'ongoing' || isLiveCurrent) {
+                    cardClass = 'status-alert';
+                    statusPill = '<div class="live-status-pill pill-alert">' +
+                        svgAlert +
+                        '<span>BELUM HADIR (ALERT)</span>' +
+                        '</div>';
+                } else if (slot.time_status === 'upcoming') {
+                    cardClass = 'status-neutral';
+                    statusPill = '<div class="live-status-pill pill-neutral">' +
+                        svgClock +
+                        '<span>JAM BERIKUTNYA</span>' +
+                        '</div>';
+                } else {
+                    cardClass = 'status-neutral';
+                    statusPill = '<div class="live-status-pill pill-neutral">' +
+                        svgClock +
+                        '<span>SELESAI (TANPA ABSEN)</span>' +
+                        '</div>';
+                }
+            } else {
+                statusPill = '<div class="live-status-pill pill-neutral">' +
+                    svgClock +
+                    '<span>KOSONG / ISTIRAHAT</span>' +
+                    '</div>';
+            }
+
+            var levelClass = (card.class_level.toUpperCase() === 'SMA') ? 'level-sma' : 'level-smp';
+
+            var cHtml = '<div class="live-class-card ' + cardClass + '">';
+            
+            // Head
+            cHtml += '<div class="live-card-head">';
+            cHtml += '<div class="live-card-title">';
+            cHtml += '<span>Kelas ' + escapeHtml(card.class_name) + '</span>';
+            cHtml += '<span class="live-badge-level ' + levelClass + '">' + escapeHtml(card.class_level) + '</span>';
+            cHtml += '</div>';
+            cHtml += '<div class="live-card-period">' + periodLabel + '</div>';
+            cHtml += '</div>';
+
+            // Status Banner
+            cHtml += statusPill;
+
+            // Lesson Info
+            cHtml += '<div class="live-lesson-info">';
+            cHtml += '<div class="live-info-row" title="Guru: ' + escapeHtml(teacherName) + '">' + svgUser + '<span>Guru: <strong>' + escapeHtml(teacherName) + '</strong></span></div>';
+            cHtml += '<div class="live-info-row" title="Mapel: ' + escapeHtml(subjectName) + '">' + svgBook + '<span>Mapel: <strong>' + escapeHtml(subjectName) + '</strong></span></div>';
+            cHtml += '</div>';
+
+            // Student Attendance Strip (Numbers only with 1-letter labels)
+            cHtml += '<div class="live-student-strip">';
+            cHtml += '<div class="live-st-box st-box-h" title="Siswa Hadir: ' + (studentStats.hadir || 0) + '"><span class="live-st-num">' + (studentStats.hadir || 0) + '</span><span class="live-st-lbl">Hadir</span></div>';
+            cHtml += '<div class="live-st-box st-box-s" title="Siswa Sakit: ' + (studentStats.sakit || 0) + '"><span class="live-st-num">' + (studentStats.sakit || 0) + '</span><span class="live-st-lbl">Sakit</span></div>';
+            cHtml += '<div class="live-st-box st-box-i" title="Siswa Izin: ' + (studentStats.izin || 0) + '"><span class="live-st-num">' + (studentStats.izin || 0) + '</span><span class="live-st-lbl">Izin</span></div>';
+            cHtml += '<div class="live-st-box st-box-a" title="Siswa Alpa: ' + (studentStats.alpa || 0) + '"><span class="live-st-num">' + (studentStats.alpa || 0) + '</span><span class="live-st-lbl">Alpa</span></div>';
+            cHtml += '</div>';
+
+            // Foot
+            cHtml += '<div class="live-card-foot">';
+            cHtml += '<span style="font-size: 0.7rem; color: #94a3b8;">Presensi</span>';
+            if (attUrl && attUrl !== '#') {
+                cHtml += '<a href="' + attUrl + '" class="live-btn-detail" title="Buka Detail Presensi"><span>Detail Siswa</span>' + svgExtLink + '</a>';
+            } else {
+                cHtml += '<span style="font-size: 0.7rem; color: #cbd5e1;">Belum Ada Sesi</span>';
+            }
+            cHtml += '</div>';
+
+            cHtml += '</div>';
+            return cHtml;
+        }
+
         function renderCards() {
             if (!cardsContainer) return;
 
@@ -1202,127 +1383,54 @@ function render_live_monitoring_widget(): void
             });
 
             if (visibleCards.length === 0) {
-                cardsContainer.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: #64748b;">' +
+                cardsContainer.innerHTML = '<div style="text-align: center; padding: 3rem; color: #64748b;">' +
                     '<div style="font-weight: 600; margin-bottom: 4px;">Tidak ada kelas yang cocok dengan filter saat ini.</div>' +
                     '<div style="font-size: 0.8rem;">Coba ubah filter jenjang atau pilih jam pelajaran lain.</div>' +
                     '</div>';
                 return;
             }
 
-            var html = '';
-            visibleCards.forEach(function(card){
-                // Determine slot to show
-                var slot = null;
-                var isLiveCurrent = false;
-
-                if (selectedPeriod === 'current') {
-                    if (card.current_slot) {
-                        slot = card.current_slot;
-                        isLiveCurrent = true;
-                    } else if (card.next_slot) {
-                        slot = card.next_slot;
-                    } else if (card.latest_slot) {
-                        slot = card.latest_slot;
-                    }
-                } else if (targetPeriod && card.slots && card.slots[targetPeriod]) {
-                    slot = card.slots[targetPeriod];
-                }
-
-                // Determine Card State: Alert (Red), Present (Green), Neutral (Slate)
-                var cardClass = 'status-neutral';
-                var statusPill = '';
-                var teacherName = '-';
-                var subjectName = '-';
-                var periodLabel = 'Tidak ada KBM';
-                var studentStats = { hadir: 0, sakit: 0, izin: 0, alpa: 0 };
-                var attUrl = '#';
-
-                if (slot) {
-                    teacherName = slot.teacher_name || '-';
-                    subjectName = slot.subject_name || '-';
-                    periodLabel = 'Jam ke-' + slot.period_no + ' &bull; ' + slot.start_time + ' - ' + slot.end_time;
-                    studentStats = slot.student_stats || { hadir: 0, sakit: 0, izin: 0, alpa: 0 };
-                    attUrl = slot.attendance_url || '#';
-
-                    if (slot.is_checked_in) {
-                        cardClass = 'status-present';
-                        var inTime = slot.checkin_time ? ' (' + slot.checkin_time.substring(0, 5) + ')' : '';
-                        var gpsIcon = slot.has_gps ? ' ' + svgPin : '';
-                        statusPill = '<div class="live-status-pill pill-present">' +
-                            svgCheck +
-                            '<span>GURU HADIR' + inTime + gpsIcon + '</span>' +
-                            '</div>';
-                    } else if (slot.time_status === 'ongoing' || isLiveCurrent) {
-                        cardClass = 'status-alert';
-                        statusPill = '<div class="live-status-pill pill-alert">' +
-                            svgAlert +
-                            '<span>BELUM HADIR (ALERT)</span>' +
-                            '</div>';
-                    } else if (slot.time_status === 'upcoming') {
-                        cardClass = 'status-neutral';
-                        statusPill = '<div class="live-status-pill pill-neutral">' +
-                            svgClock +
-                            '<span>JAM BERIKUTNYA</span>' +
-                            '</div>';
-                    } else {
-                        cardClass = 'status-neutral';
-                        statusPill = '<div class="live-status-pill pill-neutral">' +
-                            svgClock +
-                            '<span>SELESAI (TANPA ABSEN)</span>' +
-                            '</div>';
-                    }
+            // Group into SMP and SMA
+            var smpCards = [];
+            var smaCards = [];
+            visibleCards.forEach(function(c){
+                if (c.class_level.toUpperCase() === 'SMA') {
+                    smaCards.push(c);
                 } else {
-                    statusPill = '<div class="live-status-pill pill-neutral">' +
-                        svgClock +
-                        '<span>KOSONG / ISTIRAHAT</span>' +
-                        '</div>';
+                    smpCards.push(c);
                 }
-
-                var levelClass = (card.class_level.toUpperCase() === 'SMA') ? 'level-sma' : 'level-smp';
-
-                html += '<div class="live-class-card ' + cardClass + '">';
-                
-                // Head
-                html += '<div class="live-card-head">';
-                html += '<div class="live-card-title">';
-                html += '<span>Kelas ' + escapeHtml(card.class_name) + '</span>';
-                html += '<span class="live-badge-level ' + levelClass + '">' + escapeHtml(card.class_level) + '</span>';
-                html += '</div>';
-                html += '<div class="live-card-period">' + periodLabel + '</div>';
-                html += '</div>';
-
-                // Status Banner
-                html += statusPill;
-
-                // Lesson Info
-                html += '<div class="live-lesson-info">';
-                html += '<div class="live-info-row">' + svgUser + '<span>Guru: <strong>' + escapeHtml(teacherName) + '</strong></span></div>';
-                html += '<div class="live-info-row">' + svgBook + '<span>Mapel: <strong>' + escapeHtml(subjectName) + '</strong></span></div>';
-                html += '</div>';
-
-                // Student Attendance Strip (Numbers only with 1-letter labels)
-                html += '<div>';
-                html += '<div style="font-size: 0.72rem; font-weight: 700; color: #64748b; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px;">Kehadiran Siswa:</div>';
-                html += '<div class="live-student-strip">';
-                html += '<div class="live-st-box st-box-h" title="Siswa Hadir"><span class="live-st-num">' + (studentStats.hadir || 0) + '</span><span class="live-st-lbl">Hadir</span></div>';
-                html += '<div class="live-st-box st-box-s" title="Siswa Sakit"><span class="live-st-num">' + (studentStats.sakit || 0) + '</span><span class="live-st-lbl">Sakit</span></div>';
-                html += '<div class="live-st-box st-box-i" title="Siswa Izin"><span class="live-st-num">' + (studentStats.izin || 0) + '</span><span class="live-st-lbl">Izin</span></div>';
-                html += '<div class="live-st-box st-box-a" title="Siswa Alpa"><span class="live-st-num">' + (studentStats.alpa || 0) + '</span><span class="live-st-lbl">Alpa</span></div>';
-                html += '</div>';
-                html += '</div>';
-
-                // Foot
-                html += '<div class="live-card-foot">';
-                html += '<span style="font-size: 0.72rem; color: #94a3b8;">Presensi Kelas</span>';
-                if (attUrl && attUrl !== '#') {
-                    html += '<a href="' + attUrl + '" class="live-btn-detail" title="Buka Detail Presensi"><span>Detail Siswa</span>' + svgExtLink + '</a>';
-                } else {
-                    html += '<span style="font-size: 0.72rem; color: #cbd5e1;">Belum Ada Sesi</span>';
-                }
-                html += '</div>';
-
-                html += '</div>';
             });
+
+            var html = '';
+
+            // Section SMP
+            if (smpCards.length > 0) {
+                html += '<div class="live-level-section">';
+                html += '<div class="live-level-title-bar">';
+                html += '<span class="live-level-pill pill-smp">SMP</span>';
+                html += '<span class="live-level-title-text">Kelas SMP (' + smpCards.length + ' Kelas)</span>';
+                html += '<span class="live-level-line"></span>';
+                html += '</div>';
+                html += '<div class="live-cards-row grid-smp">';
+                smpCards.forEach(function(c){ html += renderCardHtml(c, targetPeriod); });
+                html += '</div>';
+                html += '</div>';
+            }
+
+            // Section SMA
+            if (smaCards.length > 0) {
+                var topMargin = (smpCards.length > 0) ? ' style="margin-top: 14px;"' : '';
+                html += '<div class="live-level-section"' + topMargin + '>';
+                html += '<div class="live-level-title-bar">';
+                html += '<span class="live-level-pill pill-sma">SMA</span>';
+                html += '<span class="live-level-title-text">Kelas SMA (' + smaCards.length + ' Kelas)</span>';
+                html += '<span class="live-level-line"></span>';
+                html += '</div>';
+                html += '<div class="live-cards-row grid-sma">';
+                smaCards.forEach(function(c){ html += renderCardHtml(c, targetPeriod); });
+                html += '</div>';
+                html += '</div>';
+            }
 
             cardsContainer.innerHTML = html;
         }
