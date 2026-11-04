@@ -21,7 +21,7 @@ class ApiService {
   String? _token;
   UserModel? _currentUser;
   SchoolModel? _currentSchool;
-  String? _workingEndpointPrefix; // caches working path format (e.g. '/api.php' or '/public/api.php')
+  String? _workingEndpointPrefix;
 
   String get baseUrl => _baseUrl;
   String? get token => _token;
@@ -33,7 +33,6 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     final savedBase = prefs.getString(_keyBaseUrl);
     if (savedBase != null && savedBase.isNotEmpty) {
-      // Fix potential typo from earlier builds
       if (savedBase.contains('smpmuhashidiq')) {
         _baseUrl = savedBase.replaceAll('smpmuhashidiq', 'smpmuashidiq');
         await prefs.setString(_keyBaseUrl, _baseUrl);
@@ -107,7 +106,6 @@ class ApiService {
   List<Uri> _candidateUris(String action, [Map<String, String>? queryParams]) {
     final params = {'action': action, ...?queryParams};
 
-    // If we already know the working format, put it first
     final candidates = <String>[];
     if (_workingEndpointPrefix != null) {
       candidates.add('$_baseUrl$_workingEndpointPrefix');
@@ -170,7 +168,7 @@ class ApiService {
         final client = http.Client();
         final request = http.Request(isPost ? 'POST' : 'GET', uri);
         request.headers.addAll(_headers());
-        request.followRedirects = false; // Don't silently follow redirect to HTML login page
+        request.followRedirects = false;
 
         if (isPost && body != null) {
           request.body = body;
@@ -179,12 +177,10 @@ class ApiService {
         final streamed = await client.send(request).timeout(const Duration(seconds: 10));
         final response = await http.Response.fromStream(streamed);
 
-        // If returned valid JSON (not 301/302 redirect and not HTML)
         if (response.statusCode != 301 &&
             response.statusCode != 302 &&
             !response.body.trim().startsWith('<') &&
             response.headers['content-type']?.contains('json') == true) {
-          // Remember working path prefix
           final pathAndQuery = uri.path + (uri.queryParameters.containsKey('page') ? '?page=api' : '');
           final prefix = pathAndQuery.replaceFirst(RegExp(r'\?action=.*$'), '');
           _workingEndpointPrefix = prefix.isNotEmpty ? prefix : null;
@@ -214,23 +210,39 @@ class ApiService {
         }),
       );
 
-      // Check if redirected to HTML
       if (response.statusCode == 301 || response.statusCode == 302 || response.body.trim().startsWith('<')) {
         return {
           'success': false,
-          'message': 'Server mengalihkan ke halaman login web. Pastikan file API sudah terupdate di server atau periksa URL server.',
+          'message': 'Server mengalihkan ke login web. Silakan lakukan "Update from Remote / Git Pull" di cPanel hosting Anda.',
         };
       }
 
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (response.statusCode == 200 && data['ok'] == true) {
-        final token = data['token'] as String;
-        final user = UserModel.fromJson(data['user'] as Map<String, dynamic>);
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        return {
+          'success': false,
+          'message': 'Format respons server tidak valid.',
+        };
+      }
+
+      final data = decoded;
+
+      // Check if server redirected to web login
+      if (data['redirect'] != null && data['token'] == null) {
+        return {
+          'success': false,
+          'message': 'Server live belum di-pull di cPanel (merespon redirect web login). Silakan klik "Update from Remote" di cPanel Git Version Control atau gunakan USB Localhost.',
+        };
+      }
+
+      if (response.statusCode == 200 && data['ok'] == true && data['token'] != null) {
+        final token = data['token'].toString();
+        final user = UserModel.fromJson((data['user'] as Map<String, dynamic>?) ?? {});
         final school = SchoolModel.fromJson((data['school'] as Map<String, dynamic>?) ?? {});
         await saveAuth(token: token, user: user, school: school);
-        return {'success': true, 'message': data['message'] ?? 'Login berhasil'};
+        return {'success': true, 'message': data['message']?.toString() ?? 'Login berhasil'};
       } else {
-        return {'success': false, 'message': data['message'] ?? 'Login gagal'};
+        return {'success': false, 'message': data['message']?.toString() ?? 'Username atau password salah'};
       }
     } catch (e) {
       return {'success': false, 'message': 'Gagal terhubung ke server ($baseUrl): $e'};
@@ -241,11 +253,11 @@ class ApiService {
     try {
       final response = await _executeWithFallback('whatsapp_feed', queryParams: {'limit': limit.toString()});
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        if (data['ok'] == true) {
-          final stats = WhatsAppStats.fromJson((data['stats'] as Map<String, dynamic>?) ?? {});
-          final queueRaw = (data['queue'] as List<dynamic>?) ?? [];
-          final logsRaw = (data['logs'] as List<dynamic>?) ?? [];
+        final dynamic decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['ok'] == true) {
+          final stats = WhatsAppStats.fromJson((decoded['stats'] as Map<String, dynamic>?) ?? {});
+          final queueRaw = (decoded['queue'] as List<dynamic>?) ?? [];
+          final logsRaw = (decoded['logs'] as List<dynamic>?) ?? [];
 
           return {
             'success': true,
@@ -269,13 +281,16 @@ class ApiService {
         body: jsonEncode({'limit': limit}),
       );
 
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      return {
-        'success': data['ok'] == true,
-        'message': data['message'] ?? 'Selesai memproses antrian.',
-        'sent': data['sent'] ?? 0,
-        'failed': data['failed'] ?? 0,
-      };
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return {
+          'success': decoded['ok'] == true,
+          'message': decoded['message']?.toString() ?? 'Selesai memproses antrian.',
+          'sent': decoded['sent'] ?? 0,
+          'failed': decoded['failed'] ?? 0,
+        };
+      }
+      return {'success': false, 'message': 'Format respons tidak valid.'};
     } catch (e) {
       return {'success': false, 'message': 'Koneksi gagal: $e'};
     }
@@ -285,9 +300,9 @@ class ApiService {
     try {
       final response = await _executeWithFallback('notifications');
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        if (data['ok'] == true) {
-          final list = (data['notifications'] as List<dynamic>?) ?? [];
+        final dynamic decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['ok'] == true) {
+          final list = (decoded['notifications'] as List<dynamic>?) ?? [];
           return list.map((e) => NotificationItem.fromJson(e as Map<String, dynamic>)).toList();
         }
       }
@@ -301,15 +316,15 @@ class ApiService {
     try {
       final response = await _executeWithFallback('my_schedule');
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        if (data['ok'] == true) {
-          final todayRaw = (data['today'] as List<dynamic>?) ?? [];
-          final weekRaw = (data['week'] as List<dynamic>?) ?? [];
+        final dynamic decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['ok'] == true) {
+          final todayRaw = (decoded['today'] as List<dynamic>?) ?? [];
+          final weekRaw = (decoded['week'] as List<dynamic>?) ?? [];
 
           return {
             'success': true,
-            'today_day_name': data['today_day_name'] ?? '',
-            'today_date': data['today_date'] ?? '',
+            'today_day_name': decoded['today_day_name'] ?? '',
+            'today_date': decoded['today_date'] ?? '',
             'today': todayRaw.map((e) => ScheduleItem.fromJson(e as Map<String, dynamic>)).toList(),
             'week': weekRaw.map((e) => DaySchedule.fromJson(e as Map<String, dynamic>)).toList(),
           };
@@ -324,11 +339,14 @@ class ApiService {
   Future<Map<String, dynamic>> triggerScheduleReminders() async {
     try {
       final response = await _executeWithFallback('trigger_schedule_reminders', isPost: true);
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      return {
-        'success': data['ok'] == true,
-        'message': data['message'] ?? 'Reminder jadwal berhasil dipicu.',
-      };
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return {
+          'success': decoded['ok'] == true,
+          'message': decoded['message']?.toString() ?? 'Reminder jadwal berhasil dipicu.',
+        };
+      }
+      return {'success': false, 'message': 'Format respons tidak valid.'};
     } catch (e) {
       return {'success': false, 'message': 'Error: $e'};
     }
