@@ -492,7 +492,7 @@ if (!function_exists('sibling_assignments_for_assignment')) {
 if (!function_exists('class_order_by_clause')) {
     function class_order_by_clause(string $prefix = ''): string
     {
-        $p = $prefix !== '' ? "{$prefix}." : '';
+        $p = $prefix !== '' ? rtrim($prefix, '.') . '.' : '';
         $hasDisplayOrder = function_exists('table_column_exists') && table_column_exists('classes', 'display_order');
         $displayOrderClause = $hasDisplayOrder ? "COALESCE(NULLIF({$p}display_order, 0), 9999) ASC, " : '';
 

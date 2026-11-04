@@ -35,6 +35,7 @@ return [
     'delete_lesson_schedule' => 'action_delete_lesson_schedule',
     'save_schedule_grid' => 'action_save_schedule_grid',
     'save_schedule_daily_matrix' => 'action_save_schedule_daily_matrix',
+    'save_teacher_schedule_matrix' => 'action_save_teacher_schedule_matrix',
     'save_schedule_request' => 'action_save_schedule_request',
     'delete_schedule_request' => 'action_delete_schedule_request',
     'save_journal' => 'action_save_journal',

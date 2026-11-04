@@ -868,11 +868,28 @@ function action_generate_lesson_schedule(): void
 
 function action_save_lesson_schedule(): void
 {
-    require_role(['admin']);
+    require_role(['admin', 'guru']);
     schedule_require_tables();
 
     $id = (int)($_POST['id'] ?? 0);
     $assignment = schedule_assignment_by_id((int)($_POST['assignment_id'] ?? 0));
+
+    if (user_role() === 'guru') {
+        $teacherId = schedule_current_teacher_id();
+        if ((int)$assignment['teacher_id'] !== $teacherId) {
+            throw new RuntimeException('Anda hanya dapat mengatur jadwal untuk penugasan mengajar Anda sendiri.');
+        }
+        if ($id > 0) {
+            $existingSched = fetch_one('SELECT teacher_id, locked FROM lesson_schedules WHERE id = ?', [$id]);
+            if (!$existingSched || (int)$existingSched['teacher_id'] !== $teacherId) {
+                throw new RuntimeException('Anda tidak memiliki akses ke jadwal ini.');
+            }
+            if ((int)$existingSched['locked'] === 1) {
+                throw new RuntimeException('Jadwal ini dikunci oleh admin.');
+            }
+        }
+    }
+
     $day = schedule_normalize_day($_POST['day_of_week'] ?? 1);
     $period = schedule_clamped_int($_POST['period_no'] ?? 1, 1, 12, 1);
     [$defaultStart, $defaultEnd] = schedule_time_for_period($period);
@@ -881,7 +898,7 @@ function action_save_lesson_schedule(): void
     if ($endTime <= $startTime) {
         throw new RuntimeException('Jam selesai harus lebih besar dari jam mulai.');
     }
-    $locked = isset($_POST['locked']) ? 1 : 0;
+    $locked = (is_admin() && isset($_POST['locked'])) ? 1 : 0;
     $note = trim((string)($_POST['note'] ?? ''));
 
     if ($id > 0 && !fetch_one('SELECT id FROM lesson_schedules WHERE id = ?', [$id])) {
@@ -975,12 +992,23 @@ function action_save_lesson_schedule(): void
 
 function action_delete_lesson_schedule(): void
 {
-    require_role(['admin']);
+    require_role(['admin', 'guru']);
     schedule_require_tables();
 
     $id = (int)($_POST['id'] ?? 0);
     $sched = fetch_one('SELECT * FROM lesson_schedules WHERE id = ?', [$id]);
     if ($sched) {
+        if (user_role() === 'guru') {
+            $teacherId = schedule_current_teacher_id();
+            if ((int)$sched['teacher_id'] !== $teacherId) {
+                flash('danger', 'Anda tidak memiliki hak akses untuk menghapus jadwal guru lain.');
+                redirect_to('lesson-schedule');
+            }
+            if ((int)$sched['locked'] === 1) {
+                flash('danger', 'Jadwal ini terkunci oleh admin dan tidak dapat dihapus.');
+                redirect_to('lesson-schedule');
+            }
+        }
         $assignment = schedule_assignment_by_id((int)$sched['assignment_id']);
         if ($assignment && function_exists('sibling_assignments_for_assignment')) {
             $siblings = sibling_assignments_for_assignment($assignment);
@@ -1070,7 +1098,11 @@ function page_lesson_schedule(): void
     }
 
     if (is_admin()) {
-        render_lesson_schedule_admin_page();
+        if (!empty($_GET['view']) && $_GET['view'] === 'teacher_matrix' && (int)($_GET['teacher_id'] ?? 0) > 0) {
+            render_lesson_schedule_teacher_page((int)$_GET['teacher_id']);
+        } else {
+            render_lesson_schedule_admin_page();
+        }
     } elseif (user_role() === 'guru') {
         render_lesson_schedule_teacher_page();
     } else {
@@ -1118,23 +1150,233 @@ function render_lesson_schedule_admin_page(): void
     // render_schedule_request_table($requests, true);
 }
 
-function render_lesson_schedule_teacher_page(): void
+function render_lesson_schedule_teacher_page(?int $customTeacherId = null): void
 {
-    $teacherId = schedule_current_teacher_id();
-    $editRequest = [];
-    if ((int)($_GET['edit_request'] ?? 0) > 0) {
-        $editRequest = schedule_request_by_id((int)$_GET['edit_request']);
+    $isGuru = user_role() === 'guru';
+    $teacherId = $customTeacherId ?: ($isGuru ? (int)(current_user()['teacher_id'] ?? 0) : (int)($_GET['teacher_id'] ?? 0));
+
+    if ($teacherId <= 0) {
+        echo '<div class="alert danger">Akun Anda belum terhubung dengan data guru. Silakan hubungi Administrator untuk menghubungkan akun pengguna Anda ke data guru.</div>';
+        return;
     }
 
-    $rows = schedule_rows(['teacher_id' => $teacherId]);
-    $requests = schedule_request_rows($teacherId);
+    $teacher = fetch_one('SELECT * FROM teachers WHERE id = ?', [$teacherId]);
+    if (!$teacher) {
+        echo '<div class="alert danger">Data guru tidak ditemukan.</div>';
+        return;
+    }
+
+    $orderClause = function_exists('class_order_by_clause') ? class_order_by_clause('c') : 'c.display_order, c.grade, c.name';
+    $assignments = fetch_all(
+        'SELECT ta.id, ta.class_id, ta.subject_id, c.name AS class_name, c.grade, c.physical_group, s.name AS subject_name, s.short_name
+         FROM teaching_assignments ta
+         JOIN classes c ON c.id = ta.class_id
+         JOIN subjects s ON s.id = ta.subject_id
+         WHERE ta.teacher_id = ? AND ta.active = 1
+         ORDER BY ' . $orderClause . ', s.name',
+        [$teacherId]
+    );
+
+    $assignedSubjects = [];
+    foreach ($assignments as $a) {
+        $assignedSubjects[$a['subject_name']][] = $a['class_name'] . (!empty($a['physical_group']) ? ' (' . $a['physical_group'] . ')' : '');
+    }
+
+    $existing = [];
+    $totalFilled = 0;
+    foreach (fetch_all('SELECT ls.*, c.name AS class_name, s.name AS subject_name FROM lesson_schedules ls JOIN classes c ON c.id = ls.class_id JOIN subjects s ON s.id = ls.subject_id WHERE ls.teacher_id = ?', [$teacherId]) as $row) {
+        $existing[(int)$row['day_of_week']][(int)$row['period_no']] = $row;
+        $totalFilled++;
+    }
+
+    $school = get_school_profile();
+    $maxPeriods = (int)($school['max_periods'] ?? 10);
+    $days = schedule_days();
+
+    $occupied = [];
+    foreach (fetch_all('SELECT ls.class_id, ls.day_of_week, ls.period_no, c.name AS class_name, t.name AS teacher_name FROM lesson_schedules ls JOIN classes c ON c.id = ls.class_id JOIN teachers t ON t.id = ls.teacher_id WHERE ls.teacher_id <> ?', [$teacherId]) as $occ) {
+        $occupied[(int)$occ['day_of_week']][(int)$occ['period_no']][(int)$occ['class_id']] = $occ['teacher_name'];
+    }
+
+    if (is_admin()): ?>
+        <div style="margin-bottom:1rem;">
+            <a href="<?= e(route_url('lesson-schedule')) ?>" class="button small secondary" style="display:inline-flex;align-items:center;gap:6px;font-weight:600;">
+                <i data-lucide="arrow-left" style="width:14px;height:14px;"></i> Kembali ke Jadwal Admin
+            </a>
+        </div>
+    <?php endif;
+
     render_schedule_metrics([
-        'Slot Mengajar' => count($rows),
+        'Nama Guru' => (string)$teacher['name'],
+        'Beban Penugasan' => count($assignments) . ' Penugasan Kelas',
+        'Slot Terjadwal' => $totalFilled . ' Jam Pelajaran',
     ]);
-    render_lesson_schedule_table($rows, false);
-    // Fitur Request Jadwal di-hidden sementara
-    // render_schedule_request_form($editRequest, [], $teacherId);
-    // render_schedule_request_table($requests, true);
+    ?>
+
+    <div class="alert info" style="margin-bottom:1.5rem;display:flex;align-items:flex-start;gap:12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:14px 18px;color:#0369a1;">
+        <i data-lucide="info" style="width:24px;height:24px;flex-shrink:0;margin-top:2px;color:#0284c7;"></i>
+        <div style="font-size:0.92rem;line-height:1.5;">
+            <strong>Pengisian Jadwal Mengajar Mandiri:</strong><br>
+            Silakan tentukan jadwal mengajar Anda dari hari <strong>Senin sampai Sabtu</strong> sesuai dengan jadwal sekolah yang sudah ada.
+            Pilih kelas dan mata pelajaran pada jam yang sesuai, lalu klik <strong>"Simpan Jadwal Mengajar"</strong>.
+            <div style="margin-top:4px;color:#0f766e;font-weight:600;">
+                💡 Jadwal ini akan langsung digunakan pada aplikasi mobile untuk <strong>Presensi Masuk Kelas</strong> dan <strong>Absensi Siswa</strong>.
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-bottom:1.25rem;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;">
+        <div style="font-size:0.85rem;font-weight:700;color:var(--text);margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+            <i data-lucide="book-open" style="width:16px;height:16px;color:#0284c7;"></i> Penugasan Mengajar Anda:
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            <?php if (empty($assignedSubjects)): ?>
+                <span style="color:#ef4444;font-size:0.85rem;">Belum ada penugasan mengajar aktif untuk akun ini. Silakan hubungi bagian kurikulum.</span>
+            <?php else: ?>
+                <?php foreach ($assignedSubjects as $subj => $classList): ?>
+                    <span style="display:inline-flex;align-items:center;gap:5px;background:#f1f5f9;border:1px solid #cbd5e1;padding:4px 10px;border-radius:6px;font-size:0.82rem;">
+                        <strong><?= e($subj) ?>:</strong> <?= e(implode(', ', array_unique($classList))) ?>
+                    </span>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <section class="panel" style="overflow:hidden;margin-bottom:2rem;">
+        <form method="post" id="teacher-schedule-matrix-form">
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="save_teacher_schedule_matrix">
+            <input type="hidden" name="teacher_id" value="<?= e($teacherId) ?>">
+
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border);background:var(--surface);flex-wrap:wrap;gap:10px;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:1.05rem;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;">
+                        <i data-lucide="calendar" style="color:#0284c7;"></i> Matriks Jadwal Mengajar Mingguan
+                    </span>
+                    <span style="font-size:0.8rem;background:#e0f2fe;color:#0369a1;font-weight:600;padding:3px 10px;border-radius:12px;">
+                        <?= e($teacher['name']) ?>
+                    </span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <button type="submit" class="button primary" style="font-weight:600;display:inline-flex;align-items:center;gap:6px;">
+                        <i data-lucide="save" style="width:16px;height:16px;"></i> Simpan Jadwal Mengajar
+                    </button>
+                </div>
+            </div>
+
+            <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0;">
+                <table class="table" style="margin:0;width:100%;min-width:760px;border-collapse:collapse;">
+                    <thead>
+                        <tr style="background:var(--table-header, #f8fafc);">
+                            <th style="width:130px;text-align:center;padding:10px;position:sticky;left:0;background:var(--table-header, #f8fafc);z-index:2;border-right:2px solid var(--border);">Jam / Waktu</th>
+                            <?php foreach ($days as $dayNum => $dayName): ?>
+                                <th style="text-align:center;padding:10px;min-width:130px;"><?= e($dayName) ?></th>
+                            <?php endforeach; ?>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php for ($p = 1; $p <= $maxPeriods; $p++):
+                            [$defaultStart, $defaultEnd] = schedule_time_for_period($p, 1);
+                        ?>
+                            <tr>
+                                <td class="schedule-matrix-sticky-col" style="position:sticky;left:0;background:#fff;z-index:1;border-right:2px solid var(--border);text-align:center;padding:8px 10px;">
+                                    <div style="font-weight:700;font-size:0.85rem;color:var(--text);">Jam ke-<?= $p ?></div>
+                                    <div style="font-size:0.75rem;color:var(--text-muted,#64748b);"><?= e($defaultStart . ' - ' . $defaultEnd) ?></div>
+                                </td>
+                                <?php foreach ($days as $dayNum => $dayName):
+                                    $current = $existing[$dayNum][$p] ?? null;
+                                    $currentAssignmentId = $current ? (int)$current['assignment_id'] : 0;
+                                    $isLocked = $current && (int)$current['locked'] === 1;
+                                ?>
+                                    <td style="padding:6px;vertical-align:middle;text-align:center;<?= $currentAssignmentId > 0 ? 'background:#f0fdf4;' : '' ?>">
+                                        <?php if ($isLocked): ?>
+                                            <div style="background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;padding:6px 8px;border-radius:6px;font-size:0.78rem;font-weight:600;line-height:1.3;" title="Jadwal ini dikunci oleh admin">
+                                                🔒 <?= e($current['class_name'] . ' - ' . $current['subject_name']) ?>
+                                                <input type="hidden" name="teacher_slot[<?= $dayNum ?>][<?= $p ?>]" value="<?= $currentAssignmentId ?>">
+                                            </div>
+                                        <?php else: ?>
+                                            <select name="teacher_slot[<?= $dayNum ?>][<?= $p ?>]"
+                                                    class="form-control teacher-slot-select"
+                                                    style="width:100%;font-size:0.8rem;padding:6px 8px;border-radius:6px;border:1px solid <?= $currentAssignmentId > 0 ? '#10b981' : '#cbd5e1' ?>;background:<?= $currentAssignmentId > 0 ? '#ecfdf5' : '#ffffff' ?>;color:<?= $currentAssignmentId > 0 ? '#065f46' : 'inherit' ?>;font-weight:<?= $currentAssignmentId > 0 ? '600' : 'normal' ?>;">
+                                                <option value="0">-- Kosong --</option>
+                                                <?php foreach ($assignments as $asgn):
+                                                    $asgnId = (int)$asgn['id'];
+                                                    $isSelected = ($currentAssignmentId === $asgnId);
+                                                    $occTeacher = $occupied[$dayNum][$p][(int)$asgn['class_id']] ?? null;
+                                                    $isConflict = ($occTeacher && !$isSelected);
+                                                ?>
+                                                    <option value="<?= $asgnId ?>" <?= $isSelected ? 'selected' : '' ?> <?= $isConflict ? 'disabled style="color:#94a3b8;background:#f8fafc;"' : '' ?>>
+                                                        <?= e($asgn['class_name'] . ' - ' . $asgn['subject_name'] . ($isConflict ? ' [Bentrok: ' . $occTeacher . ']' : '')) ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        <?php endif; ?>
+                                    </td>
+                                <?php endforeach; ?>
+                            </tr>
+                            <?php
+                            $breakMins = schedule_break_minutes_for_after($p);
+                            if ($breakMins > 0):
+                                [, $bEnd] = schedule_time_for_period($p, 1);
+                                [$bNext] = schedule_time_for_period($p + 1, 1);
+                            ?>
+                                <tr class="schedule-matrix-break-row">
+                                    <td class="schedule-matrix-sticky-col" style="position:sticky;left:0;background:#fef3c7 !important;font-weight:700;border-right:2px solid var(--border);text-align:center;padding:6px;font-size:0.8rem;color:#92400e;">
+                                        ☕ ISTIRAHAT
+                                    </td>
+                                    <td colspan="<?= count($days) ?>" style="text-align:center;background:#fef3c7 !important;color:#92400e;font-weight:600;padding:6px;font-size:0.82rem;">
+                                        ☕ Istirahat (<?= $breakMins ?> Menit: <?= e($bEnd) ?> - <?= e($bNext) ?>)
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                        <?php endfor; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="padding:14px 16px;border-top:1px solid var(--border);background:var(--surface);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                <div style="font-size:0.82rem;color:var(--text-muted, #64748b);">
+                    Pastikan jadwal sudah sesuai sebelum menekan Simpan.
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button type="button" class="button secondary" onclick="if(confirm('Batalkan perubahan yang belum disimpan dan muat ulang halaman?')) location.reload();">
+                        Reset
+                    </button>
+                    <button type="submit" class="button primary" style="font-weight:600;display:inline-flex;align-items:center;gap:6px;">
+                        <i data-lucide="save" style="width:16px;height:16px;"></i> Simpan Jadwal Mengajar
+                    </button>
+                </div>
+            </div>
+        </form>
+    </section>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.teacher-slot-select').forEach(function(sel) {
+            sel.addEventListener('change', function() {
+                var val = parseInt(this.value, 10) || 0;
+                var td = this.closest('td');
+                if (val > 0) {
+                    this.style.background = '#ecfdf5';
+                    this.style.borderColor = '#10b981';
+                    this.style.color = '#065f46';
+                    this.style.fontWeight = '600';
+                    if (td) td.style.background = '#f0fdf4';
+                } else {
+                    this.style.background = '#ffffff';
+                    this.style.borderColor = '#cbd5e1';
+                    this.style.color = 'inherit';
+                    this.style.fontWeight = 'normal';
+                    if (td) td.style.background = '';
+                }
+            });
+        });
+    });
+    </script>
+
+    <?php
+    $rows = schedule_rows(['teacher_id' => $teacherId]);
+    render_lesson_schedule_table($rows, true);
 }
 
 function render_lesson_schedule_student_page(): void
@@ -1258,7 +1500,15 @@ function render_schedule_filter_panel(int $classId, int $teacherId): void
             <input type="hidden" name="page" value="lesson-schedule">
             <label>Kelas <select name="class_id"><?= options($classes, $classId ?: '') ?></select></label>
             <label>Guru <select name="teacher_id"><?= options($teachers, $teacherId ?: '') ?></select></label>
-            <div class="actions"><button class="button">Tampilkan</button><a class="button" href="<?= e(route_url('lesson-schedule')) ?>">Reset</a></div>
+            <div class="actions">
+                <button class="button">Tampilkan</button>
+                <a class="button" href="<?= e(route_url('lesson-schedule')) ?>">Reset</a>
+                <?php if ($teacherId > 0): ?>
+                    <a class="button primary small" href="<?= e(route_url('lesson-schedule', ['teacher_id' => $teacherId, 'view' => 'teacher_matrix'])) ?>" title="Buka matriks jadwal mingguan guru ini" style="display:inline-flex;align-items:center;gap:5px;">
+                        <i data-lucide="calendar" style="width:14px;height:14px;"></i> Matriks Guru Ini
+                    </a>
+                <?php endif; ?>
+            </div>
         </form>
     </section>
     <?php
@@ -1364,10 +1614,14 @@ function schedule_lock_badge(int $locked): string
 
 function lesson_schedule_actions(int $id): string
 {
-    return '<div class="row-actions"><a class="button small" href="' . e(route_url('lesson-schedule', ['edit_schedule' => $id])) . '">Edit</a>'
-        . '<form method="post" data-confirm="Hapus jadwal ini? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus jadwal?" data-confirm-label="Ya, hapus" data-confirm-tone="danger">' . csrf_field()
+    $html = '<div class="row-actions">';
+    if (is_admin()) {
+        $html .= '<a class="button small" href="' . e(route_url('lesson-schedule', ['edit_schedule' => $id])) . '">Edit</a>';
+    }
+    $html .= '<form method="post" data-confirm="Hapus jadwal ini? Tindakan ini tidak dapat dibatalkan." data-confirm-title="Hapus jadwal?" data-confirm-label="Ya, hapus" data-confirm-tone="danger">' . csrf_field()
         . '<input type="hidden" name="action" value="delete_lesson_schedule"><input type="hidden" name="id" value="' . e($id) . '">'
         . '<button class="button small danger">Hapus</button></form></div>';
+    return $html;
 }
 
 function schedule_request_actions(int $id): string
@@ -2528,6 +2782,197 @@ function action_save_schedule_daily_matrix(): void
         flash('success', "✅ Jadwal hari {$dayLabel} untuk semua kelas berhasil disimpan! ({$saved} slot diperbarui, {$deleted} dihapus).");
     }
     redirect_to('lesson-schedule', ['grid_day' => $day]);
+}
+
+function action_save_teacher_schedule_matrix(): void
+{
+    require_role(['admin', 'guru']);
+    schedule_require_tables();
+
+    $isGuru = user_role() === 'guru';
+    $teacherId = $isGuru ? schedule_current_teacher_id() : (int)($_POST['teacher_id'] ?? 0);
+    $redirectParams = $isGuru ? [] : ['teacher_id' => $teacherId, 'view' => 'teacher_matrix'];
+
+    if ($teacherId <= 0) {
+        flash('danger', 'Data guru tidak valid.');
+        redirect_to('lesson-schedule');
+    }
+
+    $teacher = fetch_one('SELECT * FROM teachers WHERE id = ?', [$teacherId]);
+    if (!$teacher) {
+        flash('danger', 'Data guru tidak ditemukan.');
+        redirect_to('lesson-schedule');
+    }
+
+    $teacherSlots = $_POST['teacher_slot'] ?? [];
+    if (!is_array($teacherSlots)) {
+        $teacherSlots = [];
+    }
+
+    $school = get_school_profile();
+    $maxPeriods = (int)($school['max_periods'] ?? 10);
+    $days = schedule_days();
+
+    // Fetch valid active assignments for this teacher
+    $validAssignments = fetch_all(
+        'SELECT ta.id, ta.class_id, ta.subject_id, c.name AS class_name, c.physical_group, s.name AS subject_name
+         FROM teaching_assignments ta
+         JOIN classes c ON c.id = ta.class_id
+         JOIN subjects s ON s.id = ta.subject_id
+         WHERE ta.teacher_id = ? AND ta.active = 1',
+        [$teacherId]
+    );
+    $assignmentMap = [];
+    foreach ($validAssignments as $va) {
+        $assignmentMap[(int)$va['id']] = $va;
+    }
+
+    // Existing schedules for this teacher
+    $existing = [];
+    foreach (fetch_all('SELECT id, assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked FROM lesson_schedules WHERE teacher_id = ?', [$teacherId]) as $row) {
+        $existing[(int)$row['day_of_week']][(int)$row['period_no']] = $row;
+    }
+
+    $saved = 0;
+    $deleted = 0;
+    $errors = [];
+
+    db()->beginTransaction();
+    try {
+        foreach ($days as $day => $dayName) {
+            for ($p = 1; $p <= $maxPeriods; $p++) {
+                $assignmentId = (int)($teacherSlots[$day][$p] ?? 0);
+                [$defaultStart, $defaultEnd] = schedule_time_for_period($p, $day);
+                $startTime = $defaultStart;
+                $endTime = $defaultEnd;
+
+                $current = $existing[$day][$p] ?? null;
+                $currentAssignmentId = $current ? (int)$current['assignment_id'] : 0;
+
+                // 1. Both empty
+                if ($assignmentId === 0 && !$current) {
+                    continue;
+                }
+
+                // 2. Slot cleared by user
+                if ($assignmentId === 0 && $current) {
+                    if ((int)$current['locked'] === 1) {
+                        $errors[] = "Hari {$dayName} Jam ke-{$p} dikunci admin.";
+                        continue;
+                    }
+                    $curAsgn = schedule_assignment_by_id((int)$current['assignment_id']);
+                    if ($curAsgn && function_exists('sibling_assignments_for_assignment')) {
+                        $siblings = sibling_assignments_for_assignment($curAsgn);
+                        foreach ($siblings as $sib) {
+                            $sibCId = (int)$sib['class_id'];
+                            execute_sql('DELETE FROM lesson_schedules WHERE class_id = ? AND day_of_week = ? AND period_no = ? AND locked = 0', [$sibCId, $day, $p]);
+                        }
+                    }
+                    execute_sql('DELETE FROM lesson_schedules WHERE id = ?', [(int)$current['id']]);
+                    unset($existing[$day][$p]);
+                    $deleted++;
+                    continue;
+                }
+
+                // 3. Same assignment unchanged
+                if ($assignmentId === $currentAssignmentId) {
+                    continue;
+                }
+
+                // 4. Assigned slot
+                if ($assignmentId > 0) {
+                    $assignment = $assignmentMap[$assignmentId] ?? null;
+                    if (!$assignment) {
+                        $errors[] = "Penugasan tidak valid pada Hari {$dayName} Jam ke-{$p}.";
+                        continue;
+                    }
+                    if ($current && (int)$current['locked'] === 1) {
+                        $errors[] = "Hari {$dayName} Jam ke-{$p} dikunci admin.";
+                        continue;
+                    }
+
+                    $classId = (int)$assignment['class_id'];
+
+                    // Check if class is already occupied by another teacher at day & period
+                    $conflictClass = fetch_one(
+                        'SELECT ls.id, ls.teacher_id, t.name AS teacher_name, c.name AS class_name, c.physical_group, ls.subject_id
+                         FROM lesson_schedules ls
+                         JOIN teachers t ON t.id = ls.teacher_id
+                         JOIN classes c ON c.id = ls.class_id
+                         WHERE ls.class_id = ? AND ls.day_of_week = ? AND ls.period_no = ? AND ls.teacher_id <> ?',
+                        [$classId, $day, $p, $teacherId]
+                    );
+                    if ($conflictClass) {
+                        $isGroupMatch = !empty($assignment['physical_group'])
+                            && !empty($conflictClass['physical_group'])
+                            && strcasecmp(trim((string)$assignment['physical_group']), trim((string)$conflictClass['physical_group'])) === 0
+                            && (int)$conflictClass['subject_id'] === (int)$assignment['subject_id'];
+                        if (!$isGroupMatch) {
+                            $errors[] = "Hari {$dayName} Jam ke-{$p}: Kelas {$conflictClass['class_name']} sudah diisi oleh {$conflictClass['teacher_name']}.";
+                            continue;
+                        }
+                    }
+
+                    if ($current) {
+                        execute_sql(
+                            'UPDATE lesson_schedules SET assignment_id = ?, teacher_id = ?, class_id = ?, subject_id = ?, start_time = ?, end_time = ?, updated_at = ? WHERE id = ?',
+                            [(int)$assignment['id'], $teacherId, $classId, (int)$assignment['subject_id'], $startTime, $endTime, now_string(), (int)$current['id']]
+                        );
+                    } else {
+                        execute_sql(
+                            'INSERT INTO lesson_schedules (assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked, generated_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)',
+                            [(int)$assignment['id'], $teacherId, $classId, (int)$assignment['subject_id'], $day, $p, $startTime, $endTime, (int)current_user()['id'], now_string(), now_string()]
+                        );
+                    }
+                    $saved++;
+
+                    // Sync sibling assignments (e.g. parallel classes sharing physical_group)
+                    $fullAsgn = schedule_assignment_by_id((int)$assignment['id']);
+                    if ($fullAsgn && function_exists('sibling_assignments_for_assignment')) {
+                        $siblings = sibling_assignments_for_assignment($fullAsgn);
+                        foreach ($siblings as $sib) {
+                            $sibClassId = (int)$sib['class_id'];
+                            $sibCurrent = fetch_one(
+                                'SELECT id, locked FROM lesson_schedules WHERE class_id = ? AND day_of_week = ? AND period_no = ?',
+                                [$sibClassId, $day, $p]
+                            );
+                            if ($sibCurrent) {
+                                if ((int)$sibCurrent['locked'] !== 1) {
+                                    execute_sql(
+                                        'UPDATE lesson_schedules SET assignment_id = ?, teacher_id = ?, class_id = ?, subject_id = ?, start_time = ?, end_time = ?, updated_at = ? WHERE id = ?',
+                                        [(int)$sib['id'], (int)$sib['teacher_id'], $sibClassId, (int)$sib['subject_id'], $startTime, $endTime, now_string(), (int)$sibCurrent['id']]
+                                    );
+                                }
+                            } else {
+                                execute_sql(
+                                    'INSERT INTO lesson_schedules (assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked, generated_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)',
+                                    [(int)$sib['id'], (int)$sib['teacher_id'], $sibClassId, (int)$sib['subject_id'], $day, $p, $startTime, $endTime, (int)current_user()['id'], now_string(), now_string()]
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        db()->commit();
+    } catch (Throwable $e) {
+        db()->rollBack();
+        $msg = $e->getMessage();
+        if (str_contains($msg, 'Duplicate entry') || str_contains($msg, '1062')) {
+            flash('danger', '⚠️ Terjadi bentrok jadwal saat menyimpan ke database.');
+        } else {
+            flash('danger', 'Gagal menyimpan jadwal: ' . $msg);
+        }
+        redirect_to('lesson-schedule', $redirectParams);
+        return;
+    }
+
+    if ($errors) {
+        flash('warning', "Jadwal mengajar berhasil diperbarui ({$saved} slot disimpan, {$deleted} slot dikosongkan), terdapat catatan: " . implode('<br>', array_slice($errors, 0, 5)));
+    } else {
+        flash('success', "✅ Jadwal mengajar mingguan berhasil disimpan! ({$saved} slot diperbarui, {$deleted} slot dikosongkan).");
+    }
+    redirect_to('lesson-schedule', $redirectParams);
 }
 
 function action_save_schedule_grid(): void
