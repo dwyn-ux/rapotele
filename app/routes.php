@@ -18,6 +18,7 @@ return [
 
     'private' => [
         'dashboard' => 'page_dashboard',
+        'live-monitor-feed' => 'page_live_monitor_feed',
         'update-data' => 'page_update_data',
         'school' => 'page_school',
         'schools' => 'page_schools',
