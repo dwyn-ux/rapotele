@@ -490,11 +490,13 @@ if (!function_exists('sibling_assignments_for_assignment')) {
 }
 
 if (!function_exists('class_order_by_clause')) {
-    function class_order_by_clause(string $prefix = 'c'): string
+    function class_order_by_clause(string $prefix = ''): string
     {
         $p = $prefix !== '' ? "{$prefix}." : '';
-        return "COALESCE(NULLIF({$p}display_order, 0), 9999) ASC,
-                CASE 
+        $hasDisplayOrder = function_exists('table_column_exists') && table_column_exists('classes', 'display_order');
+        $displayOrderClause = $hasDisplayOrder ? "COALESCE(NULLIF({$p}display_order, 0), 9999) ASC, " : '';
+
+        return "{$displayOrderClause}CASE 
                     WHEN {$p}grade IN ('VII', '7') THEN 7
                     WHEN {$p}grade IN ('VIII', '8') THEN 8
                     WHEN {$p}grade IN ('IX', '9') THEN 9
