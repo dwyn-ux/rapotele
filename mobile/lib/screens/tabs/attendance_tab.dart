@@ -37,6 +37,10 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
   bool _isTeacherInClass = false;
   String? _teacherClassTimeIn;
   bool _isCheckingInClass = false;
+  bool _hasSchedule = true;
+  String? _scheduleInfo;
+  String _scheduleDayName = '';
+  List<String> _otherSchedules = [];
 
   List<TeachingAssignmentModel> _assignments = [];
   TeachingAssignmentModel? _selectedAssignment;
@@ -161,6 +165,11 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
           _students = (res['students'] as List<StudentAttendanceItem>?) ?? [];
           _isTeacherInClass = res['teacher_checked_in'] == true;
           _teacherClassTimeIn = res['teacher_time_in']?.toString();
+          _hasSchedule = res['has_schedule'] == true;
+          _scheduleInfo = res['schedule_info']?.toString();
+          _scheduleDayName = res['day_name']?.toString() ?? '';
+          _otherSchedules = (res['other_schedules'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+
           final sess = res['session'] as Map<String, dynamic>?;
           if (sess != null && sess['topic'] != null && sess['topic'].toString().isNotEmpty) {
             _topicController.text = sess['topic'].toString();
@@ -169,6 +178,9 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
           _students = [];
           _isTeacherInClass = false;
           _teacherClassTimeIn = null;
+          _hasSchedule = true;
+          _scheduleInfo = null;
+          _otherSchedules = [];
         }
       });
     }
@@ -176,6 +188,10 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
 
   Future<void> _submitTeacherClassCheckIn() async {
     if (_selectedAssignment == null) return;
+    if (!_hasSchedule) {
+      _showMustCheckInDialog();
+      return;
+    }
     setState(() => _isCheckingInClass = true);
 
     final res = await _api.teacherClassCheckIn(
@@ -289,6 +305,44 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
   }
 
   void _showMustCheckInDialog() {
+    if (!_hasSchedule) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.event_busy_rounded, color: Color(0xFFDC2626)),
+              SizedBox(width: 8),
+              Text('Tidak Ada Jadwal Mengajar'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tidak ada jadwal KBM terdaftar untuk ${_selectedAssignment?.displayName ?? ''} pada hari $_scheduleDayName. Guru hanya dapat melakukan absen masuk kelas pada jadwal mengajar yang telah ditentukan.',
+              ),
+              if (_otherSchedules.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                const Text('Jadwal kelas ini di hari lain:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                const SizedBox(height: 4),
+                ..._otherSchedules.map((s) => Text('• $s', style: const TextStyle(fontSize: 12, color: Color(0xFF475569)))),
+              ],
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Tutup'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -300,8 +354,8 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
             Text('Absen Masuk Kelas Wajib'),
           ],
         ),
-        content: const Text(
-          'Bapak/Ibu Guru belum melakukan absensi masuk kelas untuk sesi ini. Silakan tekan tombol "Absen Masuk Kelas Sekarang" terlebih dahulu sebelum mendata kehadiran siswa.',
+        content: Text(
+          'Jadwal KBM: ${_scheduleInfo ?? "Hari $_scheduleDayName"}.\n\nBapak/Ibu Guru belum melakukan absensi masuk kelas untuk sesi ini. Silakan tekan tombol "Absen Masuk Kelas Sekarang" terlebih dahulu sebelum mendata kehadiran siswa.',
         ),
         actions: [
           TextButton(
@@ -837,7 +891,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
     );
   }
 
-  /// Banner requirement: Guru belum bisa absen siswa sebelum absen masuk kelas
+  /// Banner requirement: Guru belum bisa absen siswa sebelum absen masuk kelas, dan harus ada jadwal
   Widget _buildTeacherClassStatusBanner(ThemeData theme) {
     if (_isTeacherInClass) {
       final timeDisplay = _teacherClassTimeIn != null && _teacherClassTimeIn!.length >= 5
@@ -863,7 +917,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF166534)),
                   ),
                   Text(
-                    'Pukul $timeDisplay WIB • Presensi siswa aktif',
+                    'Pukul $timeDisplay WIB • ${_scheduleInfo ?? "Jadwal Aktif"} • Presensi aktif',
                     style: const TextStyle(fontSize: 11, color: Color(0xFF15803D)),
                   ),
                 ],
@@ -885,8 +939,65 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
       );
     }
 
+    if (!_hasSchedule) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF2F2),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFFECACA)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.event_busy_rounded, color: Color(0xFFDC2626), size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Tidak Ada Jadwal KBM Hari $_scheduleDayName',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF991B1B)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Absen masuk kelas terkunci karena tidak ada jadwal KBM terdaftar untuk ${_selectedAssignment?.displayName ?? "mapel ini"} pada hari $_scheduleDayName.',
+              style: const TextStyle(fontSize: 11, color: Color(0xFF7F1D1D)),
+            ),
+            if (_otherSchedules.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Jadwal di hari lain:\n• ${_otherSchedules.join("\n• ")}',
+                style: const TextStyle(fontSize: 10, color: Color(0xFFB91C1C), fontWeight: FontWeight.w600),
+              ),
+            ],
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => _showMustCheckInDialog(),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.grey.shade400,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                icon: const Icon(Icons.block, size: 16, color: Colors.white),
+                label: const Text(
+                  'Terkunci (Harus Sesuai Jadwal KBM)',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFFFFFBEB),
         borderRadius: BorderRadius.circular(12),
@@ -895,21 +1006,21 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.lock_clock_rounded, color: Color(0xFFD97706), size: 18),
-              SizedBox(width: 6),
+              const Icon(Icons.lock_clock_rounded, color: Color(0xFFD97706), size: 18),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  'Absensi Siswa Terkunci: Wajib Absen Masuk Kelas',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF92400E)),
+                  'Jadwal KBM Ditemukan (${_scheduleInfo ?? "Hari $_scheduleDayName"})',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF92400E)),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 4),
           const Text(
-            'Bapak/Ibu Guru wajib absen masuk kelas terlebih dahulu sesuai jadwal sebelum mendata presensi siswa.',
+            'Guru wajib melakukan presensi masuk kelas sesuai jadwal terlebih dahulu sebelum mendata kehadiran siswa.',
             style: TextStyle(fontSize: 11, color: Color(0xFF78350F)),
           ),
           const SizedBox(height: 8),

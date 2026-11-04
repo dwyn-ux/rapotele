@@ -832,15 +832,60 @@ function mobile_api_handle_students_for_attendance(): void
 
     $teacherCheckedIn = !empty($session['teacher_attended']) && (int)$session['teacher_attended'] === 1;
 
+    // Check if there is a scheduled lesson on this day of week
+    $dayOfWeek = (int)(new DateTimeImmutable($date))->format('N');
+    $daysMap = [1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu', 4 => 'Kamis', 5 => 'Jumat', 6 => 'Sabtu', 7 => 'Minggu'];
+    $dayName = $daysMap[$dayOfWeek] ?? 'Hari ini';
+
+    $hasScheduleTable = table_exists('lesson_schedules');
+    $todaySchedule = null;
+    $otherSchedules = [];
+
+    if ($hasScheduleTable) {
+        $allSchedules = fetch_all(
+            "SELECT ls.*, c.name AS class_name, s.name AS subject_name
+             FROM lesson_schedules ls
+             JOIN classes c ON c.id = ls.class_id
+             JOIN subjects s ON s.id = ls.subject_id
+             WHERE (ls.assignment_id = ? OR (ls.teacher_id = ? AND ls.class_id = ? AND ls.subject_id = ?))
+             ORDER BY ls.day_of_week ASC, ls.period_no ASC",
+            [$assignmentId, (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id']]
+        );
+
+        foreach ($allSchedules as $sched) {
+            $dow = (int)$sched['day_of_week'];
+            if ($dow === $dayOfWeek) {
+                if (!$todaySchedule) {
+                    $todaySchedule = $sched;
+                }
+            } else {
+                $dName = $daysMap[$dow] ?? ('Hari ' . $dow);
+                $pNo = $sched['period_no'] ?? 1;
+                $timeStr = substr((string)$sched['start_time'], 0, 5) . ' - ' . substr((string)$sched['end_time'], 0, 5);
+                $otherSchedules[$dow] = "$dName (Jam ke-$pNo, $timeStr)";
+            }
+        }
+    }
+
+    $hasSchedule = ($todaySchedule !== null);
+    $scheduleInfo = null;
+    if ($todaySchedule) {
+        $scheduleInfo = 'Jam ke-' . ($todaySchedule['period_no'] ?? 1) . ' (' . substr((string)$todaySchedule['start_time'], 0, 5) . ' - ' . substr((string)$todaySchedule['end_time'], 0, 5) . ')';
+    }
+
     mobile_api_response(true, [
         'assignment' => $assignment,
         'date' => $date,
+        'day_name' => $dayName,
         'meeting_no' => $meetingNo,
         'session' => $session,
         'students' => $students,
         'teacher_checked_in' => $teacherCheckedIn,
         'teacher_time_in' => $session['teacher_time_in'] ?? null,
         'teacher_status' => $session['teacher_status'] ?? 'hadir',
+        'has_schedule' => $hasSchedule,
+        'schedule_info' => $scheduleInfo,
+        'other_schedules' => array_values($otherSchedules),
     ]);
 }
 
@@ -855,6 +900,35 @@ function mobile_api_handle_teacher_class_checkin(): void
 
     if ($assignmentId <= 0) {
         mobile_api_response(false, [], 'assignment_id wajib diisi.', 422);
+    }
+
+    $assignment = fetch_one("SELECT * FROM teaching_assignments WHERE id = ?", [$assignmentId]);
+    if (!$assignment) {
+        mobile_api_response(false, [], 'Pembelajaran kelas tidak ditemukan.', 404);
+    }
+
+    // Rule: Harus ada jadwal KBM pada hari tersebut
+    $dayOfWeek = (int)(new DateTimeImmutable($date))->format('N');
+    $daysMap = [1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu', 4 => 'Kamis', 5 => 'Jumat', 6 => 'Sabtu', 7 => 'Minggu'];
+    $dayName = $daysMap[$dayOfWeek] ?? 'hari ini';
+
+    if (table_exists('lesson_schedules')) {
+        $validSchedule = fetch_one(
+            "SELECT id, period_no, start_time, end_time FROM lesson_schedules 
+             WHERE (assignment_id = ? OR (teacher_id = ? AND class_id = ? AND subject_id = ?))
+               AND day_of_week = ?
+             LIMIT 1",
+            [$assignmentId, (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $dayOfWeek]
+        );
+
+        if (!$validSchedule) {
+            mobile_api_response(
+                false,
+                ['no_schedule' => true, 'day_name' => $dayName],
+                "Tidak dapat absen masuk kelas: Tidak ada jadwal KBM pada hari $dayName untuk kelas dan mata pelajaran ini.",
+                422
+            );
+        }
     }
 
     $session = fetch_one(

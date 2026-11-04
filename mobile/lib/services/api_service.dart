@@ -475,6 +475,10 @@ class ApiService {
             'teacher_checked_in': decoded['teacher_checked_in'] == true,
             'teacher_time_in': decoded['teacher_time_in']?.toString(),
             'teacher_status': decoded['teacher_status']?.toString() ?? 'hadir',
+            'has_schedule': decoded['has_schedule'] == true,
+            'schedule_info': decoded['schedule_info']?.toString(),
+            'day_name': decoded['day_name']?.toString() ?? '',
+            'other_schedules': (decoded['other_schedules'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
           };
         }
       }
