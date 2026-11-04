@@ -1548,10 +1548,15 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
         max-width: 230px;
         padding: 4px !important;
         background: #ffffff;
-        transition: background 0.15s ease;
+        transition: background 0.15s ease, border-color 0.15s ease;
     }
     .schedule-matrix-cell:hover {
         background: #f8fafc;
+    }
+    .schedule-matrix-cell.cell-has-conflict {
+        background: #fef2f2 !important;
+        border: 2px solid #ef4444 !important;
+        position: relative;
     }
     .matrix-slot-select {
         width: 100%;
@@ -1577,9 +1582,15 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
     }
     .matrix-slot-select.is-conflict {
         border-color: #ef4444 !important;
-        background: #fef2f2 !important;
-        color: #b91c1c !important;
-        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25) !important;
+        background: #fee2e2 !important;
+        color: #991b1b !important;
+        font-weight: 700;
+        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.35) !important;
+    }
+    .matrix-slot-select.is-group-sync {
+        border-color: #0284c7 !important;
+        background: #e0f2fe !important;
+        color: #0369a1 !important;
     }
     .matrix-conflict-msg {
         display: none;
@@ -1587,10 +1598,56 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
         color: #dc2626;
         font-weight: 600;
         margin-top: 3px;
+        line-height: 1.15;
+    }
+    .matrix-group-msg {
+        display: none;
+        font-size: 0.68rem;
+        color: #0284c7;
+        font-weight: 600;
+        margin-top: 2px;
         line-height: 1.1;
     }
-    .matrix-slot-select.is-conflict + .matrix-conflict-msg {
-        display: block;
+    .conflict-item-card {
+        background: #ffffff;
+        border: 1px solid #fca5a5;
+        border-left: 4px solid #ef4444;
+        border-radius: 6px;
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .conflict-item-period {
+        display: inline-block;
+        background: #fee2e2;
+        color: #991b1b;
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 2px 6px;
+        border-radius: 4px;
+        margin-right: 6px;
+    }
+    .conflict-class-pill {
+        display: inline-block;
+        background: #f1f5f9;
+        color: #334155;
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 1px 6px;
+        border-radius: 4px;
+        border: 1px solid #cbd5e1;
+    }
+    @keyframes pulseTarget {
+        0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+        50% { transform: scale(1.04); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0.4); }
+    }
+    .cell-pulse-target {
+        animation: pulseTarget 0.8s ease-in-out 3;
+        z-index: 100 !important;
+        position: relative;
     }
     .schedule-matrix-break-row td {
         background: #fef3c7 !important;
@@ -1649,6 +1706,9 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                     <span class="tab-badge"><?= $cnt ?> slot</span>
                 </a>
             <?php endforeach; ?>
+            <a href="<?= e(route_url('school')) ?>#section-jam-istirahat" class="button small secondary" style="margin-left:auto;font-size:0.78rem;padding:4px 10px;display:inline-flex;align-items:center;gap:5px;font-weight:600;" title="Ubah letak jam istirahat dan durasi di Profil Sekolah">
+                <i data-lucide="coffee" style="width:14px;height:14px;"></i> Atur Jam Istirahat
+            </a>
         </div>
 
     <?php if ($filterClassId > 0): ?>
@@ -1749,7 +1809,7 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
         // Ambil pembelajaran semua kelas
         $assignmentsByClass = [];
         foreach (fetch_all(
-            'SELECT ta.id, ta.class_id, ta.teacher_id, t.name AS teacher_name, s.name AS subject_name, s.short_name
+            'SELECT ta.id, ta.class_id, ta.teacher_id, ta.subject_id, t.name AS teacher_name, s.name AS subject_name, s.short_name
              FROM teaching_assignments ta
              JOIN teachers t ON t.id = ta.teacher_id
              JOIN subjects s ON s.id = ta.subject_id
@@ -1760,6 +1820,7 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
             $assignmentsByClass[$cid][$a['subject_name']][] = [
                 'id' => (int)$a['id'],
                 'teacher_id' => (int)$a['teacher_id'],
+                'subject_id' => (int)$a['subject_id'],
                 'teacher_name' => $a['teacher_name'],
                 'short_name' => $a['short_name'] ?: $a['subject_name'],
             ];
@@ -1789,13 +1850,31 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                         (<?= count($allClasses) ?> Kelas &bull; <?= $maxPeriods ?> Jam Pelajaran)
                     </span>
                 </div>
-                <div style="display:flex;align-items:center;gap:10px;">
-                    <span id="conflict-badge-summary" style="display:none;background:#fef2f2;color:#b91c1c;padding:4px 10px;border-radius:6px;font-size:0.78rem;font-weight:700;border:1px solid #fca5a5;">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <a href="<?= e(route_url('school')) ?>#section-jam-istirahat" class="button small secondary" style="font-weight:600;display:inline-flex;align-items:center;gap:5px;font-size:0.8rem;" title="Geser letak jam istirahat atau durasi">
+                        <i data-lucide="coffee" style="width:14px;height:14px;"></i> Atur Jam Istirahat
+                    </a>
+                    <span id="conflict-badge-summary" style="display:none;background:#fef2f2;color:#b91c1c;padding:5px 12px;border-radius:6px;font-size:0.8rem;font-weight:700;border:1px solid #f87171;cursor:pointer;" title="Klik untuk melompat ke daftar guru tabrakan">
                         ⚠️ Ada Bentrok Guru!
                     </span>
                     <button type="submit" class="button primary" style="font-weight:600;display:inline-flex;align-items:center;gap:6px;">
                         <i data-lucide="save"></i> Simpan Jadwal Hari <?= e($days[$filterDay]) ?>
                     </button>
+                </div>
+            </div>
+
+            <!-- Panel Rincian Bentrok / Tabrakan Guru (Bisa Melompat Langsung ke Kotak yang Bentrok) -->
+            <div id="conflict-panel" style="display:none;background:#fef2f2;border:1px solid #f87171;border-radius:8px;padding:12px 16px;margin:12px 16px 0 16px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+                    <div style="display:flex;align-items:center;gap:8px;color:#991b1b;font-weight:700;font-size:0.88rem;">
+                        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,0.3);"></span>
+                        <span id="conflict-panel-title">⚠️ Ditemukan Bentrok Jadwal Guru</span>
+                    </div>
+                    <div style="font-size:0.78rem;color:#7f1d1d;">
+                        Klik tombol <strong>"👉 Lihat di Tabel"</strong> pada kartu di bawah untuk langsung mengarahkan tampilan ke kotak yang tabrakan:
+                    </div>
+                </div>
+                <div id="conflict-list" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(310px, 1fr));gap:8px;margin-top:8px;">
                 </div>
             </div>
 
@@ -1805,8 +1884,11 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                         <tr>
                             <th class="schedule-matrix-sticky-col">Jam Ke &amp; Waktu</th>
                             <?php foreach ($allClasses as $cls): ?>
-                                <th>
-                                    <div style="font-size:0.88rem;font-weight:700;"><?= e($cls['name']) ?></div>
+                                <th class="schedule-matrix-col-header" data-class-col="<?= (int)$cls['id'] ?>">
+                                    <div style="font-size:0.88rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px;">
+                                        <span><?= e($cls['name']) ?></span>
+                                        <span class="col-conflict-badge" data-class-badge="<?= (int)$cls['id'] ?>" style="display:none;background:#ef4444;color:#fff;font-size:0.65rem;padding:1px 5px;border-radius:10px;font-weight:700;" title="Kelas ini memiliki guru yang bentrok">⚠️</span>
+                                    </div>
                                     <?php if (!empty($cls['physical_group'])): ?>
                                         <div style="font-size:0.7rem;font-weight:normal;color:#38bdf8;">(<?= e($cls['physical_group']) ?>)</div>
                                     <?php endif; ?>
@@ -1828,8 +1910,11 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                             }
                             ?>
                             <tr>
-                                <td class="schedule-matrix-sticky-col">
-                                    <div style="font-size:0.85rem;font-weight:700;color:var(--text);margin-bottom:2px;">Jam <?= $p ?></div>
+                                <td class="schedule-matrix-sticky-col" data-period-row="<?= $p ?>">
+                                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+                                        <div style="font-size:0.85rem;font-weight:700;color:var(--text);">Jam <?= $p ?></div>
+                                        <span class="row-conflict-badge" data-period-badge="<?= $p ?>" style="display:none;background:#ef4444;color:#fff;font-size:0.65rem;padding:1px 5px;border-radius:4px;font-weight:700;" title="Ada guru bentrok di jam ini!">Bentrok!</span>
+                                    </div>
                                     <div class="schedule-matrix-time-box">
                                         <input type="time" name="slot_time[<?= $p ?>][start]" value="<?= e($defaultStart) ?>" class="schedule-matrix-time-input">
                                         <span style="font-size:0.75rem;color:var(--text-muted);">-</span>
@@ -1843,12 +1928,13 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                                     $curAsgnId = $cur ? (int)$cur['assignment_id'] : 0;
                                     $clsAssignments = $assignmentsByClass[$cid] ?? [];
                                     ?>
-                                    <td class="schedule-matrix-cell">
+                                    <td class="schedule-matrix-cell" data-class-id="<?= $cid ?>" data-period="<?= $p ?>">
                                         <select name="matrix_slot[<?= $cid ?>][<?= $p ?>]"
                                                 class="matrix-slot-select <?= $curAsgnId > 0 ? 'is-filled' : '' ?>"
                                                 data-period="<?= $p ?>"
                                                 data-class-id="<?= $cid ?>"
                                                 data-class-name="<?= e($cls['name']) ?>"
+                                                data-physical-group="<?= e($cls['physical_group'] ?? '') ?>"
                                                 onchange="matrixSelectChanged(this)">
                                             <option value="">— Kosong —</option>
                                             <?php foreach ($clsAssignments as $subjectName => $teachers): ?>
@@ -1857,6 +1943,7 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                                                         <option value="<?= e($t['id']) ?>"
                                                                 data-teacher-id="<?= e($t['teacher_id']) ?>"
                                                                 data-teacher-name="<?= e($t['teacher_name']) ?>"
+                                                                data-subject-id="<?= e($t['subject_id'] ?? '') ?>"
                                                                 data-subject-name="<?= e($subjectName) ?>"
                                                                 <?= $curAsgnId === (int)$t['id'] ? 'selected' : '' ?>>
                                                             <?= e($subjectName) ?> — <?= e($t['teacher_name']) ?>
@@ -1866,6 +1953,7 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                                             <?php endforeach; ?>
                                         </select>
                                         <div class="matrix-conflict-msg">⚠️ Bentrok guru di jam ini!</div>
+                                        <div class="matrix-group-msg">👥 Kelas Gabungan</div>
                                     </td>
                                 <?php endforeach; ?>
                             </tr>
@@ -1900,6 +1988,35 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
         </form>
 
         <script>
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>"']/g, function(m) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+            });
+        }
+
+        function jumpToConflict(period, classIds) {
+            var targets = [];
+            classIds.forEach(function(cid) {
+                var sel = document.querySelector('.matrix-slot-select[data-period="' + period + '"][data-class-id="' + cid + '"]');
+                if (sel) {
+                    targets.push(sel);
+                    var cell = sel.closest('.schedule-matrix-cell');
+                    if (cell) {
+                        cell.classList.add('cell-pulse-target');
+                        setTimeout(function() {
+                            cell.classList.remove('cell-pulse-target');
+                        }, 3000);
+                    }
+                }
+            });
+
+            if (targets.length > 0) {
+                targets[0].scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                targets[0].focus();
+            }
+        }
+
         function checkMatrixConflicts() {
             var selects = document.querySelectorAll('.matrix-slot-select');
             var byPeriod = {};
@@ -1909,7 +2026,14 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                 byPeriod[p].push(sel);
             });
 
+            // Reset semua indikator
+            document.querySelectorAll('.row-conflict-badge').forEach(function(b) { b.style.display = 'none'; });
+            document.querySelectorAll('.col-conflict-badge').forEach(function(b) { b.style.display = 'none'; });
+            document.querySelectorAll('.schedule-matrix-cell').forEach(function(c) { c.classList.remove('cell-has-conflict'); });
+
+            var conflictCards = [];
             var totalConflicts = 0;
+
             Object.keys(byPeriod).forEach(function(p) {
                 var periodSelects = byPeriod[p];
                 var teacherCounts = {};
@@ -1918,30 +2042,104 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                     var tid = opt ? opt.getAttribute('data-teacher-id') : null;
                     if (tid && tid !== '0' && sel.value !== '') {
                         if (!teacherCounts[tid]) teacherCounts[tid] = [];
-                        teacherCounts[tid].push(sel);
+                        teacherCounts[tid].push({
+                            sel: sel,
+                            opt: opt,
+                            className: sel.getAttribute('data-class-name'),
+                            classId: sel.getAttribute('data-class-id'),
+                            physicalGroup: (sel.getAttribute('data-physical-group') || '').trim().toLowerCase(),
+                            subjectId: opt.getAttribute('data-subject-id') || '',
+                            teacherName: opt.getAttribute('data-teacher-name') || 'Guru'
+                        });
                     }
                 });
 
+                Object.keys(teacherCounts).forEach(function(tid) {
+                    var items = teacherCounts[tid];
+                    if (items.length <= 1) return;
+
+                    // Periksa apakah ini rombel gabungan (physical_group dan subject_id sama)
+                    var firstGroup = items[0].physicalGroup;
+                    var firstSubject = items[0].subjectId;
+                    var isGroupSync = (firstGroup !== '' && firstSubject !== '');
+                    if (isGroupSync) {
+                        for (var i = 1; i < items.length; i++) {
+                            if (items[i].physicalGroup !== firstGroup || items[i].subjectId !== firstSubject) {
+                                isGroupSync = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (isGroupSync) {
+                        // Ini rombel gabungan yang sah
+                        items.forEach(function(item) {
+                            item.sel.classList.add('is-group-sync');
+                            item.sel.classList.remove('is-conflict');
+                            var cell = item.sel.closest('.schedule-matrix-cell');
+                            if (cell) cell.classList.remove('cell-has-conflict');
+                            var msg = item.sel.parentElement.querySelector('.matrix-conflict-msg');
+                            if (msg) msg.style.display = 'none';
+                            var grpMsg = item.sel.parentElement.querySelector('.matrix-group-msg');
+                            if (grpMsg) {
+                                grpMsg.textContent = '👥 Gabungan: ' + items[0].opt.getAttribute('data-subject-name');
+                                grpMsg.style.display = 'block';
+                            }
+                        });
+                    } else {
+                        // BENTROK NYATA
+                        totalConflicts++;
+                        var teacherName = items[0].teacherName;
+                        var classNames = items.map(function(x) { return x.className; });
+                        var classIds = items.map(function(x) { return x.classId; });
+
+                        // Beri tanda merah pada baris Jam ke-p
+                        var rowBadge = document.querySelector('.row-conflict-badge[data-period-badge="' + p + '"]');
+                        if (rowBadge) rowBadge.style.display = 'inline-block';
+
+                        // Beri tanda merah pada kolom kelas yang bersangkutan
+                        classIds.forEach(function(cid) {
+                            var colBadge = document.querySelector('.col-conflict-badge[data-class-badge="' + cid + '"]');
+                            if (colBadge) colBadge.style.display = 'inline-block';
+                        });
+
+                        items.forEach(function(item) {
+                            item.sel.classList.add('is-conflict');
+                            item.sel.classList.remove('is-group-sync');
+                            var cell = item.sel.closest('.schedule-matrix-cell');
+                            if (cell) cell.classList.add('cell-has-conflict');
+                            var msg = item.sel.parentElement.querySelector('.matrix-conflict-msg');
+                            if (msg) {
+                                var otherNames = items.filter(function(x) { return x.sel !== item.sel; }).map(function(x) { return x.className; });
+                                msg.textContent = '⚠️ Bentrok: ' + teacherName + ' juga di ' + otherNames.join(', ');
+                                msg.style.display = 'block';
+                            }
+                            var grpMsg = item.sel.parentElement.querySelector('.matrix-group-msg');
+                            if (grpMsg) grpMsg.style.display = 'none';
+                        });
+
+                        conflictCards.push({
+                            period: p,
+                            teacherName: teacherName,
+                            classNames: classNames,
+                            classIds: classIds
+                        });
+                    }
+                });
+
+                // Bersihkan sel yang tidak ada bentrok
                 periodSelects.forEach(function(sel) {
                     var opt = sel.options[sel.selectedIndex];
                     var tid = opt ? opt.getAttribute('data-teacher-id') : null;
-                    var isConflict = false;
-                    if (tid && teacherCounts[tid] && teacherCounts[tid].length > 1) {
-                        isConflict = true;
-                        totalConflicts++;
-                        var otherClasses = [];
-                        teacherCounts[tid].forEach(function(s) {
-                            if (s !== sel) otherClasses.push(s.getAttribute('data-class-name'));
-                        });
-                        var msg = sel.nextElementSibling;
-                        if (msg && msg.classList.contains('matrix-conflict-msg')) {
-                            msg.textContent = '⚠️ Bentrok: ' + opt.getAttribute('data-teacher-name') + ' juga di ' + otherClasses.join(', ');
-                        }
-                    }
-                    if (isConflict) {
-                        sel.classList.add('is-conflict');
-                    } else {
+                    if (!tid || !teacherCounts[tid] || teacherCounts[tid].length <= 1) {
                         sel.classList.remove('is-conflict');
+                        sel.classList.remove('is-group-sync');
+                        var cell = sel.closest('.schedule-matrix-cell');
+                        if (cell) cell.classList.remove('cell-has-conflict');
+                        var msg = sel.parentElement.querySelector('.matrix-conflict-msg');
+                        if (msg) msg.style.display = 'none';
+                        var grpMsg = sel.parentElement.querySelector('.matrix-group-msg');
+                        if (grpMsg) grpMsg.style.display = 'none';
                     }
                     if (sel.value !== '') {
                         sel.classList.add('is-filled');
@@ -1951,14 +2149,47 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                 });
             });
 
+            // Tampilkan Panel Rincian Bentrok & Badge
             var badge = document.getElementById('conflict-badge-summary');
-            if (badge) {
-                if (totalConflicts > 0) {
-                    badge.style.display = 'inline-block';
-                    badge.textContent = '⚠️ ' + Math.round(totalConflicts / 2) + ' Bentrok Guru Terdeteksi!';
-                } else {
-                    badge.style.display = 'none';
+            var panel = document.getElementById('conflict-panel');
+            var list = document.getElementById('conflict-list');
+            var panelTitle = document.getElementById('conflict-panel-title');
+
+            if (totalConflicts > 0) {
+                if (badge) {
+                    badge.style.display = 'inline-flex';
+                    badge.innerHTML = '⚠️ <strong>' + totalConflicts + ' Guru Tabrakan!</strong> (Klik lihat)';
+                    badge.onclick = function() {
+                        if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    };
                 }
+                if (panel && list) {
+                    panel.style.display = 'block';
+                    if (panelTitle) {
+                        panelTitle.innerHTML = '⚠️ Ditemukan ' + totalConflicts + ' Guru Tabrakan / Bentrok Jam:';
+                    }
+                    var html = '';
+                    conflictCards.forEach(function(c) {
+                        html += '<div class="conflict-item-card">' +
+                                    '<div style="overflow:hidden;">' +
+                                        '<div style="font-weight:700;color:#991b1b;font-size:0.83rem;margin-bottom:2px;display:flex;align-items:center;">' +
+                                            '<span class="conflict-item-period">Jam ke-' + c.period + '</span>' +
+                                            '<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(c.teacherName) + '</span>' +
+                                        '</div>' +
+                                        '<div style="font-size:0.75rem;color:#b91c1c;">' +
+                                            'Tabrakan di: ' + c.classNames.map(function(cn) { return '<span class="conflict-class-pill">' + escapeHtml(cn) + '</span>'; }).join(' &bull; ') +
+                                        '</div>' +
+                                    '</div>' +
+                                    '<button type="button" class="button small danger" style="padding:4px 8px;font-size:0.72rem;white-space:nowrap;font-weight:700;" onclick="jumpToConflict(' + c.period + ', [' + c.classIds.join(',') + '])">' +
+                                        '👉 Lihat di Tabel' +
+                                    '</button>' +
+                                '</div>';
+                    });
+                    list.innerHTML = html;
+                }
+            } else {
+                if (badge) badge.style.display = 'none';
+                if (panel) panel.style.display = 'none';
             }
         }
 

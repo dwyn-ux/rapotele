@@ -195,7 +195,7 @@ function page_school(): void
                 </div>
 
                 <!-- Jam & Istirahat -->
-                <div class="school-subsection-divider">
+                <div class="school-subsection-divider" id="section-jam-istirahat">
                     <span>Pengaturan Jam &amp; Istirahat</span>
                 </div>
                 <div class="school-form-grid three-col">
