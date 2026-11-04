@@ -687,33 +687,30 @@ function render_live_monitoring_widget(): void
         background: #e2e8f0;
     }
 
-    /* Subgrids for SMP (6 classes) and SMA (4 classes) */
+    /* Subgrids for SMP and SMA */
     .live-cards-row {
         display: grid;
         gap: 10px;
+        grid-template-columns: repeat(var(--cols, 6), minmax(0, 1fr));
     }
     .live-cards-row.grid-smp {
-        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-template-columns: repeat(var(--cols, 6), minmax(0, 1fr));
     }
     .live-cards-row.grid-sma {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr));
     }
 
-    @media (max-width: 1400px) {
-        .live-cards-row.grid-smp { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-        .live-cards-row.grid-sma { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    @media (max-width: 900px) {
+        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-smp { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-sma { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
     }
-    @media (max-width: 1024px) {
-        .live-cards-row.grid-smp { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-        .live-cards-row.grid-sma { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (max-width: 640px) {
+        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-smp { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-sma { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
     }
-    @media (max-width: 768px) {
-        .live-cards-row.grid-smp { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .live-cards-row.grid-sma { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
-    @media (max-width: 480px) {
-        .live-cards-row.grid-smp { grid-template-columns: 1fr; }
-        .live-cards-row.grid-sma { grid-template-columns: 1fr; }
+    @media (max-width: 420px) {
+        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-smp { grid-template-columns: 1fr !important; }
+        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-sma { grid-template-columns: 1fr !important; }
     }
 
     /* Compact Class Card */
@@ -1025,10 +1022,10 @@ function render_live_monitoring_widget(): void
         background: #334155 !important;
     }
     .live-monitor-panel.is-fullscreen .live-cards-row.grid-smp {
-        grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+        grid-template-columns: repeat(var(--cols, 6), minmax(0, 1fr)) !important;
     }
     .live-monitor-panel.is-fullscreen .live-cards-row.grid-sma {
-        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr)) !important;
     }
     .live-monitor-panel.is-fullscreen .live-class-card {
         height: 100% !important;
@@ -1418,13 +1415,14 @@ function render_live_monitoring_widget(): void
 
             // Section SMP
             if (smpCards.length > 0) {
+                var smpCols = Math.max(1, smpCards.length);
                 html += '<div class="live-level-section">';
                 html += '<div class="live-level-title-bar">';
                 html += '<span class="live-level-pill pill-smp">SMP</span>';
                 html += '<span class="live-level-title-text">Kelas SMP (' + smpCards.length + ' Kelas)</span>';
                 html += '<span class="live-level-line"></span>';
                 html += '</div>';
-                html += '<div class="live-cards-row grid-smp">';
+                html += '<div class="live-cards-row grid-smp" style="--cols: ' + smpCols + '; grid-template-columns: repeat(' + smpCols + ', minmax(0, 1fr));">';
                 smpCards.forEach(function(c){ html += renderCardHtml(c, targetPeriod); });
                 html += '</div>';
                 html += '</div>';
@@ -1432,14 +1430,15 @@ function render_live_monitoring_widget(): void
 
             // Section SMA
             if (smaCards.length > 0) {
-                var topMargin = (smpCards.length > 0) ? ' style="margin-top: 14px;"' : '';
+                var smaCols = Math.max(1, smaCards.length);
+                var topMargin = (smpCards.length > 0) ? ' style="margin-top: 12px;"' : '';
                 html += '<div class="live-level-section"' + topMargin + '>';
                 html += '<div class="live-level-title-bar">';
                 html += '<span class="live-level-pill pill-sma">SMA</span>';
                 html += '<span class="live-level-title-text">Kelas SMA (' + smaCards.length + ' Kelas)</span>';
                 html += '<span class="live-level-line"></span>';
                 html += '</div>';
-                html += '<div class="live-cards-row grid-sma">';
+                html += '<div class="live-cards-row grid-sma" style="--cols: ' + smaCols + '; grid-template-columns: repeat(' + smaCols + ', minmax(0, 1fr));">';
                 smaCards.forEach(function(c){ html += renderCardHtml(c, targetPeriod); });
                 html += '</div>';
                 html += '</div>';
