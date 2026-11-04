@@ -67,17 +67,53 @@ function schedule_period_duration(int $dayOfWeek): int
     return (int)($school['regular_period_minutes'] ?? 35);
 }
 
-function schedule_break_minutes_for_after(int $afterPeriod): int
+function schedule_break_minutes_for_after(int $afterPeriod, ?int $dayOfWeek = null): int
 {
     $school = get_school_profile();
+
+    // 1. Hari Jum'at terpisah jika diaktifkan (5 = Jumat)
+    if ($dayOfWeek === 5 && !empty($school['friday_break_custom'])) {
+        $fb1After = (int)($school['friday_break1_after'] ?? 0);
+        $fb1Minutes = (int)($school['friday_break1_minutes'] ?? 0);
+        $fb2After = (int)($school['friday_break2_after'] ?? 0);
+        $fb2Minutes = (int)($school['friday_break2_minutes'] ?? 0);
+        if ($fb1After > 0 && $afterPeriod === $fb1After) {
+            return $fb1Minutes;
+        }
+        if ($fb2After > 0 && $afterPeriod === $fb2After) {
+            return $fb2Minutes;
+        }
+        return 0;
+    }
+
+    // 2. Hari Khusus (misal: Senin, Rabu, Jum'at) jika diaktifkan
+    if (!empty($school['custom_break_enabled']) && $dayOfWeek !== null) {
+        $customDays = trim((string)($school['custom_break_days'] ?? ''));
+        $daysList = $customDays !== '' ? array_map('intval', array_map('trim', explode(',', $customDays))) : [];
+        if (in_array($dayOfWeek, $daysList, true)) {
+            $cb1After = (int)($school['custom_break1_after'] ?? 2);
+            $cb1Minutes = (int)($school['custom_break1_minutes'] ?? 15);
+            $cb2After = (int)($school['custom_break2_after'] ?? 5);
+            $cb2Minutes = (int)($school['custom_break2_minutes'] ?? 15);
+            if ($cb1After > 0 && $afterPeriod === $cb1After) {
+                return $cb1Minutes;
+            }
+            if ($cb2After > 0 && $afterPeriod === $cb2After) {
+                return $cb2Minutes;
+            }
+            return 0;
+        }
+    }
+
+    // 3. Standar (Hari Biasa)
     $break1After = (int)($school['break1_after'] ?? 3);
     $break1Minutes = (int)($school['break1_minutes'] ?? 15);
     $break2After = (int)($school['break2_after'] ?? 6);
     $break2Minutes = (int)($school['break2_minutes'] ?? 15);
-    if ($afterPeriod === $break1After) {
+    if ($break1After > 0 && $afterPeriod === $break1After) {
         return $break1Minutes;
     }
-    if ($afterPeriod === $break2After) {
+    if ($break2After > 0 && $afterPeriod === $break2After) {
         return $break2Minutes;
     }
     return 0;
@@ -92,9 +128,10 @@ function schedule_time_for_period(int $period, ?int $dayOfWeek = null): array
     $duration = schedule_period_duration($dayOfWeek ?? 1);
 
     $currentMinute = $baseMinute;
+    $effDay = $dayOfWeek ?? 1;
     for ($p = 1; $p < $period; $p++) {
         $currentMinute += $duration;
-        $breakMinutes = schedule_break_minutes_for_after($p);
+        $breakMinutes = schedule_break_minutes_for_after($p, $effDay);
         if ($breakMinutes > 0) {
             $currentMinute += $breakMinutes;
         }
@@ -892,7 +929,7 @@ function action_save_lesson_schedule(): void
 
     $day = schedule_normalize_day($_POST['day_of_week'] ?? 1);
     $period = schedule_clamped_int($_POST['period_no'] ?? 1, 1, 12, 1);
-    [$defaultStart, $defaultEnd] = schedule_time_for_period($period);
+    [$defaultStart, $defaultEnd] = schedule_time_for_period($period, $day);
     $startTime = schedule_normalize_time($_POST['start_time'] ?? '') ?? $defaultStart;
     $endTime = schedule_normalize_time($_POST['end_time'] ?? '') ?? $defaultEnd;
     if ($endTime <= $startTime) {
@@ -1287,8 +1324,11 @@ function render_lesson_schedule_teacher_page(?int $customTeacherId = null): void
                                     $current = $existing[$dayNum][$p] ?? null;
                                     $currentAssignmentId = $current ? (int)$current['assignment_id'] : 0;
                                     $isLocked = $current && (int)$current['locked'] === 1;
+                                    [$dayStart, $dayEnd] = schedule_time_for_period($p, $dayNum);
+                                    $dayBreak = schedule_break_minutes_for_after($p, $dayNum);
                                 ?>
                                     <td style="padding:6px;vertical-align:middle;text-align:center;<?= $currentAssignmentId > 0 ? 'background:#f0fdf4;' : '' ?>">
+                                        <div style="font-size:0.72rem;color:var(--text-muted,#64748b);font-weight:600;margin-bottom:3px;"><?= e($dayStart . ' - ' . $dayEnd) ?></div>
                                         <?php if ($isLocked): ?>
                                             <div style="background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;padding:6px 8px;border-radius:6px;font-size:0.78rem;font-weight:600;line-height:1.3;" title="Jadwal ini dikunci oleh admin">
                                                 🔒 <?= e($current['class_name'] . ' - ' . $current['subject_name']) ?>
@@ -1311,12 +1351,25 @@ function render_lesson_schedule_teacher_page(?int $customTeacherId = null): void
                                                 <?php endforeach; ?>
                                             </select>
                                         <?php endif; ?>
+                                        <?php if ($dayBreak > 0): ?>
+                                            <div style="margin-top:3px;font-size:0.7rem;color:#92400e;background:#fef3c7;border:1px solid #fde68a;border-radius:4px;padding:2px 4px;font-weight:600;display:inline-block;" title="Istirahat <?= $dayBreak ?> menit setelah jam ini">
+                                                ☕ Istirahat <?= $dayBreak ?>m
+                                            </div>
+                                        <?php endif; ?>
                                     </td>
                                 <?php endforeach; ?>
                             </tr>
                             <?php
-                            $breakMins = schedule_break_minutes_for_after($p);
-                            if ($breakMins > 0):
+                            $daysWithBreak = [];
+                            $firstBreakMins = 0;
+                            foreach ($days as $dNum => $dName) {
+                                $bm = schedule_break_minutes_for_after($p, $dNum);
+                                if ($bm > 0) {
+                                    $daysWithBreak[] = $dName;
+                                    $firstBreakMins = $bm;
+                                }
+                            }
+                            if (!empty($daysWithBreak) && count($daysWithBreak) === count($days)):
                                 [, $bEnd] = schedule_time_for_period($p, 1);
                                 [$bNext] = schedule_time_for_period($p + 1, 1);
                             ?>
@@ -1325,7 +1378,7 @@ function render_lesson_schedule_teacher_page(?int $customTeacherId = null): void
                                         ☕ ISTIRAHAT
                                     </td>
                                     <td colspan="<?= count($days) ?>" style="text-align:center;background:#fef3c7 !important;color:#92400e;font-weight:600;padding:6px;font-size:0.82rem;">
-                                        ☕ Istirahat (<?= $breakMins ?> Menit: <?= e($bEnd) ?> - <?= e($bNext) ?>)
+                                        ☕ Istirahat (<?= $firstBreakMins ?> Menit: <?= e($bEnd) ?> - <?= e($bNext) ?>)
                                     </td>
                                 </tr>
                             <?php endif; ?>
@@ -1443,22 +1496,57 @@ function render_schedule_template_panel(): void
                 </button>
             <?php endforeach; ?>
         </div>
-        <div class="schedule-period-strip">
+        <div class="schedule-period-strip" style="flex-wrap:wrap;">
             <?php
             $school = get_school_profile();
             $maxPeriods = (int)($school['max_periods'] ?? 10);
-            for ($p = 1; $p <= $maxPeriods; $p++):
-                [$start, $end] = schedule_time_for_period($p, 1);
+            $hasCustom = !empty($school['custom_break_enabled']);
+            $customDaysStr = (string)($school['custom_break_days'] ?? '1,3,5');
+            $customDaysList = array_map('intval', explode(',', $customDaysStr));
+            $customDaySample = !empty($customDaysList[0]) ? $customDaysList[0] : 1;
+            $regularDaySample = 2; // Selasa is standard
+            if (in_array(2, $customDaysList, true)) {
+                $regularDaySample = 4; // Kamis
+            }
+            ?>
+            <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);width:100%;margin-bottom:4px;display:flex;align-items:center;gap:6px;">
+                <i data-lucide="clock" style="width:13px;height:13px;"></i> Hari Biasa (<?= e(schedule_days()[$regularDaySample] ?? 'Reguler') ?>):
+            </div>
+            <?php for ($p = 1; $p <= $maxPeriods; $p++):
+                [$start, $end] = schedule_time_for_period($p, $regularDaySample);
             ?>
                 <span><strong><?= e($p) ?></strong><?= e($start . '-' . $end) ?></span>
             <?php
-                $breakMins = schedule_break_minutes_for_after($p);
+                $breakMins = schedule_break_minutes_for_after($p, $regularDaySample);
                 if ($breakMins > 0):
-                    [, $bEnd] = schedule_time_for_period($p, 1);
-                    [$bNext] = schedule_time_for_period($p + 1, 1);
+                    [, $bEnd] = schedule_time_for_period($p, $regularDaySample);
+                    [$bNext] = schedule_time_for_period($p + 1, $regularDaySample);
             ?>
                 <span class="schedule-period-break"><strong>☕</strong><?= e($bEnd . '-' . $bNext) ?></span>
             <?php endif; endfor; ?>
+
+            <?php if ($hasCustom):
+                $customDayNames = [];
+                foreach ($customDaysList as $cd) {
+                    if (isset(schedule_days()[$cd])) $customDayNames[] = schedule_days()[$cd];
+                }
+            ?>
+                <div style="font-size:0.75rem;font-weight:700;color:#0369a1;width:100%;margin-top:10px;margin-bottom:4px;display:flex;align-items:center;gap:6px;">
+                    <i data-lucide="sparkles" style="width:13px;height:13px;color:#0284c7;"></i> Hari Khusus Istirahat Berbeda (<?= e(implode(', ', $customDayNames)) ?>):
+                </div>
+                <?php for ($p = 1; $p <= $maxPeriods; $p++):
+                    [$start, $end] = schedule_time_for_period($p, $customDaySample);
+                ?>
+                    <span style="background:#f0f9ff;border-color:#bae6fd;"><strong><?= e($p) ?></strong><?= e($start . '-' . $end) ?></span>
+                <?php
+                    $breakMins = schedule_break_minutes_for_after($p, $customDaySample);
+                    if ($breakMins > 0):
+                        [, $bEnd] = schedule_time_for_period($p, $customDaySample);
+                        [$bNext] = schedule_time_for_period($p + 1, $customDaySample);
+                ?>
+                    <span class="schedule-period-break" style="background:#fef3c7;border-color:#fde68a;"><strong>☕</strong><?= e($bEnd . '-' . $bNext) ?></span>
+                <?php endif; endfor; ?>
+            <?php endif; ?>
         </div>
     </section>
     <?php
@@ -1517,7 +1605,7 @@ function render_schedule_filter_panel(int $classId, int $teacherId): void
 function render_lesson_schedule_form(array $edit): void
 {
     $period = (int)($edit['period_no'] ?? 1);
-    [$defaultStart, $defaultEnd] = schedule_time_for_period($period);
+    [$defaultStart, $defaultEnd] = schedule_time_for_period($period, (int)($edit['day_of_week'] ?? 1));
     $assignments = schedule_assignment_options();
     input_panel_start($edit ? 'Edit Slot Jadwal' : 'Input Slot Jadwal', 'Tambah Slot Jadwal', (bool)$edit || isset($_GET['add_schedule']));
     ?>
@@ -2222,7 +2310,7 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                                 <?php endforeach; ?>
                             </tr>
                             <?php
-                            $breakMins = schedule_break_minutes_for_after($p);
+                            $breakMins = schedule_break_minutes_for_after($p, $filterDay);
                             if ($breakMins > 0):
                                 [, $bEnd] = schedule_time_for_period($p, $filterDay);
                                 [$bNext] = schedule_time_for_period($p + 1, $filterDay);

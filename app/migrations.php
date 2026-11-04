@@ -1197,6 +1197,17 @@ function run_migrations_locked(): void
     migration_add_column('school_profile', 'break1_minutes', 'INT NULL DEFAULT 15');
     migration_add_column('school_profile', 'break2_after', 'INT NULL DEFAULT 6');
     migration_add_column('school_profile', 'break2_minutes', 'INT NULL DEFAULT 15');
+    migration_add_column('school_profile', 'custom_break_enabled', 'TINYINT(1) NULL DEFAULT 0');
+    migration_add_column('school_profile', 'custom_break_days', "VARCHAR(64) NULL DEFAULT '1,3,5'");
+    migration_add_column('school_profile', 'custom_break1_after', 'INT NULL DEFAULT 2');
+    migration_add_column('school_profile', 'custom_break1_minutes', 'INT NULL DEFAULT 15');
+    migration_add_column('school_profile', 'custom_break2_after', 'INT NULL DEFAULT 5');
+    migration_add_column('school_profile', 'custom_break2_minutes', 'INT NULL DEFAULT 15');
+    migration_add_column('school_profile', 'friday_break_custom', 'TINYINT(1) NULL DEFAULT 0');
+    migration_add_column('school_profile', 'friday_break1_after', 'INT NULL DEFAULT 2');
+    migration_add_column('school_profile', 'friday_break1_minutes', 'INT NULL DEFAULT 15');
+    migration_add_column('school_profile', 'friday_break2_after', 'INT NULL DEFAULT 0');
+    migration_add_column('school_profile', 'friday_break2_minutes', 'INT NULL DEFAULT 0');
     migration_add_column('school_profile', 'village', 'VARCHAR(120) NULL');
     migration_add_column('school_profile', 'district', 'VARCHAR(120) NULL');
     migration_add_column('school_profile', 'regency', 'VARCHAR(120) NULL');

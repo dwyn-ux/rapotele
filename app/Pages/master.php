@@ -196,12 +196,13 @@ function page_school(): void
 
                 <!-- Jam & Istirahat -->
                 <div class="school-subsection-divider" id="section-jam-istirahat">
-                    <span>Pengaturan Jam &amp; Istirahat</span>
+                    <span>Pengaturan Jam &amp; Istirahat Standar (Hari Biasa)</span>
                 </div>
                 <div class="school-form-grid three-col">
                     <div class="school-form-group">
                         <label class="school-label">Istirahat 1 Setelah Jam</label>
                         <select class="school-input school-select" name="break1_after">
+                            <option value="0">Tidak Ada</option>
                             <?php for ($i = 1; $i <= 9; $i++): ?>
                             <option value="<?= $i ?>" <?= ($school['break1_after'] ?? 3) == $i ? 'selected' : '' ?>>Jam <?= $i ?></option>
                             <?php endfor; ?>
@@ -209,11 +210,12 @@ function page_school(): void
                     </div>
                     <div class="school-form-group">
                         <label class="school-label">Durasi Istirahat 1 (menit)</label>
-                        <input type="number" min="5" max="60" class="school-input" name="break1_minutes" value="<?= e($school['break1_minutes'] ?? '15') ?>" placeholder="15">
+                        <input type="number" min="0" max="60" class="school-input" name="break1_minutes" value="<?= e($school['break1_minutes'] ?? '15') ?>" placeholder="15">
                     </div>
                     <div class="school-form-group">
                         <label class="school-label">Istirahat 2 Setelah Jam</label>
                         <select class="school-input school-select" name="break2_after">
+                            <option value="0">Tidak Ada</option>
                             <?php for ($i = 1; $i <= 9; $i++): ?>
                             <option value="<?= $i ?>" <?= ($school['break2_after'] ?? 6) == $i ? 'selected' : '' ?>>Jam <?= $i ?></option>
                             <?php endfor; ?>
@@ -223,11 +225,111 @@ function page_school(): void
                 <div class="school-form-grid two-col">
                     <div class="school-form-group">
                         <label class="school-label">Durasi Istirahat 2 (menit)</label>
-                        <input type="number" min="5" max="60" class="school-input" name="break2_minutes" value="<?= e($school['break2_minutes'] ?? '15') ?>" placeholder="15">
+                        <input type="number" min="0" max="60" class="school-input" name="break2_minutes" value="<?= e($school['break2_minutes'] ?? '15') ?>" placeholder="15">
                     </div>
                     <div class="school-form-group">
-                        <label class="school-label">Jam Maksimal</label>
+                        <label class="school-label">Jam Maksimal Per Hari</label>
                         <input type="number" min="1" max="12" class="school-input" name="max_periods" value="<?= e($school['max_periods'] ?? '10') ?>" placeholder="10">
+                    </div>
+                </div>
+
+                <!-- Pengaturan Istirahat Khusus (Senin, Rabu, Jum'at, dll.) -->
+                <div style="margin-top:1.5rem;padding:16px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+                        <label class="school-check" style="font-weight:700;font-size:0.95rem;color:#0f172a;cursor:pointer;display:inline-flex;align-items:center;gap:8px;">
+                            <input type="checkbox" name="custom_break_enabled" id="toggle_custom_break" value="1" <?= checked(!empty($school['custom_break_enabled'])) ?> onchange="document.getElementById('custom_break_fields').style.display = this.checked ? 'block' : 'none';">
+                            <span class="school-check-mark"></span>
+                            <span>⭐ Aktifkan Jadwal Istirahat Khusus Hari Tertentu (Senin, Rabu, Jum'at, dll.)</span>
+                        </label>
+                        <span style="font-size:0.8rem;background:#e0f2fe;color:#0369a1;font-weight:600;padding:3px 10px;border-radius:12px;">
+                            Opsi Fleksibel
+                        </span>
+                    </div>
+
+                    <div id="custom_break_fields" style="display: <?= !empty($school['custom_break_enabled']) ? 'block' : 'none' ?>;margin-top:12px;padding-top:12px;border-top:1px dashed #cbd5e1;">
+                        <div style="margin-bottom:14px;">
+                            <label class="school-label" style="font-weight:600;margin-bottom:6px;display:block;">Pilih Hari yang Menerapkan Jadwal Istirahat Khusus Ini:</label>
+                            <?php
+                            $activeCustomDays = explode(',', (string)($school['custom_break_days'] ?? '1,3,5'));
+                            $daysMap = [1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu', 4 => 'Kamis', 5 => "Jum'at", 6 => 'Sabtu'];
+                            ?>
+                            <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;">
+                                <?php foreach ($daysMap as $dNum => $dName): ?>
+                                    <label style="display:inline-flex;align-items:center;gap:6px;font-size:0.88rem;cursor:pointer;background:#fff;border:1px solid #cbd5e1;padding:6px 12px;border-radius:6px;">
+                                        <input type="checkbox" name="custom_break_days[]" value="<?= $dNum ?>" <?= in_array((string)$dNum, $activeCustomDays, true) ? 'checked' : '' ?>>
+                                        <strong><?= e($dName) ?></strong>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
+                            <small style="color:#64748b;margin-top:4px;display:block;">Centang hari-hari yang jadwal istirahatnya berbeda (misal: <strong>Senin, Rabu, dan Jum'at</strong>).</small>
+                        </div>
+
+                        <div class="school-form-grid three-col">
+                            <div class="school-form-group">
+                                <label class="school-label">Istirahat Khusus 1 Setelah Jam</label>
+                                <select class="school-input school-select" name="custom_break1_after">
+                                    <option value="0">Tidak Ada</option>
+                                    <?php for ($i = 1; $i <= 9; $i++): ?>
+                                    <option value="<?= $i ?>" <?= ($school['custom_break1_after'] ?? 2) == $i ? 'selected' : '' ?>>Jam <?= $i ?></option>
+                                    <?php endfor; ?>
+                                </select>
+                            </div>
+                            <div class="school-form-group">
+                                <label class="school-label">Durasi Istirahat Khusus 1 (menit)</label>
+                                <input type="number" min="0" max="60" class="school-input" name="custom_break1_minutes" value="<?= e($school['custom_break1_minutes'] ?? '15') ?>" placeholder="15">
+                            </div>
+                            <div class="school-form-group">
+                                <label class="school-label">Istirahat Khusus 2 Setelah Jam</label>
+                                <select class="school-input school-select" name="custom_break2_after">
+                                    <option value="0">Tidak Ada</option>
+                                    <?php for ($i = 1; $i <= 9; $i++): ?>
+                                    <option value="<?= $i ?>" <?= ($school['custom_break2_after'] ?? 5) == $i ? 'selected' : '' ?>>Jam <?= $i ?></option>
+                                    <?php endfor; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="school-form-grid two-col" style="margin-top:8px;">
+                            <div class="school-form-group">
+                                <label class="school-label">Durasi Istirahat Khusus 2 (menit)</label>
+                                <input type="number" min="0" max="60" class="school-input" name="custom_break2_minutes" value="<?= e($school['custom_break2_minutes'] ?? '15') ?>" placeholder="15">
+                            </div>
+                        </div>
+
+                        <!-- Opsi Khusus Hari Jum'at jika ingin beda lagi -->
+                        <div style="margin-top:14px;padding-top:12px;border-top:1px dashed #e2e8f0;">
+                            <label class="school-check" style="font-weight:600;font-size:0.88rem;color:#334155;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                                <input type="checkbox" name="friday_break_custom" id="toggle_friday_break" value="1" <?= checked(!empty($school['friday_break_custom'])) ?> onchange="document.getElementById('friday_break_fields').style.display = this.checked ? 'block' : 'none';">
+                                <span class="school-check-mark"></span>
+                                <span>Atur Hari Jum'at secara terpisah (opsional jika jeda Sholat Jum'at berbeda lagi)</span>
+                            </label>
+
+                            <div id="friday_break_fields" style="display: <?= !empty($school['friday_break_custom']) ? 'block' : 'none' ?>;margin-top:10px;">
+                                <div class="school-form-grid three-col">
+                                    <div class="school-form-group">
+                                        <label class="school-label">Istirahat Jum'at 1 Setelah Jam</label>
+                                        <select class="school-input school-select" name="friday_break1_after">
+                                            <option value="0">Tidak Ada</option>
+                                            <?php for ($i = 1; $i <= 9; $i++): ?>
+                                            <option value="<?= $i ?>" <?= ($school['friday_break1_after'] ?? 2) == $i ? 'selected' : '' ?>>Jam <?= $i ?></option>
+                                            <?php endfor; ?>
+                                        </select>
+                                    </div>
+                                    <div class="school-form-group">
+                                        <label class="school-label">Durasi Istirahat Jum'at 1 (menit)</label>
+                                        <input type="number" min="0" max="90" class="school-input" name="friday_break1_minutes" value="<?= e($school['friday_break1_minutes'] ?? '15') ?>" placeholder="15">
+                                    </div>
+                                    <div class="school-form-group">
+                                        <label class="school-label">Istirahat Jum'at 2 Setelah Jam</label>
+                                        <select class="school-input school-select" name="friday_break2_after">
+                                            <option value="0">Tidak Ada</option>
+                                            <?php for ($i = 1; $i <= 9; $i++): ?>
+                                            <option value="<?= $i ?>" <?= ($school['friday_break2_after'] ?? 0) == $i ? 'selected' : '' ?>>Jam <?= $i ?></option>
+                                            <?php endfor; ?>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -469,6 +571,8 @@ function page_school_edit(): void
         'regular_period_minutes' => 35, 'short_period_minutes' => 25,
         'short_days' => '', 'max_periods' => 10, 'start_time' => '07:00',
         'break1_after' => 3, 'break1_minutes' => 15, 'break2_after' => 6, 'break2_minutes' => 15,
+        'custom_break_enabled' => 0, 'custom_break_days' => '1,3,5', 'custom_break1_after' => 2, 'custom_break1_minutes' => 15, 'custom_break2_after' => 5, 'custom_break2_minutes' => 15,
+        'friday_break_custom' => 0, 'friday_break1_after' => 2, 'friday_break1_minutes' => 15, 'friday_break2_after' => 0, 'friday_break2_minutes' => 0,
         'village' => '', 'district' => '', 'regency' => '', 'province' => '',
     ];
     render_header($id > 0 ? 'Edit Sekolah' : 'Tambah Sekolah');
