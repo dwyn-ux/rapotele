@@ -255,12 +255,17 @@ function page_student_dashboard(): void
 function page_live_monitor_feed(): void
 {
     require_role(['admin', 'guru']);
+    require_once APP_ROOT . '/app/Services/schedule.php';
     header('Content-Type: application/json; charset=utf-8');
 
     $today = (int)date('N');
     $date = date('Y-m-d');
     $timeNow = date('H:i');
 
+    // Fetch all active classes
+    $classes = fetch_all('SELECT id, name, level FROM classes ORDER BY level, name');
+
+    // Fetch all schedules for today
     $schedules = fetch_all(
         'SELECT ls.id, ls.assignment_id, ls.teacher_id, ls.class_id, ls.subject_id, ls.day_of_week, ls.period_no, ls.start_time, ls.end_time,
                 t.name as teacher_name, c.name as class_name, c.level as class_level, s.name as subject_name
@@ -310,25 +315,36 @@ function page_live_monitor_feed(): void
         $teachingAttBySchedule[(int)$ta['schedule_id']] = $ta;
     }
 
-    $rows = [];
-    $totalOngoing = 0;
-    $totalCheckedIn = 0;
-    $totalAlertNotCheckedIn = 0;
-    $totalStudentsHadir = 0;
-    $totalStudentsSakit = 0;
-    $totalStudentsIzin = 0;
-    $totalStudentsAlpa = 0;
+    // Index schedules by class_id and period_no
+    $schedulesByClass = [];
+    $periodsToday = [];
+    $activePeriodNow = null;
 
     foreach ($schedules as $row) {
-        $schedId = (int)$row['id'];
-        $asgnId = (int)$row['assignment_id'];
+        $p = (int)$row['period_no'];
         $start = substr((string)$row['start_time'], 0, 5);
         $end = substr((string)$row['end_time'], 0, 5);
+
+        if (!isset($periodsToday[$p])) {
+            $periodsToday[$p] = [
+                'period_no' => $p,
+                'start_time' => $start,
+                'end_time' => $end,
+            ];
+        }
+
+        // Check if this period is active right now
+        if ($timeNow >= $start && $timeNow <= $end) {
+            $activePeriodNow = $p;
+        }
+
+        $schedId = (int)$row['id'];
+        $asgnId = (int)$row['assignment_id'];
+        $classId = (int)$row['class_id'];
 
         $timeStatus = 'upcoming';
         if ($timeNow >= $start && $timeNow <= $end) {
             $timeStatus = 'ongoing';
-            $totalOngoing++;
         } elseif ($timeNow > $end) {
             $timeStatus = 'finished';
         }
@@ -359,10 +375,6 @@ function page_live_monitor_feed(): void
             }
             if (isset($studentCountsBySession[(int)$sess['id']])) {
                 $studentStats = array_merge($studentStats, $studentCountsBySession[(int)$sess['id']]);
-                $totalStudentsHadir += $studentStats['hadir'];
-                $totalStudentsSakit += $studentStats['sakit'];
-                $totalStudentsIzin += $studentStats['izin'];
-                $totalStudentsAlpa += $studentStats['alpa'];
             }
         } elseif ($tAtt && !empty($tAtt['status']) && $tAtt['status'] !== 'belum input') {
             $isCheckedIn = true;
@@ -371,25 +383,13 @@ function page_live_monitor_feed(): void
             $checkinNotes = (string)($tAtt['notes'] ?: '');
         }
 
-        if ($isCheckedIn) {
-            $totalCheckedIn++;
-        } elseif ($timeStatus === 'ongoing') {
-            $totalAlertNotCheckedIn++;
-        }
-
-        $level = function_exists('class_level_from_grade_or_name') 
-            ? class_level_from_grade_or_name($row['class_level'] ?? '', null, $row['class_name'] ?? '')
-            : ($row['class_level'] ?: '');
-
-        $rows[] = [
+        $schedulesByClass[$classId][$p] = [
             'id' => $schedId,
             'assignment_id' => $asgnId,
-            'period_no' => (int)$row['period_no'],
+            'period_no' => $p,
             'start_time' => $start,
             'end_time' => $end,
             'time_status' => $timeStatus,
-            'class_name' => $row['class_name'],
-            'class_level' => $level,
             'subject_name' => $row['subject_name'],
             'teacher_name' => $row['teacher_name'],
             'meeting_no' => $meetingNo,
@@ -405,21 +405,107 @@ function page_live_monitor_feed(): void
         ];
     }
 
+    ksort($periodsToday);
+
+    // Build class cards data
+    $classCards = [];
+    $totalOngoingClasses = 0;
+    $totalPresentTeachers = 0;
+    $totalAbsentAlerts = 0;
+    $totalHadirStudents = 0;
+    $totalSakitStudents = 0;
+    $totalIzinStudents = 0;
+    $totalAlpaStudents = 0;
+
+    $availablePeriodKeys = array_keys($periodsToday);
+    $latestPeriodToday = !empty($availablePeriodKeys) ? end($availablePeriodKeys) : 1;
+
+    foreach ($classes as $c) {
+        $cid = (int)$c['id'];
+        $cName = $c['name'];
+        $cLevel = function_exists('class_level_from_grade_or_name') 
+            ? class_level_from_grade_or_name($c['level'] ?? '', null, $cName)
+            : ($c['level'] ?: 'SMP');
+
+        $classSlots = $schedulesByClass[$cid] ?? [];
+
+        // Sum student attendance for this class today across all sessions
+        $classStudentSum = ['hadir' => 0, 'sakit' => 0, 'izin' => 0, 'alpa' => 0];
+        foreach ($classSlots as $slot) {
+            $classStudentSum['hadir'] += $slot['student_stats']['hadir'];
+            $classStudentSum['sakit'] += $slot['student_stats']['sakit'];
+            $classStudentSum['izin'] += $slot['student_stats']['izin'];
+            $classStudentSum['alpa'] += $slot['student_stats']['alpa'];
+        }
+        $totalHadirStudents += $classStudentSum['hadir'];
+        $totalSakitStudents += $classStudentSum['sakit'];
+        $totalIzinStudents += $classStudentSum['izin'];
+        $totalAlpaStudents += $classStudentSum['alpa'];
+
+        // Find active slot right now
+        $currentSlot = null;
+        if ($activePeriodNow && isset($classSlots[$activePeriodNow])) {
+            $currentSlot = $classSlots[$activePeriodNow];
+        } else {
+            foreach ($classSlots as $s) {
+                if ($s['time_status'] === 'ongoing') {
+                    $currentSlot = $s;
+                    break;
+                }
+            }
+        }
+
+        // Find next slot if no current slot
+        $nextSlot = null;
+        if (!$currentSlot) {
+            foreach ($classSlots as $s) {
+                if ($s['time_status'] === 'upcoming') {
+                    $nextSlot = $s;
+                    break;
+                }
+            }
+        }
+
+        if ($currentSlot) {
+            $totalOngoingClasses++;
+            if ($currentSlot['is_checked_in']) {
+                $totalPresentTeachers++;
+            } else {
+                $totalAbsentAlerts++;
+            }
+        }
+
+        $classCards[] = [
+            'class_id' => $cid,
+            'class_name' => $cName,
+            'class_level' => $cLevel,
+            'has_schedule_today' => !empty($classSlots),
+            'slots' => $classSlots,
+            'current_slot' => $currentSlot,
+            'next_slot' => $nextSlot,
+            'latest_slot' => !empty($classSlots) ? end($classSlots) : null,
+            'class_student_sum' => $classStudentSum,
+        ];
+    }
+
     echo json_encode([
         'ok' => true,
         'server_time' => date('H:i:s'),
         'date_formatted' => schedule_days()[$today] . ', ' . date('d/m/Y'),
+        'active_period_now' => $activePeriodNow,
+        'latest_period_today' => $latestPeriodToday,
+        'periods_list' => array_values($periodsToday),
         'summary' => [
-            'total_slots' => count($schedules),
-            'total_checked_in' => $totalCheckedIn,
-            'total_ongoing' => $totalOngoing,
-            'total_alert_not_checked_in' => $totalAlertNotCheckedIn,
-            'students_hadir' => $totalStudentsHadir,
-            'students_sakit' => $totalStudentsSakit,
-            'students_izin' => $totalStudentsIzin,
-            'students_alpa' => $totalStudentsAlpa,
+            'total_classes' => count($classes),
+            'total_ongoing' => $totalOngoingClasses,
+            'total_checked_in' => $totalPresentTeachers,
+            'total_alert_not_checked_in' => $totalAbsentAlerts,
+            'students_hadir' => $totalHadirStudents,
+            'students_sakit' => $totalSakitStudents,
+            'students_izin' => $totalIzinStudents,
+            'students_alpa' => $totalAlpaStudents,
         ],
-        'rows' => $rows,
+        'class_cards' => $classCards,
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -432,15 +518,15 @@ function render_live_monitoring_widget(): void
     .live-monitor-panel {
         background: #ffffff;
         border: 1px solid var(--border, #e2e8f0);
-        border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05);
-        margin-bottom: 1.5rem;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06);
+        margin-bottom: 2rem;
         overflow: hidden;
     }
     .live-monitor-header {
         background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
         color: #ffffff;
-        padding: 16px 20px;
+        padding: 16px 22px;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -456,7 +542,7 @@ function render_live_monitoring_widget(): void
         box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
         animation: livePulseAnim 1.6s infinite;
         vertical-align: middle;
-        margin-right: 6px;
+        margin-right: 8px;
     }
     @keyframes livePulseAnim {
         0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
@@ -467,38 +553,44 @@ function render_live_monitoring_widget(): void
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
         gap: 12px;
-        padding: 16px 20px;
+        padding: 16px 22px;
         background: #f8fafc;
         border-bottom: 1px solid var(--border, #e2e8f0);
     }
     .live-stat-card {
         background: #ffffff;
         border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 12px 14px;
+        border-radius: 12px;
+        padding: 12px 16px;
         display: flex;
         align-items: center;
-        gap: 12px;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        gap: 14px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.03);
     }
-    .live-stat-icon {
-        width: 38px;
-        height: 38px;
-        border-radius: 8px;
+    .live-stat-icon-wrap {
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.1rem;
         flex-shrink: 0;
     }
-    .live-filters {
+    .live-filters-bar {
         display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 12px 20px;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 22px;
         border-bottom: 1px solid #e2e8f0;
         background: #ffffff;
-        overflow-x: auto;
+        flex-wrap: wrap;
+    }
+    .live-filters-group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
     }
     .live-filter-btn {
         background: #f1f5f9;
@@ -506,7 +598,7 @@ function render_live_monitoring_widget(): void
         color: #475569;
         padding: 5px 12px;
         border-radius: 20px;
-        font-size: 0.8rem;
+        font-size: 0.78rem;
         font-weight: 600;
         cursor: pointer;
         display: inline-flex;
@@ -517,180 +609,358 @@ function render_live_monitoring_widget(): void
     }
     .live-filter-btn:hover {
         background: #e2e8f0;
-        color: #1e293b;
+        color: #0f172a;
     }
     .live-filter-btn.active {
         background: #0284c7;
         border-color: #0284c7;
         color: #ffffff;
     }
-    .live-table-wrap {
-        max-height: 440px;
+    .live-select-period {
+        font-size: 0.82rem;
+        padding: 5px 10px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        background: #f8fafc;
+        color: #0f172a;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    /* Cards Grid */
+    .live-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+        gap: 16px;
+        padding: 22px;
+        background: #f8fafc;
+        max-height: 720px;
         overflow-y: auto;
     }
-    .live-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.86rem;
+
+    /* Class Card */
+    .live-class-card {
+        background: #ffffff;
+        border-radius: 14px;
+        padding: 16px;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+        border: 2px solid #e2e8f0;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 14px;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+        position: relative;
     }
-    .live-table th {
-        position: sticky;
-        top: 0;
-        background: #f8fafc;
-        color: #475569;
+    .live-class-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px -2px rgba(15, 23, 42, 0.08);
+    }
+
+    /* Red Card (Teacher absent during active class) */
+    .live-class-card.status-alert {
+        border-color: #ef4444;
+        background: linear-gradient(180deg, #fff5f5 0%, #ffffff 50%);
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.08);
+    }
+
+    /* Green Card (Teacher present) */
+    .live-class-card.status-present {
+        border-color: #10b981;
+        background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 50%);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.08);
+    }
+
+    /* Neutral Card (Break / Outside hours) */
+    .live-class-card.status-neutral {
+        border-color: #e2e8f0;
+        background: #ffffff;
+    }
+
+    /* Card Header */
+    .live-card-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    .live-card-title {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .live-badge-level {
+        font-size: 0.68rem;
         font-weight: 700;
-        padding: 10px 14px;
-        text-align: left;
-        border-bottom: 1px solid #e2e8f0;
-        z-index: 2;
+        padding: 2px 7px;
+        border-radius: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
-    .live-table td {
-        padding: 10px 14px;
-        border-bottom: 1px solid #f1f5f9;
-        vertical-align: middle;
+    .level-smp {
+        background: #e0f2fe;
+        color: #0369a1;
+        border: 1px solid #bae6fd;
     }
-    .live-table tr:hover {
-        background: #f8fafc;
+    .level-sma {
+        background: #ede9fe;
+        color: #6d28d9;
+        border: 1px solid #ddd6fe;
     }
-    .live-badge-ongoing {
-        background: #fef2f2;
+    .live-card-period {
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #64748b;
+        background: #f1f5f9;
+        padding: 3px 8px;
+        border-radius: 6px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+    }
+
+    /* Status Banner Pill */
+    .live-status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .live-status-pill.pill-alert {
+        background: #fee2e2;
         color: #b91c1c;
         border: 1px solid #fecaca;
-        padding: 3px 8px;
-        border-radius: 6px;
-        font-weight: 700;
-        font-size: 0.75rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        animation: pulseWarning 1.5s infinite;
+        animation: cardAlertGlow 1.8s infinite;
     }
-    @keyframes pulseWarning {
+    @keyframes cardAlertGlow {
         0%, 100% { opacity: 1; }
-        50% { opacity: 0.65; }
+        50% { opacity: 0.75; }
     }
-    .live-badge-checked {
-        background: #f0fdf4;
+    .live-status-pill.pill-present {
+        background: #dcfce7;
         color: #15803d;
         border: 1px solid #bbf7d0;
-        padding: 3px 8px;
-        border-radius: 6px;
-        font-weight: 700;
-        font-size: 0.75rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
     }
-    .live-badge-upcoming {
+    .live-status-pill.pill-neutral {
         background: #f1f5f9;
         color: #64748b;
         border: 1px solid #e2e8f0;
-        padding: 3px 8px;
-        border-radius: 6px;
-        font-size: 0.75rem;
+    }
+
+    /* Lesson info */
+    .live-lesson-info {
+        background: #f8fafc;
+        border: 1px solid #f1f5f9;
+        border-radius: 10px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .live-info-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.82rem;
+        color: #334155;
+    }
+    .live-info-row svg {
+        flex-shrink: 0;
+        color: #64748b;
+    }
+    .live-info-row strong {
+        color: #0f172a;
+    }
+
+    /* Student attendance numbers strip (Numbers only + 1-letter labels) */
+    .live-student-strip {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+    }
+    .live-st-box {
+        border-radius: 8px;
+        padding: 6px 4px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid;
+    }
+    .live-st-num {
+        font-size: 1.05rem;
+        font-weight: 800;
+        line-height: 1.1;
+    }
+    .live-st-lbl {
+        font-size: 0.65rem;
+        font-weight: 700;
+        margin-top: 2px;
+        opacity: 0.9;
+        text-transform: uppercase;
+    }
+    .st-box-h {
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+        color: #15803d;
+    }
+    .st-box-s {
+        background: #f0f9ff;
+        border-color: #bae6fd;
+        color: #0369a1;
+    }
+    .st-box-i {
+        background: #fffbeb;
+        border-color: #fde68a;
+        color: #b45309;
+    }
+    .st-box-a {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: #b91c1c;
+    }
+
+    /* Card Footer */
+    .live-card-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-top: 6px;
+        border-top: 1px dashed #e2e8f0;
+    }
+    .live-btn-detail {
+        font-size: 0.76rem;
         font-weight: 600;
+        color: #0284c7;
+        text-decoration: none;
         display: inline-flex;
         align-items: center;
         gap: 4px;
-    }
-    .live-badge-finished {
-        background: #f8fafc;
-        color: #94a3b8;
-        padding: 3px 8px;
+        padding: 3px 6px;
         border-radius: 6px;
-        font-size: 0.75rem;
+        transition: background 0.15s ease;
+    }
+    .live-btn-detail:hover {
+        background: #e0f2fe;
     }
     </style>
 
     <div class="live-monitor-panel">
+        <!-- Header Panel -->
         <div class="live-monitor-header">
             <div>
-                <div style="font-weight: 700; font-size: 1.05rem; display: flex; align-items: center;">
+                <div style="font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; letter-spacing: 0.3px;">
                     <span class="live-dot-pulse"></span>
                     <span>LIVE MONITORING KBM &amp; PRESENSI</span>
                 </div>
-                <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 2px;">
-                    <span id="live-header-date">Memuat data...</span> &bull; Server time: <span id="live-header-time">--:--:--</span>
+                <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 3px; display: flex; align-items: center; gap: 8px;">
+                    <span id="live-header-date">Memuat data...</span>
+                    <span>&bull;</span>
+                    <span style="display: inline-flex; align-items: center; gap: 4px;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        <span id="live-header-time">--:--:--</span>
+                    </span>
                 </div>
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
-                <div style="font-size: 0.8rem; color: #cbd5e1; background: rgba(255,255,255,0.08); padding: 4px 10px; border-radius: 6px; display: flex; align-items: center; gap: 6px;">
-                    <i data-lucide="clock" style="width: 14px; height: 14px;"></i>
-                    <span>Update dlm: <strong id="live-countdown" style="color:#38bdf8;">10</strong>s</span>
+                <div style="font-size: 0.8rem; color: #cbd5e1; background: rgba(255,255,255,0.08); padding: 5px 12px; border-radius: 8px; display: flex; align-items: center; gap: 6px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    <span>Refresh: <strong id="live-countdown" style="color:#38bdf8;">10</strong>s</span>
                 </div>
-                <button type="button" id="btn-toggle-auto" class="button small" style="background: rgba(255,255,255,0.15); border: none; color: #ffffff; padding: 4px 10px; font-size: 0.8rem;" title="Jeda/Lanjutkan Update Otomatis">
-                    <span id="btn-toggle-auto-text">⏸️ Jeda</span>
+                <button type="button" id="btn-toggle-auto" class="button small" style="background: rgba(255,255,255,0.15); border: none; color: #ffffff; padding: 5px 12px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 5px; border-radius: 8px;" title="Jeda/Lanjutkan Update Otomatis">
+                    <span id="btn-toggle-auto-icon">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                    </span>
+                    <span id="btn-toggle-auto-text">Jeda</span>
                 </button>
-                <button type="button" id="btn-manual-refresh" class="button small primary" style="background: #0284c7; border: none; font-size: 0.8rem; padding: 4px 12px; display: inline-flex; align-items: center; gap: 4px;">
-                    <i data-lucide="refresh-cw" id="icon-manual-refresh" style="width: 14px; height: 14px;"></i>
+                <button type="button" id="btn-manual-refresh" class="button small primary" style="background: #0284c7; border: none; font-size: 0.8rem; padding: 5px 14px; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px;" title="Refresh Sekarang">
+                    <svg id="icon-manual-refresh" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                     <span>Refresh</span>
                 </button>
             </div>
         </div>
 
+        <!-- Metric Counter Cards -->
         <div class="live-monitor-stats">
             <div class="live-stat-card">
-                <div class="live-stat-icon" style="background: #e0f2fe; color: #0284c7;">🏫</div>
+                <div class="live-stat-icon-wrap" style="background: #e0f2fe; color: #0284c7;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                </div>
                 <div>
-                    <div style="font-size: 0.75rem; color: #64748b; font-weight: 600;">Kelas Berlangsung</div>
+                    <div style="font-size: 0.74rem; color: #64748b; font-weight: 600;">Total Kelas Aktif</div>
                     <div style="font-size: 1.25rem; font-weight: 800; color: #0f172a;" id="stat-ongoing">0</div>
                 </div>
             </div>
             <div class="live-stat-card">
-                <div class="live-stat-icon" style="background: #dcfce7; color: #16a34a;">👨‍🏫</div>
+                <div class="live-stat-icon-wrap" style="background: #dcfce7; color: #16a34a;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="16 11 18 13 22 9"></polyline></svg>
+                </div>
                 <div>
-                    <div style="font-size: 0.75rem; color: #64748b; font-weight: 600;">Guru Hadir di Kelas</div>
+                    <div style="font-size: 0.74rem; color: #64748b; font-weight: 600;">Guru Hadir di Kelas</div>
                     <div style="font-size: 1.25rem; font-weight: 800; color: #16a34a;" id="stat-checked-in">0</div>
                 </div>
             </div>
             <div class="live-stat-card">
-                <div class="live-stat-icon" style="background: #fee2e2; color: #dc2626;">🚨</div>
+                <div class="live-stat-icon-wrap" style="background: #fee2e2; color: #dc2626;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                </div>
                 <div>
-                    <div style="font-size: 0.75rem; color: #64748b; font-weight: 600;">Belum Masuk Kelas</div>
+                    <div style="font-size: 0.74rem; color: #64748b; font-weight: 600;">Belum Masuk Kelas</div>
                     <div style="font-size: 1.25rem; font-weight: 800; color: #dc2626;" id="stat-alert">0</div>
                 </div>
             </div>
             <div class="live-stat-card">
-                <div class="live-stat-icon" style="background: #fef3c7; color: #d97706;">🎓</div>
+                <div class="live-stat-icon-wrap" style="background: #fef3c7; color: #d97706;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                </div>
                 <div>
-                    <div style="font-size: 0.75rem; color: #64748b; font-weight: 600;">Kehadiran Siswa Hari Ini</div>
-                    <div style="font-size: 0.88rem; font-weight: 700; color: #1e293b;" id="stat-students">
-                        <span style="color:#16a34a;">0 H</span> &bull; <span style="color:#0284c7;">0 S</span> &bull; <span style="color:#d97706;">0 I</span> &bull; <span style="color:#dc2626;">0 A</span>
+                    <div style="font-size: 0.74rem; color: #64748b; font-weight: 600;">Total Siswa Hadir Hari Ini</div>
+                    <div style="font-size: 1.25rem; font-weight: 800; color: #0f172a;" id="stat-students">
+                        0
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="live-filters">
-            <span style="font-size: 0.8rem; font-weight: 700; color: #64748b; margin-right: 4px;">Filter:</span>
-            <button type="button" class="live-filter-btn active" data-filter="all">Semua Sesi (<span id="filter-cnt-all">0</span>)</button>
-            <button type="button" class="live-filter-btn" data-filter="ongoing">Sedang Berlangsung (<span id="filter-cnt-ongoing">0</span>)</button>
-            <button type="button" class="live-filter-btn" data-filter="alert" style="color: #b91c1c;">Belum Check-in (<span id="filter-cnt-alert">0</span>)</button>
-            <button type="button" class="live-filter-btn" data-filter="checked">Sudah Hadir (<span id="filter-cnt-checked">0</span>)</button>
-            <button type="button" class="live-filter-btn" data-filter="upcoming">Jam Berikutnya</button>
+        <!-- Filter & Period Bar -->
+        <div class="live-filters-bar">
+            <div class="live-filters-group">
+                <span style="font-size: 0.78rem; font-weight: 700; color: #64748b; margin-right: 2px;">Jenjang:</span>
+                <button type="button" class="live-filter-btn active" data-level="all">Semua Kelas</button>
+                <button type="button" class="live-filter-btn" data-level="SMP">SMP</button>
+                <button type="button" class="live-filter-btn" data-level="SMA">SMA</button>
+
+                <span style="font-size: 0.78rem; font-weight: 700; color: #64748b; margin-left: 10px; margin-right: 2px;">Status:</span>
+                <button type="button" class="live-filter-btn active" data-status="all">Semua</button>
+                <button type="button" class="live-filter-btn" data-status="alert" style="color: #b91c1c;">Belum Hadir</button>
+                <button type="button" class="live-filter-btn" data-status="present" style="color: #15803d;">Hadir</button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="live-period-select" style="font-size: 0.78rem; font-weight: 700; color: #64748b;">Jam Pelajaran:</label>
+                <select id="live-period-select" class="live-select-period">
+                    <option value="current">⚡ Jam Saat Ini (Otomatis)</option>
+                </select>
+            </div>
         </div>
 
-        <div class="live-table-wrap">
-            <table class="live-table">
-                <thead>
-                    <tr>
-                        <th style="width: 130px;">Jam &amp; Waktu</th>
-                        <th style="width: 140px;">Kelas</th>
-                        <th>Mata Pelajaran</th>
-                        <th>Guru Pengampu</th>
-                        <th style="width: 200px;">Status Kehadiran Guru</th>
-                        <th style="width: 160px;">Presensi Siswa</th>
-                        <th style="width: 90px; text-align: center;">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody id="live-table-body">
-                    <tr>
-                        <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
-                            Memuat data aktivitas KBM hari ini...
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+        <!-- Cards Container Grid -->
+        <div class="live-cards-grid" id="live-cards-container">
+            <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: #64748b;">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: livePulseAnim 1s infinite; margin-bottom: 8px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <div>Memuat pemantauan kelas secara realtime...</div>
+            </div>
         </div>
     </div>
 
@@ -700,17 +970,36 @@ function render_live_monitoring_widget(): void
         var countdownSec = 10;
         var curTimer = 10;
         var isPaused = false;
-        var activeFilter = 'all';
-        var cachedRows = [];
+        var isTabHidden = false;
+        var activeLevel = 'all';
+        var activeStatus = 'all';
+        var selectedPeriod = 'current'; // 'current' or integer period_no
+
+        var cachedCards = [];
+        var cachedPeriods = [];
+        var activePeriodNow = null;
+        var latestPeriodToday = null;
         var intervalId = null;
 
         var countdownEl = document.getElementById('live-countdown');
         var btnToggleAuto = document.getElementById('btn-toggle-auto');
+        var btnToggleIcon = document.getElementById('btn-toggle-auto-icon');
         var btnToggleText = document.getElementById('btn-toggle-auto-text');
         var btnManual = document.getElementById('btn-manual-refresh');
-        var tableBody = document.getElementById('live-table-body');
+        var cardsContainer = document.getElementById('live-cards-container');
         var dateEl = document.getElementById('live-header-date');
         var timeEl = document.getElementById('live-header-time');
+        var periodSelect = document.getElementById('live-period-select');
+
+        var svgPlay = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+        var svgPause = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+        var svgCheck = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+        var svgAlert = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+        var svgUser = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+        var svgBook = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>';
+        var svgClock = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
+        var svgPin = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+        var svgExtLink = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
 
         function fetchFeed() {
             var icon = document.getElementById('icon-manual-refresh');
@@ -722,11 +1011,15 @@ function render_live_monitoring_widget(): void
                     if (icon) icon.style.animation = '';
                     if (!data || !data.ok) return;
 
-                    cachedRows = data.rows || [];
+                    cachedCards = data.class_cards || [];
+                    cachedPeriods = data.periods_list || [];
+                    activePeriodNow = data.active_period_now;
+                    latestPeriodToday = data.latest_period_today;
+
                     if (dateEl) dateEl.textContent = data.date_formatted || '';
                     if (timeEl) timeEl.textContent = data.server_time || '';
 
-                    // Update summary
+                    // Update summary numbers
                     var sm = data.summary || {};
                     var elOngoing = document.getElementById('stat-ongoing');
                     var elChecked = document.getElementById('stat-checked-in');
@@ -734,35 +1027,17 @@ function render_live_monitoring_widget(): void
                     var elStudents = document.getElementById('stat-students');
 
                     if (elOngoing) elOngoing.textContent = sm.total_ongoing || 0;
-                    if (elChecked) elChecked.textContent = (sm.total_checked_in || 0) + ' / ' + (sm.total_slots || 0);
+                    if (elChecked) elChecked.textContent = (sm.total_checked_in || 0) + ' / ' + (sm.total_ongoing || sm.total_classes || 0);
                     if (elAlert) elAlert.textContent = sm.total_alert_not_checked_in || 0;
                     if (elStudents) {
-                        elStudents.innerHTML = '<span style="color:#16a34a;">' + (sm.students_hadir || 0) + ' H</span> &bull; ' +
-                            '<span style="color:#0284c7;">' + (sm.students_sakit || 0) + ' S</span> &bull; ' +
-                            '<span style="color:#d97706;">' + (sm.students_izin || 0) + ' I</span> &bull; ' +
+                        elStudents.innerHTML = '<span style="color:#16a34a;">' + (sm.students_hadir || 0) + ' H</span> &nbsp;&bull;&nbsp; ' +
+                            '<span style="color:#0284c7;">' + (sm.students_sakit || 0) + ' S</span> &nbsp;&bull;&nbsp; ' +
+                            '<span style="color:#d97706;">' + (sm.students_izin || 0) + ' I</span> &nbsp;&bull;&nbsp; ' +
                             '<span style="color:#dc2626;">' + (sm.students_alpa || 0) + ' A</span>';
                     }
 
-                    // Update filter counts
-                    var cntAlert = 0;
-                    var cntChecked = 0;
-                    var cntOngoing = 0;
-                    cachedRows.forEach(function(r){
-                        if (r.time_status === 'ongoing') cntOngoing++;
-                        if (r.is_checked_in) cntChecked++;
-                        if (r.time_status === 'ongoing' && !r.is_checked_in) cntAlert++;
-                    });
-
-                    var elFCntAll = document.getElementById('filter-cnt-all');
-                    var elFCntOngoing = document.getElementById('filter-cnt-ongoing');
-                    var elFCntAlert = document.getElementById('filter-cnt-alert');
-                    var elFCntChecked = document.getElementById('filter-cnt-checked');
-                    if (elFCntAll) elFCntAll.textContent = cachedRows.length;
-                    if (elFCntOngoing) elFCntOngoing.textContent = cntOngoing;
-                    if (elFCntAlert) elFCntAlert.textContent = cntAlert;
-                    if (elFCntChecked) elFCntChecked.textContent = cntChecked;
-
-                    renderRows();
+                    updatePeriodDropdown();
+                    renderCards();
                 })
                 .catch(function(err){
                     if (icon) icon.style.animation = '';
@@ -770,70 +1045,178 @@ function render_live_monitoring_widget(): void
                 });
         }
 
-        function renderRows() {
-            if (!tableBody) return;
-            var filtered = cachedRows.filter(function(r){
-                if (activeFilter === 'ongoing') return r.time_status === 'ongoing';
-                if (activeFilter === 'alert') return r.time_status === 'ongoing' && !r.is_checked_in;
-                if (activeFilter === 'checked') return r.is_checked_in;
-                if (activeFilter === 'upcoming') return r.time_status === 'upcoming';
+        function updatePeriodDropdown() {
+            if (!periodSelect) return;
+            var currentVal = periodSelect.value;
+            var html = '<option value="current">⚡ Jam Saat Ini ' + (activePeriodNow ? '(Jam ke-' + activePeriodNow + ')' : '(Otomatis)') + '</option>';
+            cachedPeriods.forEach(function(p){
+                var isSelected = (currentVal == p.period_no) ? ' selected' : '';
+                html += '<option value="' + p.period_no + '"' + isSelected + '>Jam ke-' + p.period_no + ' (' + p.start_time + ' - ' + p.end_time + ')</option>';
+            });
+            periodSelect.innerHTML = html;
+            if (currentVal) periodSelect.value = currentVal;
+        }
+
+        function renderCards() {
+            if (!cardsContainer) return;
+
+            // Determine which period we are displaying for each card
+            var targetPeriod = null;
+            if (selectedPeriod === 'current') {
+                targetPeriod = activePeriodNow || latestPeriodToday;
+            } else {
+                targetPeriod = parseInt(selectedPeriod, 10);
+            }
+
+            // Filter classes by level and status
+            var visibleCards = cachedCards.filter(function(card){
+                // Level filter
+                if (activeLevel !== 'all') {
+                    if (card.class_level.toUpperCase() !== activeLevel.toUpperCase()) return false;
+                }
+
+                // Get target slot for this card
+                var slot = null;
+                if (selectedPeriod === 'current' && card.current_slot) {
+                    slot = card.current_slot;
+                } else if (targetPeriod && card.slots && card.slots[targetPeriod]) {
+                    slot = card.slots[targetPeriod];
+                }
+
+                // Status filter
+                if (activeStatus === 'alert') {
+                    if (!slot || slot.is_checked_in) return false;
+                } else if (activeStatus === 'present') {
+                    if (!slot || !slot.is_checked_in) return false;
+                }
+
                 return true;
             });
 
-            if (filtered.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#64748b;">Tidak ada sesi KBM yang cocok dengan filter ini.</td></tr>';
+            if (visibleCards.length === 0) {
+                cardsContainer.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: #64748b;">' +
+                    '<div style="font-weight: 600; margin-bottom: 4px;">Tidak ada kelas yang cocok dengan filter saat ini.</div>' +
+                    '<div style="font-size: 0.8rem;">Coba ubah filter jenjang atau pilih jam pelajaran lain.</div>' +
+                    '</div>';
                 return;
             }
 
             var html = '';
-            filtered.forEach(function(r){
-                var rowBg = '';
-                if (r.time_status === 'ongoing' && !r.is_checked_in) {
-                    rowBg = 'background: #fff1f2;';
-                } else if (r.time_status === 'ongoing' && r.is_checked_in) {
-                    rowBg = 'background: #f0fdf4;';
+            visibleCards.forEach(function(card){
+                // Determine slot to show
+                var slot = null;
+                var isLiveCurrent = false;
+
+                if (selectedPeriod === 'current') {
+                    if (card.current_slot) {
+                        slot = card.current_slot;
+                        isLiveCurrent = true;
+                    } else if (card.next_slot) {
+                        slot = card.next_slot;
+                    } else if (card.latest_slot) {
+                        slot = card.latest_slot;
+                    }
+                } else if (targetPeriod && card.slots && card.slots[targetPeriod]) {
+                    slot = card.slots[targetPeriod];
                 }
 
-                // Status Badge
-                var statusBadge = '';
-                if (r.is_checked_in) {
-                    var gpsIcon = r.has_gps ? ' <span title="Lokasi GPS terdeteksi (' + r.lat.toFixed(4) + ', ' + r.lng.toFixed(4) + ')">📍</span>' : '';
-                    statusBadge = '<span class="live-badge-checked">✓ Hadir ' + (r.checkin_time ? '(' + r.checkin_time.substring(0,5) + ')' : '') + gpsIcon + '</span>';
-                } else if (r.time_status === 'ongoing') {
-                    statusBadge = '<span class="live-badge-ongoing">🚨 Belum Masuk Kelas</span>';
-                } else if (r.time_status === 'upcoming') {
-                    statusBadge = '<span class="live-badge-upcoming">⏳ Akan Datang</span>';
+                // Determine Card State: Alert (Red), Present (Green), Neutral (Slate)
+                var cardClass = 'status-neutral';
+                var statusPill = '';
+                var teacherName = '-';
+                var subjectName = '-';
+                var periodLabel = 'Tidak ada KBM';
+                var studentStats = { hadir: 0, sakit: 0, izin: 0, alpa: 0 };
+                var attUrl = '#';
+
+                if (slot) {
+                    teacherName = slot.teacher_name || '-';
+                    subjectName = slot.subject_name || '-';
+                    periodLabel = 'Jam ke-' + slot.period_no + ' &bull; ' + slot.start_time + ' - ' + slot.end_time;
+                    studentStats = slot.student_stats || { hadir: 0, sakit: 0, izin: 0, alpa: 0 };
+                    attUrl = slot.attendance_url || '#';
+
+                    if (slot.is_checked_in) {
+                        cardClass = 'status-present';
+                        var inTime = slot.checkin_time ? ' (' + slot.checkin_time.substring(0, 5) + ')' : '';
+                        var gpsIcon = slot.has_gps ? ' ' + svgPin : '';
+                        statusPill = '<div class="live-status-pill pill-present">' +
+                            svgCheck +
+                            '<span>GURU HADIR' + inTime + gpsIcon + '</span>' +
+                            '</div>';
+                    } else if (slot.time_status === 'ongoing' || isLiveCurrent) {
+                        cardClass = 'status-alert';
+                        statusPill = '<div class="live-status-pill pill-alert">' +
+                            svgAlert +
+                            '<span>BELUM HADIR (ALERT)</span>' +
+                            '</div>';
+                    } else if (slot.time_status === 'upcoming') {
+                        cardClass = 'status-neutral';
+                        statusPill = '<div class="live-status-pill pill-neutral">' +
+                            svgClock +
+                            '<span>JAM BERIKUTNYA</span>' +
+                            '</div>';
+                    } else {
+                        cardClass = 'status-neutral';
+                        statusPill = '<div class="live-status-pill pill-neutral">' +
+                            svgClock +
+                            '<span>SELESAI (TANPA ABSEN)</span>' +
+                            '</div>';
+                    }
                 } else {
-                    statusBadge = '<span class="live-badge-finished">Selesai (Tanpa Check-in)</span>';
+                    statusPill = '<div class="live-status-pill pill-neutral">' +
+                        svgClock +
+                        '<span>KOSONG / ISTIRAHAT</span>' +
+                        '</div>';
                 }
 
-                // Student Stats
-                var stHtml = '<span style="color:#94a3b8;font-size:0.78rem;">-</span>';
-                var st = r.student_stats;
-                var totalSt = (st.hadir || 0) + (st.sakit || 0) + (st.izin || 0) + (st.alpa || 0);
-                if (totalSt > 0) {
-                    stHtml = '<span style="font-size:0.78rem;font-weight:600;">' +
-                        '<span style="color:#16a34a;">' + st.hadir + 'H</span> ' +
-                        '<span style="color:#0284c7;">' + st.sakit + 'S</span> ' +
-                        '<span style="color:#d97706;">' + st.izin + 'I</span> ' +
-                        '<span style="color:#dc2626;">' + st.alpa + 'A</span>' +
-                        '</span>';
+                var levelClass = (card.class_level.toUpperCase() === 'SMA') ? 'level-sma' : 'level-smp';
+
+                html += '<div class="live-class-card ' + cardClass + '">';
+                
+                // Head
+                html += '<div class="live-card-head">';
+                html += '<div class="live-card-title">';
+                html += '<span>Kelas ' + escapeHtml(card.class_name) + '</span>';
+                html += '<span class="live-badge-level ' + levelClass + '">' + escapeHtml(card.class_level) + '</span>';
+                html += '</div>';
+                html += '<div class="live-card-period">' + periodLabel + '</div>';
+                html += '</div>';
+
+                // Status Banner
+                html += statusPill;
+
+                // Lesson Info
+                html += '<div class="live-lesson-info">';
+                html += '<div class="live-info-row">' + svgUser + '<span>Guru: <strong>' + escapeHtml(teacherName) + '</strong></span></div>';
+                html += '<div class="live-info-row">' + svgBook + '<span>Mapel: <strong>' + escapeHtml(subjectName) + '</strong></span></div>';
+                html += '</div>';
+
+                // Student Attendance Strip (Numbers only with 1-letter labels)
+                html += '<div>';
+                html += '<div style="font-size: 0.72rem; font-weight: 700; color: #64748b; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px;">Kehadiran Siswa:</div>';
+                html += '<div class="live-student-strip">';
+                html += '<div class="live-st-box st-box-h" title="Siswa Hadir"><span class="live-st-num">' + (studentStats.hadir || 0) + '</span><span class="live-st-lbl">Hadir</span></div>';
+                html += '<div class="live-st-box st-box-s" title="Siswa Sakit"><span class="live-st-num">' + (studentStats.sakit || 0) + '</span><span class="live-st-lbl">Sakit</span></div>';
+                html += '<div class="live-st-box st-box-i" title="Siswa Izin"><span class="live-st-num">' + (studentStats.izin || 0) + '</span><span class="live-st-lbl">Izin</span></div>';
+                html += '<div class="live-st-box st-box-a" title="Siswa Alpa"><span class="live-st-num">' + (studentStats.alpa || 0) + '</span><span class="live-st-lbl">Alpa</span></div>';
+                html += '</div>';
+                html += '</div>';
+
+                // Foot
+                html += '<div class="live-card-foot">';
+                html += '<span style="font-size: 0.72rem; color: #94a3b8;">Presensi Kelas</span>';
+                if (attUrl && attUrl !== '#') {
+                    html += '<a href="' + attUrl + '" class="live-btn-detail" title="Buka Detail Presensi"><span>Detail Siswa</span>' + svgExtLink + '</a>';
+                } else {
+                    html += '<span style="font-size: 0.72rem; color: #cbd5e1;">Belum Ada Sesi</span>';
                 }
+                html += '</div>';
 
-                var levelBadge = r.class_level ? ' <span style="font-size:0.7rem;padding:1px 5px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:700;">' + escapeHtml(r.class_level) + '</span>' : '';
-
-                html += '<tr style="' + rowBg + '">';
-                html += '<td><strong>Jam ke-' + r.period_no + '</strong><br><span style="font-size:0.75rem;color:#64748b;">' + r.start_time + ' - ' + r.end_time + '</span></td>';
-                html += '<td><strong>' + escapeHtml(r.class_name) + '</strong>' + levelBadge + '</td>';
-                html += '<td>' + escapeHtml(r.subject_name) + '</td>';
-                html += '<td><strong>' + escapeHtml(r.teacher_name) + '</strong></td>';
-                html += '<td>' + statusBadge + '</td>';
-                html += '<td>' + stHtml + '</td>';
-                html += '<td style="text-align:center;"><a href="' + r.attendance_url + '" class="button small secondary" style="padding:3px 8px;font-size:0.75rem;" title="Buka Detail Absensi Kelas">Buka</a></td>';
-                html += '</tr>';
+                html += '</div>';
             });
 
-            tableBody.innerHTML = html;
+            cardsContainer.innerHTML = html;
         }
 
         function escapeHtml(str) {
@@ -841,11 +1224,11 @@ function render_live_monitoring_widget(): void
             return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
-        // Timer loop
+        // Timer Loop
         function startTimer() {
             if (intervalId) clearInterval(intervalId);
             intervalId = setInterval(function(){
-                if (isPaused) return;
+                if (isPaused || isTabHidden) return;
                 curTimer--;
                 if (countdownEl) countdownEl.textContent = curTimer;
                 if (curTimer <= 0) {
@@ -855,23 +1238,54 @@ function render_live_monitoring_widget(): void
             }, 1000);
         }
 
-        // Filter button clicks
-        document.querySelectorAll('.live-filter-btn').forEach(function(btn){
+        // Smart Visibility Handler (Stop requesting server when user leaves tab)
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                isTabHidden = true;
+            } else {
+                isTabHidden = false;
+                curTimer = countdownSec;
+                if (countdownEl) countdownEl.textContent = curTimer;
+                fetchFeed();
+            }
+        });
+
+        // Filter button handlers
+        document.querySelectorAll('.live-filter-btn[data-level]').forEach(function(btn){
             btn.addEventListener('click', function(){
-                document.querySelectorAll('.live-filter-btn').forEach(function(b){ b.classList.remove('active'); });
+                document.querySelectorAll('.live-filter-btn[data-level]').forEach(function(b){ b.classList.remove('active'); });
                 btn.classList.add('active');
-                activeFilter = btn.getAttribute('data-filter') || 'all';
-                renderRows();
+                activeLevel = btn.getAttribute('data-level') || 'all';
+                renderCards();
             });
         });
+
+        document.querySelectorAll('.live-filter-btn[data-status]').forEach(function(btn){
+            btn.addEventListener('click', function(){
+                document.querySelectorAll('.live-filter-btn[data-status]').forEach(function(b){ b.classList.remove('active'); });
+                btn.classList.add('active');
+                activeStatus = btn.getAttribute('data-status') || 'all';
+                renderCards();
+            });
+        });
+
+        if (periodSelect) {
+            periodSelect.addEventListener('change', function(){
+                selectedPeriod = periodSelect.value;
+                renderCards();
+            });
+        }
 
         if (btnToggleAuto) {
             btnToggleAuto.addEventListener('click', function(){
                 isPaused = !isPaused;
                 if (btnToggleText) {
-                    btnToggleText.textContent = isPaused ? '▶️ Lanjutkan' : '⏸️ Jeda';
+                    btnToggleText.textContent = isPaused ? 'Lanjutkan' : 'Jeda';
                 }
-                btnToggleAuto.style.background = isPaused ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.15)';
+                if (btnToggleIcon) {
+                    btnToggleIcon.innerHTML = isPaused ? svgPlay : svgPause;
+                }
+                btnToggleAuto.style.background = isPaused ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.15)';
             });
         }
 
