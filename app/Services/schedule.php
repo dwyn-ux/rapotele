@@ -71,7 +71,29 @@ function schedule_break_minutes_for_after(int $afterPeriod, ?int $dayOfWeek = nu
 {
     $school = get_school_profile();
 
-    // 1. Hari Jum'at terpisah jika diaktifkan (5 = Jumat)
+    // 1. Pengaturan Khusus Spesifik Per-Hari (Senin, Selasa, Jumat, dll.)
+    if ($dayOfWeek !== null && !empty($school['daily_breaks'])) {
+        $daily = is_array($school['daily_breaks'])
+            ? $school['daily_breaks']
+            : json_decode((string)$school['daily_breaks'], true);
+
+        if (is_array($daily) && !empty($daily[(string)$dayOfWeek]['enabled'])) {
+            $dCfg = $daily[(string)$dayOfWeek];
+            $b1After = (int)($dCfg['break1_after'] ?? 0);
+            $b1Min = (int)($dCfg['break1_minutes'] ?? 0);
+            $b2After = (int)($dCfg['break2_after'] ?? 0);
+            $b2Min = (int)($dCfg['break2_minutes'] ?? 0);
+            if ($b1After > 0 && $afterPeriod === $b1After) {
+                return $b1Min;
+            }
+            if ($b2After > 0 && $afterPeriod === $b2After) {
+                return $b2Min;
+            }
+            return 0;
+        }
+    }
+
+    // 2. Hari Jum'at terpisah jika diaktifkan (5 = Jumat, legacy fallback)
     if ($dayOfWeek === 5 && !empty($school['friday_break_custom'])) {
         $fb1After = (int)($school['friday_break1_after'] ?? 0);
         $fb1Minutes = (int)($school['friday_break1_minutes'] ?? 0);
@@ -86,7 +108,7 @@ function schedule_break_minutes_for_after(int $afterPeriod, ?int $dayOfWeek = nu
         return 0;
     }
 
-    // 2. Hari Khusus (misal: Senin, Rabu, Jum'at) jika diaktifkan
+    // 3. Hari Khusus generic jika diaktifkan (legacy fallback)
     if (!empty($school['custom_break_enabled']) && $dayOfWeek !== null) {
         $customDays = trim((string)($school['custom_break_days'] ?? ''));
         $daysList = $customDays !== '' ? array_map('intval', array_map('trim', explode(',', $customDays))) : [];
@@ -105,7 +127,7 @@ function schedule_break_minutes_for_after(int $afterPeriod, ?int $dayOfWeek = nu
         }
     }
 
-    // 3. Standar (Hari Biasa)
+    // 4. Standar (Hari Biasa)
     $break1After = (int)($school['break1_after'] ?? 3);
     $break1Minutes = (int)($school['break1_minutes'] ?? 15);
     $break2After = (int)($school['break2_after'] ?? 6);
@@ -117,6 +139,30 @@ function schedule_break_minutes_for_after(int $afterPeriod, ?int $dayOfWeek = nu
         return $break2Minutes;
     }
     return 0;
+}
+
+function schedule_day_has_custom_breaks(int $dayOfWeek): bool
+{
+    $school = get_school_profile();
+    if (!empty($school['daily_breaks'])) {
+        $daily = is_array($school['daily_breaks'])
+            ? $school['daily_breaks']
+            : json_decode((string)$school['daily_breaks'], true);
+        if (is_array($daily) && !empty($daily[(string)$dayOfWeek]['enabled'])) {
+            return true;
+        }
+    }
+    if ($dayOfWeek === 5 && !empty($school['friday_break_custom'])) {
+        return true;
+    }
+    if (!empty($school['custom_break_enabled'])) {
+        $customDays = trim((string)($school['custom_break_days'] ?? ''));
+        $daysList = $customDays !== '' ? array_map('intval', array_map('trim', explode(',', $customDays))) : [];
+        if (in_array($dayOfWeek, $daysList, true)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function schedule_time_for_period(int $period, ?int $dayOfWeek = null): array
@@ -1502,17 +1548,39 @@ function render_schedule_template_panel(): void
             <?php
             $school = get_school_profile();
             $maxPeriods = (int)($school['max_periods'] ?? 10);
-            $hasCustom = !empty($school['custom_break_enabled']);
-            $customDaysStr = (string)($school['custom_break_days'] ?? '1,3,5');
-            $customDaysList = array_map('intval', explode(',', $customDaysStr));
-            $customDaySample = !empty($customDaysList[0]) ? $customDaysList[0] : 1;
-            $regularDaySample = 2; // Selasa is standard
-            if (in_array(2, $customDaysList, true)) {
-                $regularDaySample = 4; // Kamis
+            $allDays = schedule_days();
+
+            $standardDays = [];
+            $customGroups = [];
+
+            foreach ($allDays as $dNum => $dName) {
+                if (!schedule_day_has_custom_breaks($dNum)) {
+                    $standardDays[] = $dName;
+                } else {
+                    $sig = '';
+                    for ($p = 1; $p <= $maxPeriods; $p++) {
+                        $sig .= $p . ':' . schedule_break_minutes_for_after($p, $dNum) . '|';
+                    }
+                    if (!isset($customGroups[$sig])) {
+                        $customGroups[$sig] = [
+                            'sample' => $dNum,
+                            'names' => [],
+                        ];
+                    }
+                    $customGroups[$sig]['names'][] = $dName;
+                }
+            }
+
+            $regularDaySample = 2; // Default Selasa
+            foreach ($allDays as $dNum => $dName) {
+                if (!schedule_day_has_custom_breaks($dNum)) {
+                    $regularDaySample = $dNum;
+                    break;
+                }
             }
             ?>
             <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);width:100%;margin-bottom:4px;display:flex;align-items:center;gap:6px;">
-                <i data-lucide="clock" style="width:13px;height:13px;"></i> Hari Biasa (<?= e(schedule_days()[$regularDaySample] ?? 'Reguler') ?>):
+                <i data-lucide="clock" style="width:13px;height:13px;"></i> Hari Biasa (<?= e(!empty($standardDays) ? implode(', ', $standardDays) : 'Standar') ?>):
             </div>
             <?php for ($p = 1; $p <= $maxPeriods; $p++):
                 [$start, $end] = schedule_time_for_period($p, $regularDaySample);
@@ -1527,28 +1595,26 @@ function render_schedule_template_panel(): void
                 <span class="schedule-period-break"><strong>☕</strong><?= e($bEnd . '-' . $bNext) ?></span>
             <?php endif; endfor; ?>
 
-            <?php if ($hasCustom):
-                $customDayNames = [];
-                foreach ($customDaysList as $cd) {
-                    if (isset(schedule_days()[$cd])) $customDayNames[] = schedule_days()[$cd];
-                }
+            <?php foreach ($customGroups as $cg):
+                $sampleDay = $cg['sample'];
+                $dayLabel = implode(', ', $cg['names']);
             ?>
                 <div style="font-size:0.75rem;font-weight:700;color:#0369a1;width:100%;margin-top:10px;margin-bottom:4px;display:flex;align-items:center;gap:6px;">
-                    <i data-lucide="sparkles" style="width:13px;height:13px;color:#0284c7;"></i> Hari Khusus Istirahat Berbeda (<?= e(implode(', ', $customDayNames)) ?>):
+                    <i data-lucide="sparkles" style="width:13px;height:13px;color:#0284c7;"></i> Hari Khusus: <?= e($dayLabel) ?>
                 </div>
                 <?php for ($p = 1; $p <= $maxPeriods; $p++):
-                    [$start, $end] = schedule_time_for_period($p, $customDaySample);
+                    [$start, $end] = schedule_time_for_period($p, $sampleDay);
                 ?>
                     <span style="background:#f0f9ff;border-color:#bae6fd;"><strong><?= e($p) ?></strong><?= e($start . '-' . $end) ?></span>
                 <?php
-                    $breakMins = schedule_break_minutes_for_after($p, $customDaySample);
+                    $breakMins = schedule_break_minutes_for_after($p, $sampleDay);
                     if ($breakMins > 0):
-                        [, $bEnd] = schedule_time_for_period($p, $customDaySample);
-                        [$bNext] = schedule_time_for_period($p + 1, $customDaySample);
+                        [, $bEnd] = schedule_time_for_period($p, $sampleDay);
+                        [$bNext] = schedule_time_for_period($p + 1, $sampleDay);
                 ?>
                     <span class="schedule-period-break" style="background:#fef3c7;border-color:#fde68a;"><strong>☕</strong><?= e($bEnd . '-' . $bNext) ?></span>
                 <?php endif; endfor; ?>
-            <?php endif; ?>
+            <?php endforeach; ?>
         </div>
     </section>
     <?php

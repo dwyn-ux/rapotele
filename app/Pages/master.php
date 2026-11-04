@@ -233,105 +233,118 @@ function page_school(): void
                     </div>
                 </div>
 
-                <!-- Pengaturan Istirahat Khusus (Senin, Rabu, Jum'at, dll.) -->
-                <div style="margin-top:1.5rem;padding:16px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;">
-                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
-                        <label class="school-check" style="font-weight:700;font-size:0.95rem;color:#0f172a;cursor:pointer;display:inline-flex;align-items:center;gap:8px;">
-                            <input type="checkbox" name="custom_break_enabled" id="toggle_custom_break" value="1" <?= checked(!empty($school['custom_break_enabled'])) ?> onchange="document.getElementById('custom_break_fields').style.display = this.checked ? 'block' : 'none';">
-                            <span class="school-check-mark"></span>
-                            <span>⭐ Aktifkan Jadwal Istirahat Khusus Hari Tertentu (Senin, Rabu, Jum'at, dll.)</span>
-                        </label>
-                        <span style="font-size:0.8rem;background:#e0f2fe;color:#0369a1;font-weight:600;padding:3px 10px;border-radius:12px;">
-                            Opsi Fleksibel
-                        </span>
+                <!-- Pengaturan Istirahat Khusus Per Hari (Senin, Selasa, Jum'at, dll.) -->
+                <?php
+                $dailyBreaksRaw = $school['daily_breaks'] ?? null;
+                $savedDailyBreaks = [];
+                if (!empty($dailyBreaksRaw)) {
+                    $savedDailyBreaks = is_array($dailyBreaksRaw) ? $dailyBreaksRaw : (json_decode((string)$dailyBreaksRaw, true) ?: []);
+                }
+                $daysMap = [1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu', 4 => 'Kamis', 5 => "Jum'at", 6 => 'Sabtu'];
+                $legacyCustomDays = explode(',', (string)($school['custom_break_days'] ?? '1,3,5'));
+                ?>
+                <div style="margin-top:1.5rem;padding:18px 20px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:12px;">
+                    <div style="margin-bottom:14px;">
+                        <div style="font-weight:700;font-size:1rem;color:#0f172a;display:flex;align-items:center;gap:8px;">
+                            <span>⭐ Pengaturan Jadwal Istirahat Khusus Per Hari (Senin, Selasa, Jum'at, dll.)</span>
+                        </div>
+                        <div style="font-size:0.83rem;color:#64748b;margin-top:4px;">
+                            Aktifkan dan atur jadwal istirahat secara spesifik jika hari tertentu memiliki waktu istirahat yang berbeda-beda (misal: <strong>Senin</strong> beda, <strong>Selasa</strong> beda, dan <strong>Jum'at</strong> beda). Hari yang tidak dicentang otomatis mengikuti <strong>Jadwal Istirahat Standar (Hari Biasa)</strong> di atas.
+                        </div>
                     </div>
 
-                    <div id="custom_break_fields" style="display: <?= !empty($school['custom_break_enabled']) ? 'block' : 'none' ?>;margin-top:12px;padding-top:12px;border-top:1px dashed #cbd5e1;">
-                        <div style="margin-bottom:14px;">
-                            <label class="school-label" style="font-weight:600;margin-bottom:6px;display:block;">Pilih Hari yang Menerapkan Jadwal Istirahat Khusus Ini:</label>
-                            <?php
-                            $activeCustomDays = explode(',', (string)($school['custom_break_days'] ?? '1,3,5'));
-                            $daysMap = [1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu', 4 => 'Kamis', 5 => "Jum'at", 6 => 'Sabtu'];
-                            ?>
-                            <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;">
-                                <?php foreach ($daysMap as $dNum => $dName): ?>
-                                    <label style="display:inline-flex;align-items:center;gap:6px;font-size:0.88rem;cursor:pointer;background:#fff;border:1px solid #cbd5e1;padding:6px 12px;border-radius:6px;">
-                                        <input type="checkbox" name="custom_break_days[]" value="<?= $dNum ?>" <?= in_array((string)$dNum, $activeCustomDays, true) ? 'checked' : '' ?>>
-                                        <strong><?= e($dName) ?></strong>
+                    <div style="display:flex;flex-direction:column;gap:12px;">
+                        <?php foreach ($daysMap as $dNum => $dName):
+                            $hasSaved = isset($savedDailyBreaks[(string)$dNum]);
+                            if ($hasSaved) {
+                                $dCfg = $savedDailyBreaks[(string)$dNum];
+                                $dEnabled = !empty($dCfg['enabled']);
+                                $dB1After = isset($dCfg['break1_after']) ? (int)$dCfg['break1_after'] : 2;
+                                $dB1Min = isset($dCfg['break1_minutes']) ? (int)$dCfg['break1_minutes'] : 15;
+                                $dB2After = isset($dCfg['break2_after']) ? (int)$dCfg['break2_after'] : 5;
+                                $dB2Min = isset($dCfg['break2_minutes']) ? (int)$dCfg['break2_minutes'] : 15;
+                            } else {
+                                // Default initial state from legacy fields if any
+                                if ($dNum === 5 && !empty($school['friday_break_custom'])) {
+                                    $dEnabled = true;
+                                    $dB1After = (int)($school['friday_break1_after'] ?? 2);
+                                    $dB1Min = (int)($school['friday_break1_minutes'] ?? 15);
+                                    $dB2After = (int)($school['friday_break2_after'] ?? 0);
+                                    $dB2Min = (int)($school['friday_break2_minutes'] ?? 0);
+                                } elseif (!empty($school['custom_break_enabled']) && in_array((string)$dNum, $legacyCustomDays, true)) {
+                                    $dEnabled = true;
+                                    $dB1After = (int)($school['custom_break1_after'] ?? 2);
+                                    $dB1Min = (int)($school['custom_break1_minutes'] ?? 15);
+                                    $dB2After = (int)($school['custom_break2_after'] ?? 5);
+                                    $dB2Min = (int)($school['custom_break2_minutes'] ?? 15);
+                                } else {
+                                    $dEnabled = false;
+                                    $dB1After = (int)($school['break1_after'] ?? 3);
+                                    $dB1Min = (int)($school['break1_minutes'] ?? 15);
+                                    $dB2After = (int)($school['break2_after'] ?? 6);
+                                    $dB2Min = (int)($school['break2_minutes'] ?? 15);
+                                }
+                            }
+                        ?>
+                            <div style="background:#ffffff;border:1px solid <?= $dEnabled ? '#38bdf8' : '#e2e8f0' ?>;border-radius:10px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,0.04);" id="card-day-<?= $dNum ?>">
+                                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                                    <label style="display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-weight:700;font-size:0.95rem;color:#1e293b;">
+                                        <input type="checkbox" name="daily_breaks[<?= $dNum ?>][enabled]" id="toggle-day-<?= $dNum ?>" value="1" <?= $dEnabled ? 'checked' : '' ?> onchange="toggleDayBreak(<?= $dNum ?>, this.checked)">
+                                        <span>Hari <?= e($dName) ?></span>
                                     </label>
-                                <?php endforeach; ?>
-                            </div>
-                            <small style="color:#64748b;margin-top:4px;display:block;">Centang hari-hari yang jadwal istirahatnya berbeda (misal: <strong>Senin, Rabu, dan Jum'at</strong>).</small>
-                        </div>
+                                    <span id="badge-day-<?= $dNum ?>" style="font-size:0.75rem;padding:3px 10px;border-radius:6px;font-weight:600;background:<?= $dEnabled ? '#e0f2fe' : '#f1f5f9' ?>;color:<?= $dEnabled ? '#0369a1' : '#64748b' ?>;">
+                                        <?= $dEnabled ? '⭐ Khusus Hari ' . e($dName) : 'Mengikuti Standar Hari Biasa' ?>
+                                    </span>
+                                </div>
 
-                        <div class="school-form-grid three-col">
-                            <div class="school-form-group">
-                                <label class="school-label">Istirahat Khusus 1 Setelah Jam</label>
-                                <select class="school-input school-select" name="custom_break1_after">
-                                    <option value="0">Tidak Ada</option>
-                                    <?php for ($i = 1; $i <= 9; $i++): ?>
-                                    <option value="<?= $i ?>" <?= ($school['custom_break1_after'] ?? 2) == $i ? 'selected' : '' ?>>Jam <?= $i ?></option>
-                                    <?php endfor; ?>
-                                </select>
-                            </div>
-                            <div class="school-form-group">
-                                <label class="school-label">Durasi Istirahat Khusus 1 (menit)</label>
-                                <input type="number" min="0" max="60" class="school-input" name="custom_break1_minutes" value="<?= e($school['custom_break1_minutes'] ?? '15') ?>" placeholder="15">
-                            </div>
-                            <div class="school-form-group">
-                                <label class="school-label">Istirahat Khusus 2 Setelah Jam</label>
-                                <select class="school-input school-select" name="custom_break2_after">
-                                    <option value="0">Tidak Ada</option>
-                                    <?php for ($i = 1; $i <= 9; $i++): ?>
-                                    <option value="<?= $i ?>" <?= ($school['custom_break2_after'] ?? 5) == $i ? 'selected' : '' ?>>Jam <?= $i ?></option>
-                                    <?php endfor; ?>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="school-form-grid two-col" style="margin-top:8px;">
-                            <div class="school-form-group">
-                                <label class="school-label">Durasi Istirahat Khusus 2 (menit)</label>
-                                <input type="number" min="0" max="60" class="school-input" name="custom_break2_minutes" value="<?= e($school['custom_break2_minutes'] ?? '15') ?>" placeholder="15">
-                            </div>
-                        </div>
-
-                        <!-- Opsi Khusus Hari Jum'at jika ingin beda lagi -->
-                        <div style="margin-top:14px;padding-top:12px;border-top:1px dashed #e2e8f0;">
-                            <label class="school-check" style="font-weight:600;font-size:0.88rem;color:#334155;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
-                                <input type="checkbox" name="friday_break_custom" id="toggle_friday_break" value="1" <?= checked(!empty($school['friday_break_custom'])) ?> onchange="document.getElementById('friday_break_fields').style.display = this.checked ? 'block' : 'none';">
-                                <span class="school-check-mark"></span>
-                                <span>Atur Hari Jum'at secara terpisah (opsional jika jeda Sholat Jum'at berbeda lagi)</span>
-                            </label>
-
-                            <div id="friday_break_fields" style="display: <?= !empty($school['friday_break_custom']) ? 'block' : 'none' ?>;margin-top:10px;">
-                                <div class="school-form-grid three-col">
+                                <div id="fields-day-<?= $dNum ?>" style="display:<?= $dEnabled ? 'grid' : 'none' ?>;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:12px;margin-top:12px;padding-top:12px;border-top:1px dashed #e2e8f0;">
                                     <div class="school-form-group">
-                                        <label class="school-label">Istirahat Jum'at 1 Setelah Jam</label>
-                                        <select class="school-input school-select" name="friday_break1_after">
+                                        <label class="school-label" style="font-size:0.8rem;">Istirahat 1 Setelah Jam</label>
+                                        <select class="school-input school-select" name="daily_breaks[<?= $dNum ?>][break1_after]">
                                             <option value="0">Tidak Ada</option>
                                             <?php for ($i = 1; $i <= 9; $i++): ?>
-                                            <option value="<?= $i ?>" <?= ($school['friday_break1_after'] ?? 2) == $i ? 'selected' : '' ?>>Jam <?= $i ?></option>
+                                                <option value="<?= $i ?>" <?= $dB1After == $i ? 'selected' : '' ?>>Jam <?= $i ?></option>
                                             <?php endfor; ?>
                                         </select>
                                     </div>
                                     <div class="school-form-group">
-                                        <label class="school-label">Durasi Istirahat Jum'at 1 (menit)</label>
-                                        <input type="number" min="0" max="90" class="school-input" name="friday_break1_minutes" value="<?= e($school['friday_break1_minutes'] ?? '15') ?>" placeholder="15">
+                                        <label class="school-label" style="font-size:0.8rem;">Durasi Istirahat 1 (menit)</label>
+                                        <input type="number" min="0" max="90" class="school-input" name="daily_breaks[<?= $dNum ?>][break1_minutes]" value="<?= e($dB1Min) ?>" placeholder="15">
                                     </div>
                                     <div class="school-form-group">
-                                        <label class="school-label">Istirahat Jum'at 2 Setelah Jam</label>
-                                        <select class="school-input school-select" name="friday_break2_after">
+                                        <label class="school-label" style="font-size:0.8rem;">Istirahat 2 Setelah Jam</label>
+                                        <select class="school-input school-select" name="daily_breaks[<?= $dNum ?>][break2_after]">
                                             <option value="0">Tidak Ada</option>
                                             <?php for ($i = 1; $i <= 9; $i++): ?>
-                                            <option value="<?= $i ?>" <?= ($school['friday_break2_after'] ?? 0) == $i ? 'selected' : '' ?>>Jam <?= $i ?></option>
+                                                <option value="<?= $i ?>" <?= $dB2After == $i ? 'selected' : '' ?>>Jam <?= $i ?></option>
                                             <?php endfor; ?>
                                         </select>
+                                    </div>
+                                    <div class="school-form-group">
+                                        <label class="school-label" style="font-size:0.8rem;">Durasi Istirahat 2 (menit)</label>
+                                        <input type="number" min="0" max="90" class="school-input" name="daily_breaks[<?= $dNum ?>][break2_minutes]" value="<?= e($dB2Min) ?>" placeholder="15">
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        <?php endforeach; ?>
                     </div>
                 </div>
+                <script>
+                function toggleDayBreak(dayNum, checked) {
+                    var f = document.getElementById('fields-day-' + dayNum);
+                    var b = document.getElementById('badge-day-' + dayNum);
+                    var card = document.getElementById('card-day-' + dayNum);
+                    if (f) f.style.display = checked ? 'grid' : 'none';
+                    if (b) {
+                        b.textContent = checked ? '⭐ Khusus Hari Aktif' : 'Mengikuti Standar Hari Biasa';
+                        b.style.background = checked ? '#e0f2fe' : '#f1f5f9';
+                        b.style.color = checked ? '#0369a1' : '#64748b';
+                    }
+                    if (card) {
+                        card.style.borderColor = checked ? '#38bdf8' : '#e2e8f0';
+                    }
+                }
+                </script>
 
                 <!-- Map -->
                 <div class="school-subsection-divider" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">

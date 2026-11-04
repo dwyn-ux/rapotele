@@ -1212,6 +1212,7 @@ function run_migrations_locked(): void
     migration_add_column('school_profile', 'district', 'VARCHAR(120) NULL');
     migration_add_column('school_profile', 'regency', 'VARCHAR(120) NULL');
     migration_add_column('school_profile', 'province', 'VARCHAR(120) NULL');
+    migration_add_column('school_profile', 'daily_breaks', 'TEXT NULL');
 
     migrate_lesson_schedule_schema();
     migrate_foreign_keys();

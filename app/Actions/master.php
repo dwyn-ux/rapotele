@@ -54,6 +54,30 @@ function action_save_school(): void
     $fridayBreak2After = trim((string)($_POST['friday_break2_after'] ?? '0'));
     $fridayBreak2Minutes = trim((string)($_POST['friday_break2_minutes'] ?? '0'));
 
+    $dailyBreaksInput = $_POST['daily_breaks'] ?? [];
+    $dailyBreaks = [];
+    if (is_array($dailyBreaksInput)) {
+        foreach ($dailyBreaksInput as $dNum => $dData) {
+            $dNum = (int)$dNum;
+            if ($dNum < 1 || $dNum > 7) {
+                continue;
+            }
+            $enabled = !empty($dData['enabled']) ? 1 : 0;
+            $dailyBreaks[(string)$dNum] = [
+                'enabled' => $enabled,
+                'break1_after' => isset($dData['break1_after']) ? (int)$dData['break1_after'] : 2,
+                'break1_minutes' => isset($dData['break1_minutes']) && $dData['break1_minutes'] !== '' ? (int)$dData['break1_minutes'] : 15,
+                'break2_after' => isset($dData['break2_after']) ? (int)$dData['break2_after'] : 5,
+                'break2_minutes' => isset($dData['break2_minutes']) && $dData['break2_minutes'] !== '' ? (int)$dData['break2_minutes'] : 15,
+            ];
+        }
+    }
+    $dailyBreaksJson = !empty($dailyBreaks) ? json_encode($dailyBreaks, JSON_UNESCAPED_UNICODE) : null;
+
+    if (function_exists('migration_add_column')) {
+        migration_add_column('school_profile', 'daily_breaks', 'TEXT NULL');
+    }
+
     $data = [
         trim((string)$_POST['name']),
         trim((string)($_POST['npsn'] ?? '')),
@@ -85,6 +109,7 @@ function action_save_school(): void
         $fridayBreak1Minutes !== '' ? (int)$fridayBreak1Minutes : 15,
         $fridayBreak2After !== '' ? (int)$fridayBreak2After : 0,
         $fridayBreak2Minutes !== '' ? (int)$fridayBreak2Minutes : 0,
+        $dailyBreaksJson,
         trim((string)($_POST['village'] ?? '')),
         trim((string)($_POST['district'] ?? '')),
         trim((string)($_POST['regency'] ?? '')),
@@ -94,11 +119,11 @@ function action_save_school(): void
     ];
     if ($id > 0) {
         execute_sql(
-            'UPDATE school_profile SET name = ?, npsn = ?, address = ?, principal_name = ?, principal_nip = ?, academic_year = ?, semester = ?, location_lat = ?, location_lng = ?, attendance_radius_meters = ?, regular_period_minutes = ?, short_period_minutes = ?, short_days = ?, max_periods = ?, start_time = ?, break1_after = ?, break1_minutes = ?, break2_after = ?, break2_minutes = ?, custom_break_enabled = ?, custom_break_days = ?, custom_break1_after = ?, custom_break1_minutes = ?, custom_break2_after = ?, custom_break2_minutes = ?, friday_break_custom = ?, friday_break1_after = ?, friday_break1_minutes = ?, friday_break2_after = ?, friday_break2_minutes = ?, village = ?, district = ?, regency = ?, province = ?, updated_at = ? WHERE id = ?',
-            array_merge(array_slice($data, 0, 35), [$id])
+            'UPDATE school_profile SET name = ?, npsn = ?, address = ?, principal_name = ?, principal_nip = ?, academic_year = ?, semester = ?, location_lat = ?, location_lng = ?, attendance_radius_meters = ?, regular_period_minutes = ?, short_period_minutes = ?, short_days = ?, max_periods = ?, start_time = ?, break1_after = ?, break1_minutes = ?, break2_after = ?, break2_minutes = ?, custom_break_enabled = ?, custom_break_days = ?, custom_break1_after = ?, custom_break1_minutes = ?, custom_break2_after = ?, custom_break2_minutes = ?, friday_break_custom = ?, friday_break1_after = ?, friday_break1_minutes = ?, friday_break2_after = ?, friday_break2_minutes = ?, daily_breaks = ?, village = ?, district = ?, regency = ?, province = ?, updated_at = ? WHERE id = ?',
+            array_merge(array_slice($data, 0, 36), [$id])
         );
     } else {
-        $sql = 'INSERT INTO school_profile (name, npsn, address, principal_name, principal_nip, academic_year, semester, location_lat, location_lng, attendance_radius_meters, regular_period_minutes, short_period_minutes, short_days, max_periods, start_time, break1_after, break1_minutes, break2_after, break2_minutes, custom_break_enabled, custom_break_days, custom_break1_after, custom_break1_minutes, custom_break2_after, custom_break2_minutes, friday_break_custom, friday_break1_after, friday_break1_minutes, friday_break2_after, friday_break2_minutes, village, district, regency, province, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+        $sql = 'INSERT INTO school_profile (name, npsn, address, principal_name, principal_nip, academic_year, semester, location_lat, location_lng, attendance_radius_meters, regular_period_minutes, short_period_minutes, short_days, max_periods, start_time, break1_after, break1_minutes, break2_after, break2_minutes, custom_break_enabled, custom_break_days, custom_break1_after, custom_break1_minutes, custom_break2_after, custom_break2_minutes, friday_break_custom, friday_break1_after, friday_break1_minutes, friday_break2_after, friday_break2_minutes, daily_breaks, village, district, regency, province, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
         execute_sql($sql, $data);
     }
     if ($id === 0) {
