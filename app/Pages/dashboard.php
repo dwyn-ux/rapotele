@@ -261,7 +261,8 @@ function get_live_monitoring_data(): array
     $timeNow = date('H:i');
 
     // Fetch all active classes in proper natural school order (SMP 7-9 then SMA 10-12)
-    $classes = fetch_all('SELECT id, name, grade, level, display_order FROM classes ORDER BY display_order ASC, CAST(grade AS INTEGER) ASC, name ASC');
+    $classOrder = function_exists('class_order_by_clause') ? class_order_by_clause() : 'display_order ASC, name ASC';
+    $classes = fetch_all("SELECT id, name, grade, level, display_order FROM classes ORDER BY {$classOrder}");
 
     // Fetch all schedules for today
     $schedules = fetch_all(
