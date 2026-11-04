@@ -518,20 +518,21 @@ function render_live_monitoring_widget(): void
     .live-monitor-panel {
         background: #ffffff;
         border: 1px solid var(--border, #e2e8f0);
-        border-radius: 16px;
+        border-radius: 14px;
         box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06);
         margin-bottom: 2rem;
         overflow: hidden;
+        transition: all 0.2s ease;
     }
     .live-monitor-header {
         background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
         color: #ffffff;
-        padding: 16px 22px;
+        padding: 12px 18px;
         display: flex;
         justify-content: space-between;
         align-items: center;
         flex-wrap: wrap;
-        gap: 12px;
+        gap: 10px;
     }
     .live-dot-pulse {
         display: inline-block;
@@ -551,26 +552,26 @@ function render_live_monitoring_widget(): void
     }
     .live-monitor-stats {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-        gap: 12px;
-        padding: 16px 22px;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 10px;
+        padding: 10px 18px;
         background: #f8fafc;
         border-bottom: 1px solid var(--border, #e2e8f0);
     }
     .live-stat-card {
         background: #ffffff;
         border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 12px 16px;
+        border-radius: 10px;
+        padding: 8px 12px;
         display: flex;
         align-items: center;
-        gap: 14px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        gap: 10px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     }
     .live-stat-icon-wrap {
-        width: 42px;
-        height: 42px;
-        border-radius: 10px;
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -580,8 +581,8 @@ function render_live_monitoring_widget(): void
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
-        padding: 12px 22px;
+        gap: 10px;
+        padding: 8px 18px;
         border-bottom: 1px solid #e2e8f0;
         background: #ffffff;
         flex-wrap: wrap;
@@ -596,14 +597,14 @@ function render_live_monitoring_widget(): void
         background: #f1f5f9;
         border: 1px solid #cbd5e1;
         color: #475569;
-        padding: 5px 12px;
+        padding: 4px 10px;
         border-radius: 20px;
-        font-size: 0.78rem;
+        font-size: 0.75rem;
         font-weight: 600;
         cursor: pointer;
         display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: 5px;
         transition: all 0.15s ease;
         white-space: nowrap;
     }
@@ -617,9 +618,9 @@ function render_live_monitoring_widget(): void
         color: #ffffff;
     }
     .live-select-period {
-        font-size: 0.82rem;
-        padding: 5px 10px;
-        border-radius: 8px;
+        font-size: 0.78rem;
+        padding: 4px 8px;
+        border-radius: 6px;
         border: 1px solid #cbd5e1;
         background: #f8fafc;
         color: #0f172a;
@@ -627,48 +628,58 @@ function render_live_monitoring_widget(): void
         cursor: pointer;
     }
 
-    /* Cards Grid */
+    /* Cards Grid (Compact 5 columns x 2 rows for 10 classes) */
     .live-cards-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-        gap: 16px;
-        padding: 22px;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+        padding: 14px;
         background: #f8fafc;
-        max-height: 720px;
-        overflow-y: auto;
+    }
+    @media (max-width: 1300px) {
+        .live-cards-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+    @media (max-width: 1024px) {
+        .live-cards-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (max-width: 768px) {
+        .live-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 480px) {
+        .live-cards-grid { grid-template-columns: 1fr; }
     }
 
-    /* Class Card */
+    /* Compact Class Card */
     .live-class-card {
         background: #ffffff;
-        border-radius: 14px;
-        padding: 16px;
-        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+        border-radius: 12px;
+        padding: 10px 12px;
+        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
         border: 2px solid #e2e8f0;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        gap: 14px;
-        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-        position: relative;
+        gap: 8px;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        min-height: 155px;
     }
     .live-class-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 8px 16px -2px rgba(15, 23, 42, 0.08);
+        box-shadow: 0 6px 14px -2px rgba(15, 23, 42, 0.08);
     }
 
     /* Red Card (Teacher absent during active class) */
     .live-class-card.status-alert {
         border-color: #ef4444;
-        background: linear-gradient(180deg, #fff5f5 0%, #ffffff 50%);
-        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.08);
+        background: linear-gradient(180deg, #fff5f5 0%, #ffffff 40%);
+        box-shadow: 0 3px 10px rgba(239, 68, 68, 0.08);
     }
 
     /* Green Card (Teacher present) */
     .live-class-card.status-present {
         border-color: #10b981;
-        background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 50%);
-        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.08);
+        background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 40%);
+        box-shadow: 0 3px 10px rgba(16, 185, 129, 0.08);
     }
 
     /* Neutral Card (Break / Outside hours) */
@@ -681,24 +692,24 @@ function render_live_monitoring_widget(): void
     .live-card-head {
         display: flex;
         justify-content: space-between;
-        align-items: flex-start;
-        gap: 8px;
+        align-items: center;
+        gap: 6px;
     }
     .live-card-title {
-        font-size: 1.15rem;
+        font-size: 1.05rem;
         font-weight: 800;
         color: #0f172a;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
+        line-height: 1.2;
     }
     .live-badge-level {
-        font-size: 0.68rem;
+        font-size: 0.65rem;
         font-weight: 700;
-        padding: 2px 7px;
-        border-radius: 6px;
+        padding: 1px 6px;
+        border-radius: 4px;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
     }
     .level-smp {
         background: #e0f2fe;
@@ -711,15 +722,15 @@ function render_live_monitoring_widget(): void
         border: 1px solid #ddd6fe;
     }
     .live-card-period {
-        font-size: 0.72rem;
+        font-size: 0.68rem;
         font-weight: 600;
         color: #64748b;
         background: #f1f5f9;
-        padding: 3px 8px;
-        border-radius: 6px;
+        padding: 2px 6px;
+        border-radius: 4px;
         display: inline-flex;
         align-items: center;
-        gap: 4px;
+        gap: 3px;
         white-space: nowrap;
     }
 
@@ -727,12 +738,11 @@ function render_live_monitoring_widget(): void
     .live-status-pill {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 4px 10px;
-        border-radius: 8px;
-        font-size: 0.75rem;
+        gap: 5px;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 0.72rem;
         font-weight: 700;
-        letter-spacing: 0.3px;
         width: 100%;
         box-sizing: border-box;
     }
@@ -761,22 +771,30 @@ function render_live_monitoring_widget(): void
     .live-lesson-info {
         background: #f8fafc;
         border: 1px solid #f1f5f9;
-        border-radius: 10px;
-        padding: 10px 12px;
+        border-radius: 8px;
+        padding: 6px 8px;
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 3px;
+        font-size: 0.78rem;
     }
     .live-info-row {
         display: flex;
         align-items: center;
-        gap: 8px;
-        font-size: 0.82rem;
+        gap: 6px;
         color: #334155;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     .live-info-row svg {
         flex-shrink: 0;
         color: #64748b;
+    }
+    .live-info-row span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
     .live-info-row strong {
         color: #0f172a;
@@ -786,11 +804,11 @@ function render_live_monitoring_widget(): void
     .live-student-strip {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        gap: 6px;
+        gap: 4px;
     }
     .live-st-box {
-        border-radius: 8px;
-        padding: 6px 4px;
+        border-radius: 6px;
+        padding: 4px 2px;
         text-align: center;
         display: flex;
         flex-direction: column;
@@ -799,14 +817,14 @@ function render_live_monitoring_widget(): void
         border: 1px solid;
     }
     .live-st-num {
-        font-size: 1.05rem;
+        font-size: 0.96rem;
         font-weight: 800;
-        line-height: 1.1;
+        line-height: 1;
     }
     .live-st-lbl {
-        font-size: 0.65rem;
+        font-size: 0.6rem;
         font-weight: 700;
-        margin-top: 2px;
+        margin-top: 1px;
         opacity: 0.9;
         text-transform: uppercase;
     }
@@ -836,23 +854,107 @@ function render_live_monitoring_widget(): void
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding-top: 6px;
+        padding-top: 4px;
         border-top: 1px dashed #e2e8f0;
     }
     .live-btn-detail {
-        font-size: 0.76rem;
+        font-size: 0.72rem;
         font-weight: 600;
         color: #0284c7;
         text-decoration: none;
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        padding: 3px 6px;
-        border-radius: 6px;
-        transition: background 0.15s ease;
+        gap: 3px;
+        padding: 2px 5px;
+        border-radius: 4px;
     }
     .live-btn-detail:hover {
         background: #e0f2fe;
+    }
+
+    /* Fullscreen / 1 Layar Penuh (TV Wallboard / Command Center Mode) */
+    .live-monitor-panel.is-fullscreen {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 999999 !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        border: none !important;
+        background: #0b1120 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        box-shadow: none !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-monitor-header {
+        padding: 8px 18px !important;
+        background: #0f172a !important;
+        border-bottom: 1px solid #1e293b !important;
+        flex-shrink: 0 !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-monitor-stats {
+        padding: 6px 18px !important;
+        background: #0f172a !important;
+        border-bottom: 1px solid #1e293b !important;
+        gap: 8px !important;
+        flex-shrink: 0 !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-stat-card {
+        background: #1e293b !important;
+        border-color: #334155 !important;
+        padding: 5px 10px !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-stat-card div:last-child div:first-child {
+        color: #94a3b8 !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-stat-card div:last-child div:last-child {
+        color: #f8fafc !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-filters-bar {
+        padding: 6px 18px !important;
+        background: #0f172a !important;
+        border-bottom: 1px solid #1e293b !important;
+        flex-shrink: 0 !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-filters-bar span {
+        color: #94a3b8 !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-filter-btn {
+        background: #1e293b !important;
+        border-color: #334155 !important;
+        color: #cbd5e1 !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-filter-btn:hover {
+        background: #334155 !important;
+        color: #ffffff !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-filter-btn.active {
+        background: #0284c7 !important;
+        border-color: #0284c7 !important;
+        color: #ffffff !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-select-period {
+        background: #1e293b !important;
+        border-color: #334155 !important;
+        color: #f8fafc !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-cards-grid {
+        flex: 1 !important;
+        height: auto !important;
+        max-height: none !important;
+        padding: 10px 16px !important;
+        background: #0b1120 !important;
+        display: grid !important;
+        grid-template-columns: repeat(5, 1fr) !important;
+        grid-template-rows: repeat(2, 1fr) !important;
+        gap: 10px !important;
+        overflow: hidden !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-class-card {
+        height: 100% !important;
+        box-sizing: border-box !important;
     }
     </style>
 
@@ -860,33 +962,39 @@ function render_live_monitoring_widget(): void
         <!-- Header Panel -->
         <div class="live-monitor-header">
             <div>
-                <div style="font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; letter-spacing: 0.3px;">
+                <div style="font-weight: 700; font-size: 1.05rem; display: flex; align-items: center; letter-spacing: 0.3px;">
                     <span class="live-dot-pulse"></span>
                     <span>LIVE MONITORING KBM &amp; PRESENSI</span>
                 </div>
-                <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 3px; display: flex; align-items: center; gap: 8px;">
+                <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px; display: flex; align-items: center; gap: 8px;">
                     <span id="live-header-date">Memuat data...</span>
                     <span>&bull;</span>
                     <span style="display: inline-flex; align-items: center; gap: 4px;">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                         <span id="live-header-time">--:--:--</span>
                     </span>
                 </div>
             </div>
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <div style="font-size: 0.8rem; color: #cbd5e1; background: rgba(255,255,255,0.08); padding: 5px 12px; border-radius: 8px; display: flex; align-items: center; gap: 6px;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="font-size: 0.78rem; color: #cbd5e1; background: rgba(255,255,255,0.08); padding: 4px 10px; border-radius: 6px; display: flex; align-items: center; gap: 5px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                     <span>Refresh: <strong id="live-countdown" style="color:#38bdf8;">10</strong>s</span>
                 </div>
-                <button type="button" id="btn-toggle-auto" class="button small" style="background: rgba(255,255,255,0.15); border: none; color: #ffffff; padding: 5px 12px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 5px; border-radius: 8px;" title="Jeda/Lanjutkan Update Otomatis">
+                <button type="button" id="btn-toggle-auto" class="button small" style="background: rgba(255,255,255,0.15); border: none; color: #ffffff; padding: 4px 10px; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 5px; border-radius: 6px;" title="Jeda/Lanjutkan Update Otomatis">
                     <span id="btn-toggle-auto-icon">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
                     </span>
                     <span id="btn-toggle-auto-text">Jeda</span>
                 </button>
-                <button type="button" id="btn-manual-refresh" class="button small primary" style="background: #0284c7; border: none; font-size: 0.8rem; padding: 5px 14px; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px;" title="Refresh Sekarang">
-                    <svg id="icon-manual-refresh" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                <button type="button" id="btn-manual-refresh" class="button small primary" style="background: #0284c7; border: none; font-size: 0.78rem; padding: 4px 11px; display: inline-flex; align-items: center; gap: 5px; border-radius: 6px;" title="Refresh Sekarang">
+                    <svg id="icon-manual-refresh" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                     <span>Refresh</span>
+                </button>
+                <button type="button" id="btn-fullscreen-toggle" class="button small" style="background: #3b82f6; border: none; color: #ffffff; padding: 4px 11px; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 5px; border-radius: 6px; font-weight: 700;" title="Buka Mode 1 Layar Penuh (TV Monitor)">
+                    <span id="btn-fullscreen-icon">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                    </span>
+                    <span id="btn-fullscreen-text">1 Layar Penuh</span>
                 </button>
             </div>
         </div>
@@ -895,38 +1003,38 @@ function render_live_monitoring_widget(): void
         <div class="live-monitor-stats">
             <div class="live-stat-card">
                 <div class="live-stat-icon-wrap" style="background: #e0f2fe; color: #0284c7;">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
                 </div>
                 <div>
-                    <div style="font-size: 0.74rem; color: #64748b; font-weight: 600;">Total Kelas Aktif</div>
-                    <div style="font-size: 1.25rem; font-weight: 800; color: #0f172a;" id="stat-ongoing">0</div>
+                    <div style="font-size: 0.7rem; color: #64748b; font-weight: 600;">Kelas Aktif</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: #0f172a;" id="stat-ongoing">0</div>
                 </div>
             </div>
             <div class="live-stat-card">
                 <div class="live-stat-icon-wrap" style="background: #dcfce7; color: #16a34a;">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="16 11 18 13 22 9"></polyline></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="16 11 18 13 22 9"></polyline></svg>
                 </div>
                 <div>
-                    <div style="font-size: 0.74rem; color: #64748b; font-weight: 600;">Guru Hadir di Kelas</div>
-                    <div style="font-size: 1.25rem; font-weight: 800; color: #16a34a;" id="stat-checked-in">0</div>
+                    <div style="font-size: 0.7rem; color: #64748b; font-weight: 600;">Guru Hadir</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: #16a34a;" id="stat-checked-in">0</div>
                 </div>
             </div>
             <div class="live-stat-card">
                 <div class="live-stat-icon-wrap" style="background: #fee2e2; color: #dc2626;">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
                 </div>
                 <div>
-                    <div style="font-size: 0.74rem; color: #64748b; font-weight: 600;">Belum Masuk Kelas</div>
-                    <div style="font-size: 1.25rem; font-weight: 800; color: #dc2626;" id="stat-alert">0</div>
+                    <div style="font-size: 0.7rem; color: #64748b; font-weight: 600;">Belum Masuk</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: #dc2626;" id="stat-alert">0</div>
                 </div>
             </div>
             <div class="live-stat-card">
                 <div class="live-stat-icon-wrap" style="background: #fef3c7; color: #d97706;">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                 </div>
                 <div>
-                    <div style="font-size: 0.74rem; color: #64748b; font-weight: 600;">Total Siswa Hadir Hari Ini</div>
-                    <div style="font-size: 1.25rem; font-weight: 800; color: #0f172a;" id="stat-students">
+                    <div style="font-size: 0.7rem; color: #64748b; font-weight: 600;">Siswa Hadir Hari Ini</div>
+                    <div style="font-size: 1rem; font-weight: 800; color: #0f172a;" id="stat-students">
                         0
                     </div>
                 </div>
@@ -936,19 +1044,19 @@ function render_live_monitoring_widget(): void
         <!-- Filter & Period Bar -->
         <div class="live-filters-bar">
             <div class="live-filters-group">
-                <span style="font-size: 0.78rem; font-weight: 700; color: #64748b; margin-right: 2px;">Jenjang:</span>
+                <span style="font-size: 0.75rem; font-weight: 700; color: #64748b; margin-right: 2px;">Jenjang:</span>
                 <button type="button" class="live-filter-btn active" data-level="all">Semua Kelas</button>
                 <button type="button" class="live-filter-btn" data-level="SMP">SMP</button>
                 <button type="button" class="live-filter-btn" data-level="SMA">SMA</button>
 
-                <span style="font-size: 0.78rem; font-weight: 700; color: #64748b; margin-left: 10px; margin-right: 2px;">Status:</span>
+                <span style="font-size: 0.75rem; font-weight: 700; color: #64748b; margin-left: 8px; margin-right: 2px;">Status:</span>
                 <button type="button" class="live-filter-btn active" data-status="all">Semua</button>
                 <button type="button" class="live-filter-btn" data-status="alert" style="color: #b91c1c;">Belum Hadir</button>
                 <button type="button" class="live-filter-btn" data-status="present" style="color: #15803d;">Hadir</button>
             </div>
 
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <label for="live-period-select" style="font-size: 0.78rem; font-weight: 700; color: #64748b;">Jam Pelajaran:</label>
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <label for="live-period-select" style="font-size: 0.75rem; font-weight: 700; color: #64748b;">Jam Pelajaran:</label>
                 <select id="live-period-select" class="live-select-period">
                     <option value="current">⚡ Jam Saat Ini (Otomatis)</option>
                 </select>
@@ -957,9 +1065,9 @@ function render_live_monitoring_widget(): void
 
         <!-- Cards Container Grid -->
         <div class="live-cards-grid" id="live-cards-container">
-            <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: #64748b;">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: livePulseAnim 1s infinite; margin-bottom: 8px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                <div>Memuat pemantauan kelas secara realtime...</div>
+            <div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: #64748b;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: livePulseAnim 1s infinite; margin-bottom: 6px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <div>Memuat pemantauan kelas...</div>
             </div>
         </div>
     </div>
@@ -1296,6 +1404,56 @@ function render_live_monitoring_widget(): void
                 fetchFeed();
             });
         }
+
+        // Fullscreen Mode Handler
+        var btnFullscreen = document.getElementById('btn-fullscreen-toggle');
+        var btnFsText = document.getElementById('btn-fullscreen-text');
+        var btnFsIcon = document.getElementById('btn-fullscreen-icon');
+        var panelEl = document.querySelector('.live-monitor-panel');
+
+        var svgMaximize = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
+        var svgMinimize = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14h6m0 0v6m0-6L3 21m17-7h-6m0 0v6m0-6l7 7M14 4h6m0 0v6m0-6l-7 7M10 4H4m0 0v6m0-6l7 7"/></svg>';
+
+        function toggleFullscreen() {
+            if (!panelEl) return;
+            var isFs = panelEl.classList.toggle('is-fullscreen');
+            if (btnFsText) btnFsText.textContent = isFs ? '✕ Keluar' : '1 Layar Penuh';
+            if (btnFsIcon) btnFsIcon.innerHTML = isFs ? svgMinimize : svgMaximize;
+            if (btnFullscreen) {
+                btnFullscreen.style.background = isFs ? '#dc2626' : '#3b82f6';
+            }
+
+            if (isFs) {
+                if (panelEl.requestFullscreen) {
+                    panelEl.requestFullscreen().catch(function(){});
+                }
+            } else {
+                if (document.fullscreenElement && document.exitFullscreen) {
+                    document.exitFullscreen().catch(function(){});
+                }
+            }
+        }
+
+        if (btnFullscreen) {
+            btnFullscreen.addEventListener('click', toggleFullscreen);
+        }
+
+        document.addEventListener('fullscreenchange', function() {
+            if (!document.fullscreenElement && panelEl && panelEl.classList.contains('is-fullscreen')) {
+                panelEl.classList.remove('is-fullscreen');
+                if (btnFsText) btnFsText.textContent = '1 Layar Penuh';
+                if (btnFsIcon) btnFsIcon.innerHTML = svgMaximize;
+                if (btnFullscreen) btnFullscreen.style.background = '#3b82f6';
+            }
+        });
+
+        // Keyboard shortcut 'F' to toggle fullscreen
+        document.addEventListener('keydown', function(e) {
+            if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) return;
+            if (e.key === 'f' || e.key === 'F') {
+                toggleFullscreen();
+            }
+        });
 
         // Initial fetch
         fetchFeed();
