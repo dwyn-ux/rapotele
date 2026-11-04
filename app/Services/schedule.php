@@ -1011,7 +1011,8 @@ function action_save_lesson_schedule(): void
             && !empty($conflictTeacher['physical_group'])
             && strcasecmp(trim((string)$curClass['physical_group']), trim((string)$conflictTeacher['physical_group'])) === 0
             && (int)$conflictTeacher['subject_id'] === (int)$assignment['subject_id'];
-        if (!$isPhysicalGroupMatch) {
+        $isSameSubjectJoint = ((int)$conflictTeacher['subject_id'] === (int)$assignment['subject_id']);
+        if (!$isPhysicalGroupMatch && !$isSameSubjectJoint) {
             throw new RuntimeException('Guru sudah memiliki jadwal pada hari dan jam tersebut.');
         }
     }
@@ -2560,7 +2561,7 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                     var items = teacherCounts[tid];
                     if (items.length <= 1) return;
 
-                    // Periksa apakah ini rombel gabungan (physical_group dan subject_id sama)
+                    // Periksa apakah ini rombel gabungan (physical_group sama atau mata pelajaran sama)
                     var firstGroup = items[0].physicalGroup;
                     var firstSubject = items[0].subjectId;
                     var isGroupSync = (firstGroup !== '' && firstSubject !== '');
@@ -2572,8 +2573,17 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                             }
                         }
                     }
+                    var isSameSubjectJoint = (firstSubject !== '');
+                    if (isSameSubjectJoint) {
+                        for (var i = 1; i < items.length; i++) {
+                            if (items[i].subjectId !== firstSubject) {
+                                isSameSubjectJoint = false;
+                                break;
+                            }
+                        }
+                    }
 
-                    if (isGroupSync) {
+                    if (isGroupSync || isSameSubjectJoint) {
                         // Ini rombel gabungan yang sah
                         items.forEach(function(item) {
                             item.sel.classList.add('is-group-sync');
@@ -2834,7 +2844,8 @@ function action_save_schedule_daily_matrix(): void
                             && !empty($conflictTeacher['physical_group'])
                             && strcasecmp(trim((string)$curClassInfo['physical_group']), trim((string)$conflictTeacher['physical_group'])) === 0
                             && (int)$conflictTeacher['subject_id'] === (int)$assignment['subject_id'];
-                        if (!$isPhysicalGroupMatch) {
+                        $isSameSubjectJoint = ((int)$conflictTeacher['subject_id'] === (int)$assignment['subject_id']);
+                        if (!$isPhysicalGroupMatch && !$isSameSubjectJoint) {
                             $tName = $assignment['teacher_name'] ?? ('Guru ID ' . $assignment['teacher_id']);
                             $errors[] = "Bentrok Jam ke-{$p}: {$tName} sudah mengajar di {$conflictTeacher['class_name']}.";
                             continue;
@@ -3257,7 +3268,8 @@ function action_save_schedule_grid(): void
                         && !empty($conflictTeacher['physical_group'])
                         && strcasecmp(trim((string)$curClass['physical_group']), trim((string)$conflictTeacher['physical_group'])) === 0
                         && (int)$conflictTeacher['subject_id'] === (int)$assignment['subject_id'];
-                    if (!$isPhysicalGroupMatch) {
+                    $isSameSubjectJoint = ((int)$conflictTeacher['subject_id'] === (int)$assignment['subject_id']);
+                    if (!$isPhysicalGroupMatch && !$isSameSubjectJoint) {
                         $errors[] = "Guru sudah ada jadwal di jam ke-{$p}.";
                         continue;
                     }
