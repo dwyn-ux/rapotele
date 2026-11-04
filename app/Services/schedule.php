@@ -480,6 +480,11 @@ function schedule_require_tables(): void
             migrate_lesson_schedule_schema();
         } catch (Throwable) {}
     }
+    if (function_exists('migrate_classes_display_order')) {
+        try {
+            migrate_classes_display_order();
+        } catch (Throwable) {}
+    }
 }
 
 function schedule_clamped_int(mixed $value, int $min, int $max, int $default): int
@@ -564,7 +569,8 @@ function schedule_teacher_options(): array
 
 function schedule_class_options(): array
 {
-    return array_column_map(fetch_all('SELECT id, name FROM classes WHERE active = 1 ORDER BY grade, name'), 'id', 'name');
+    $orderClause = function_exists('class_order_by_clause') ? class_order_by_clause() : 'display_order ASC, grade, name';
+    return array_column_map(fetch_all('SELECT id, name FROM classes WHERE active = 1 ORDER BY ' . $orderClause), 'id', 'name');
 }
 
 function schedule_rows(array $filters = []): array
@@ -1393,7 +1399,8 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
         $dayCounts[(int)$r['day_of_week']] = (int)$r['cnt'];
     }
 
-    $allClasses = fetch_all('SELECT id, name, level, physical_group FROM classes WHERE active = 1 ORDER BY id');
+    $orderClause = function_exists('class_order_by_clause') ? class_order_by_clause() : 'display_order ASC, grade, name';
+    $allClasses = fetch_all('SELECT id, name, grade, level, physical_group, display_order FROM classes WHERE active = 1 ORDER BY ' . $orderClause);
 
     ?>
     <style>
@@ -1851,6 +1858,9 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                     </span>
                 </div>
                 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <button type="button" class="button small secondary" onclick="document.getElementById('modal-reorder-classes-schedule').style.display='flex';" style="font-weight:600;display:inline-flex;align-items:center;gap:5px;font-size:0.8rem;" title="Atur urutan kolom kelas di jadwal pelajaran">
+                        <i data-lucide="arrow-up-down" style="width:14px;height:14px;"></i> Urutan Kelas
+                    </button>
                     <a href="<?= e(route_url('school')) ?>#section-jam-istirahat" class="button small secondary" style="font-weight:600;display:inline-flex;align-items:center;gap:5px;font-size:0.8rem;" title="Geser letak jam istirahat atau durasi">
                         <i data-lucide="coffee" style="width:14px;height:14px;"></i> Atur Jam Istirahat
                     </a>
@@ -1987,7 +1997,83 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
             </div>
         </form>
 
+        <!-- Modal Atur Urutan Kolom Kelas di Jadwal -->
+        <div id="modal-reorder-classes-schedule" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+            <div style="background:#fff;border-radius:10px;max-width:650px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+                <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <h3 style="margin:0;font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:8px;">
+                            <i data-lucide="arrow-up-down" style="color:#0284c7;"></i> Atur Urutan Kolom Kelas di Jadwal
+                        </h3>
+                        <p style="margin:2px 0 0 0;font-size:0.78rem;color:var(--text-muted);">
+                            Ubah angka urutan untuk menentukan urutan kelas dari kiri ke kanan pada tabel jadwal.
+                        </p>
+                    </div>
+                    <button type="button" onclick="document.getElementById('modal-reorder-classes-schedule').style.display='none';" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text-muted);">&times;</button>
+                </div>
+                <form method="post" action="<?= e(route_url('classes')) ?>" style="display:flex;flex-direction:column;overflow:hidden;flex:1;">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="reorder_classes">
+                    <input type="hidden" name="redirect_back" value="lesson-schedule">
+                    <div style="padding:10px 18px;background:#f8fafc;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                        <span style="font-size:0.8rem;color:var(--text-muted);">Isi nomor urut (1, 2, 3...) sesuai urutan yang Anda inginkan:</span>
+                        <button type="button" class="button small" onclick="autoSortClassInputs('modal-reorder-classes-schedule')" style="font-size:0.75rem;padding:3px 8px;">
+                            🪄 Urutkan Otomatis (7-12)
+                        </button>
+                    </div>
+                    <div style="overflow-y:auto;padding:14px 18px;flex:1;">
+                        <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+                            <thead>
+                                <tr style="border-bottom:2px solid var(--border);text-align:left;">
+                                    <th style="padding:6px;">Kelas</th>
+                                    <th style="padding:6px;">Tingkat</th>
+                                    <th style="padding:6px;">Jenjang</th>
+                                    <th style="padding:6px;width:100px;text-align:center;">Urutan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($allClasses as $c): ?>
+                                    <tr style="border-bottom:1px solid var(--border);" data-grade="<?= e($c['grade'] ?? '') ?>" data-name="<?= e($c['name']) ?>">
+                                        <td style="padding:8px 6px;"><strong><?= e($c['name']) ?></strong></td>
+                                        <td style="padding:8px 6px;"><?= e($c['grade'] ?? '-') ?></td>
+                                        <td style="padding:8px 6px;"><?= e($c['level'] ?? '-') ?></td>
+                                        <td style="padding:8px 6px;text-align:center;">
+                                            <input type="number" name="class_order[<?= (int)$c['id'] ?>]" value="<?= (int)($c['display_order'] ?? 0) ?>" min="1" class="class-order-field" style="width:70px;text-align:center;padding:4px;border:1px solid #cbd5e1;border-radius:4px;font-weight:700;">
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;background:var(--surface);">
+                        <button type="button" class="button" onclick="document.getElementById('modal-reorder-classes-schedule').style.display='none';">Batal</button>
+                        <button type="submit" class="button primary" style="font-weight:600;"><i data-lucide="save"></i> Simpan Urutan Kolom</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <script>
+        function autoSortClassInputs(modalId) {
+            var modal = document.getElementById(modalId);
+            if (!modal) return;
+            var rows = Array.from(modal.querySelectorAll('tbody tr'));
+            rows.sort(function(a, b) {
+                var gradeA = a.getAttribute('data-grade') || '';
+                var gradeB = b.getAttribute('data-grade') || '';
+                var mapRoman = { 'vii': 7, 'viii': 8, 'ix': 9, 'x': 10, 'xi': 11, 'xii': 12 };
+                var numA = mapRoman[gradeA.toLowerCase()] || parseInt(gradeA, 10) || 99;
+                var numB = mapRoman[gradeB.toLowerCase()] || parseInt(gradeB, 10) || 99;
+                if (numA !== numB) return numA - numB;
+                var nameA = a.getAttribute('data-name') || '';
+                var nameB = b.getAttribute('data-name') || '';
+                return nameA.localeCompare(nameB);
+            });
+            rows.forEach(function(row, idx) {
+                var input = row.querySelector('.class-order-field');
+                if (input) input.value = idx + 1;
+            });
+        }
         function escapeHtml(str) {
             if (!str) return '';
             return String(str).replace(/[&<>"']/g, function(m) {
@@ -2243,7 +2329,8 @@ function action_save_schedule_daily_matrix(): void
         $existing[(int)$row['class_id']][(int)$row['period_no']] = $row;
     }
 
-    $allClasses = fetch_all('SELECT id, name, physical_group FROM classes WHERE active = 1');
+    $orderClause = function_exists('class_order_by_clause') ? class_order_by_clause() : 'display_order ASC, grade, name';
+    $allClasses = fetch_all('SELECT id, name, grade, physical_group, display_order FROM classes WHERE active = 1 ORDER BY ' . $orderClause);
     $saved = 0;
     $deleted = 0;
     $errors = [];

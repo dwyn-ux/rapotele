@@ -376,6 +376,42 @@ function migrate_lesson_schedule_schema(): void
     }
 }
 
+function migrate_classes_display_order(): void
+{
+    if (!table_exists('classes')) {
+        return;
+    }
+    migration_add_column('classes', 'display_order', 'INT NOT NULL DEFAULT 0');
+
+    try {
+        $hasCustom = (int)(fetch_one('SELECT COUNT(*) AS c FROM classes WHERE display_order > 0')['c'] ?? 0);
+        if ($hasCustom === 0) {
+            $classes = fetch_all(
+                "SELECT id, name, grade FROM classes 
+                 ORDER BY 
+                     CASE 
+                         WHEN grade IN ('VII', '7') THEN 7
+                         WHEN grade IN ('VIII', '8') THEN 8
+                         WHEN grade IN ('IX', '9') THEN 9
+                         WHEN grade IN ('X', '10') THEN 10
+                         WHEN grade IN ('XI', '11') THEN 11
+                         WHEN grade IN ('XII', '12') THEN 12
+                         WHEN (grade + 0) > 0 THEN (grade + 0)
+                         ELSE 99
+                     END ASC, 
+                     name ASC, 
+                     id ASC"
+            );
+            $order = 1;
+            foreach ($classes as $c) {
+                execute_sql('UPDATE classes SET display_order = ? WHERE id = ?', [$order++, (int)$c['id']]);
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('migrate_classes_display_order error: ' . $e->getMessage());
+    }
+}
+
 function migrations_fingerprint(): string
 {
     $hash = hash_file('sha256', __FILE__);
@@ -464,6 +500,7 @@ function run_migrations_locked(): void
             level VARCHAR(16) NULL,
             major VARCHAR(80) NULL,
             physical_group VARCHAR(80) NULL,
+            display_order INT NOT NULL DEFAULT 0,
             school_id INT UNSIGNED NULL,
             homeroom_teacher_id INT NULL,
             academic_year VARCHAR(32) NOT NULL,
@@ -1088,6 +1125,8 @@ function run_migrations_locked(): void
     migration_add_column('classes', 'level', 'VARCHAR(16) NULL');
     migration_add_column('classes', 'physical_group', 'VARCHAR(80) NULL');
     migration_add_column('classes', 'school_id', 'INT UNSIGNED NULL');
+    migration_add_column('classes', 'display_order', 'INT NOT NULL DEFAULT 0');
+    migrate_classes_display_order();
     if (table_exists('classes') && migration_column_exists('classes', 'school_id')) {
         $firstSchool = fetch_one('SELECT id FROM school_profile ORDER BY id LIMIT 1');
         if ($firstSchool) {

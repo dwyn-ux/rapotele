@@ -657,7 +657,8 @@ function page_classes(): void
     $edit = edit_row('classes') ?: [];
     $teachers = map_options('teachers', 'name');
     $schools = fetch_all('SELECT id, name FROM school_profile ORDER BY name');
-    $rows = fetch_all('SELECT c.*, t.name AS teacher_name, sp.name AS school_name FROM classes c LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id LEFT JOIN school_profile sp ON sp.id = c.school_id ORDER BY sp.name, c.grade, c.name');
+    $orderClause = function_exists('class_order_by_clause') ? class_order_by_clause('c') : 'c.display_order ASC, c.grade, c.name';
+    $rows = fetch_all('SELECT c.*, t.name AS teacher_name, sp.name AS school_name FROM classes c LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id LEFT JOIN school_profile sp ON sp.id = c.school_id ORDER BY sp.name, ' . $orderClause);
     render_header('Data Kelas');
     ?>
     <div style="background: rgba(14, 165, 233, 0.08); border-left: 4px solid #0284c7; border-radius: 8px; padding: 10px 14px; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
@@ -668,9 +669,14 @@ function page_classes(): void
                 <span style="color: #0284c7;">Jika beberapa rombel Dapodik diajar bersamaan dalam 1 ruangan fisik, Anda bisa menggabungkannya secara cepat.</span>
             </div>
         </div>
-        <a href="<?= e(route_url('gabung-kelas')) ?>" class="button small secondary" style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600; text-decoration: none;">
-            <i data-lucide="users" style="width: 14px; height: 14px;"></i> Buka Menu Gabung Kelas
-        </a>
+        <div style="display:flex;align-items:center;gap:8px;">
+            <button type="button" class="button small secondary" onclick="document.getElementById('modal-reorder-classes').style.display='flex';" style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600;">
+                <i data-lucide="arrow-up-down" style="width: 14px; height: 14px;"></i> Atur Urutan Kelas
+            </button>
+            <a href="<?= e(route_url('gabung-kelas')) ?>" class="button small secondary" style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600; text-decoration: none;">
+                <i data-lucide="users" style="width: 14px; height: 14px;"></i> Buka Menu Gabung Kelas
+            </a>
+        </div>
     </div>
     <?php
     input_panel_start($edit ? 'Edit Kelas' : 'Input Kelas', 'Tambah Kelas', (bool)$edit || isset($_GET['add']));
@@ -690,6 +696,10 @@ function page_classes(): void
             <label>
                 <span class="field-icon"><i data-lucide="users"></i> Rombel Lapangan / Kelompok KBM (Boarding)</span>
                 <input type="text" name="physical_group" value="<?= e($edit['physical_group'] ?? '') ?>" placeholder="Opsional (misal: X E untuk rombel X E1 & X E2). Kosongkan jika mandiri">
+            </label>
+            <label>
+                <span class="field-icon"><i data-lucide="arrow-up-down"></i> Nomor Urut Tampilan</span>
+                <input type="number" name="display_order" min="0" value="<?= e($edit['display_order'] ?? 0) ?>" placeholder="Contoh: 1, 2, 3... (angka kecil tampil lebih awal)">
             </label>
             <label>
                 <span class="field-icon"><i data-lucide="building"></i> Sekolah <span style="color:#c00">*</span></span>
@@ -729,10 +739,88 @@ function page_classes(): void
             <div class="wide actions form-actions-top"><button type="submit" class="button primary"><i data-lucide="save"></i> Simpan</button><a class="button" href="<?= e(route_url('classes')) ?>"><i data-lucide="rotate-ccw"></i> Reset</a></div>
         </form>
     <?php input_panel_end(); ?>
-    <?php table_panel('Daftar Kelas', ['Sekolah', 'Kelas', 'Tingkat', 'Jenjang', 'Jurusan', 'Wali Kelas', 'Jumlah Siswa', 'Status', 'Aksi'], $rows, function ($row) {
+    <?php table_panel('Daftar Kelas', ['Urutan', 'Sekolah', 'Kelas', 'Tingkat', 'Jenjang', 'Jurusan', 'Wali Kelas', 'Jumlah Siswa', 'Status', 'Aksi'], $rows, function ($row) {
         $count = (int)fetch_one('SELECT COUNT(*) AS c FROM students WHERE class_id = ?', [(int)$row['id']])['c'];
-        ?><td><?= e($row['school_name'] ?? '-') ?></td><td><strong><?= e($row['name']) ?></strong><?php if (!empty($row['report_name']) && $row['report_name'] !== $row['name']): ?><br><small style="color:var(--text-muted);font-size:0.82em;display:inline-flex;align-items:center;gap:3px;margin-top:2px;" title="Nama yang dicetak pada lembar rapor"><i data-lucide="printer" style="width:11px;height:11px"></i> Rapor: <strong><?= e($row['report_name']) ?></strong></small><?php endif; ?><?php if (!empty($row['physical_group'])): ?><br><small style="color:#0284c7;font-size:0.82em;display:inline-flex;align-items:center;gap:3px;margin-top:2px;" title="Digabung dalam KBM fisik/lapangan"><i data-lucide="users" style="width:11px;height:11px"></i> KBM: <strong><?= e($row['physical_group']) ?></strong></small><?php endif; ?></td><td><?= e($row['grade']) ?></td><td><?= e($row['level'] ?? '-') ?></td><td><?= e($row['major'] ?? '-') ?></td><td><?= e($row['teacher_name']) ?></td><td><?= e($count) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('classes', (int)$row['id'], 'delete_class') ?></td><?php
+        ?><td><span class="badge" style="font-weight:700;background:rgba(2,132,199,0.1);color:#0284c7;"><?= (int)($row['display_order'] ?? 0) ?></span></td><td><?= e($row['school_name'] ?? '-') ?></td><td><strong><?= e($row['name']) ?></strong><?php if (!empty($row['report_name']) && $row['report_name'] !== $row['name']): ?><br><small style="color:var(--text-muted);font-size:0.82em;display:inline-flex;align-items:center;gap:3px;margin-top:2px;" title="Nama yang dicetak pada lembar rapor"><i data-lucide="printer" style="width:11px;height:11px"></i> Rapor: <strong><?= e($row['report_name']) ?></strong></small><?php endif; ?><?php if (!empty($row['physical_group'])): ?><br><small style="color:#0284c7;font-size:0.82em;display:inline-flex;align-items:center;gap:3px;margin-top:2px;" title="Digabung dalam KBM fisik/lapangan"><i data-lucide="users" style="width:11px;height:11px"></i> KBM: <strong><?= e($row['physical_group']) ?></strong></small><?php endif; ?></td><td><?= e($row['grade']) ?></td><td><?= e($row['level'] ?? '-') ?></td><td><?= e($row['major'] ?? '-') ?></td><td><?= e($row['teacher_name']) ?></td><td><?= e($count) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('classes', (int)$row['id'], 'delete_class') ?></td><?php
     }, '', true); ?>
+
+    <!-- Modal Atur Urutan Kelas Cepat -->
+    <div id="modal-reorder-classes" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+        <div style="background:#fff;border-radius:10px;max-width:650px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+            <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <h3 style="margin:0;font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:8px;">
+                        <i data-lucide="arrow-up-down" style="color:#0284c7;"></i> Atur Urutan Tampilan Kelas
+                    </h3>
+                    <p style="margin:2px 0 0 0;font-size:0.78rem;color:var(--text-muted);">
+                        Urutan ini menentukan posisi kolom kelas di Jadwal Pelajaran dan daftar rapor.
+                    </p>
+                </div>
+                <button type="button" onclick="document.getElementById('modal-reorder-classes').style.display='none';" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text-muted);">&times;</button>
+            </div>
+            <form method="post" action="<?= e(route_url('classes')) ?>" style="display:flex;flex-direction:column;overflow:hidden;flex:1;">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="reorder_classes">
+                <input type="hidden" name="redirect_back" value="classes">
+                <div style="padding:10px 18px;background:#f8fafc;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+                    <span style="font-size:0.8rem;color:var(--text-muted);">Isi nomor urut (1, 2, 3...) sesuai urutan yang Anda inginkan:</span>
+                    <button type="button" class="button small" onclick="autoSortClassInputs('modal-reorder-classes')" style="font-size:0.75rem;padding:3px 8px;">
+                        🪄 Urutkan Otomatis (7-12)
+                    </button>
+                </div>
+                <div style="overflow-y:auto;padding:14px 18px;flex:1;">
+                    <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+                        <thead>
+                            <tr style="border-bottom:2px solid var(--border);text-align:left;">
+                                <th style="padding:6px;">Kelas</th>
+                                <th style="padding:6px;">Tingkat</th>
+                                <th style="padding:6px;">Jenjang</th>
+                                <th style="padding:6px;width:100px;text-align:center;">Urutan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($rows as $c): ?>
+                                <tr style="border-bottom:1px solid var(--border);" data-grade="<?= e($c['grade']) ?>" data-name="<?= e($c['name']) ?>">
+                                    <td style="padding:8px 6px;"><strong><?= e($c['name']) ?></strong></td>
+                                    <td style="padding:8px 6px;"><?= e($c['grade']) ?></td>
+                                    <td style="padding:8px 6px;"><?= e($c['level'] ?? '-') ?></td>
+                                    <td style="padding:8px 6px;text-align:center;">
+                                        <input type="number" name="class_order[<?= (int)$c['id'] ?>]" value="<?= (int)($c['display_order'] ?? 0) ?>" min="1" class="class-order-field" style="width:70px;text-align:center;padding:4px;border:1px solid #cbd5e1;border-radius:4px;font-weight:700;">
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;background:var(--surface);">
+                    <button type="button" class="button" onclick="document.getElementById('modal-reorder-classes').style.display='none';">Batal</button>
+                    <button type="submit" class="button primary" style="font-weight:600;"><i data-lucide="save"></i> Simpan Urutan Kelas</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script>
+    function autoSortClassInputs(modalId) {
+        var modal = document.getElementById(modalId);
+        if (!modal) return;
+        var rows = Array.from(modal.querySelectorAll('tbody tr'));
+        rows.sort(function(a, b) {
+            var gradeA = a.getAttribute('data-grade') || '';
+            var gradeB = b.getAttribute('data-grade') || '';
+            var mapRoman = { 'vii': 7, 'viii': 8, 'ix': 9, 'x': 10, 'xi': 11, 'xii': 12 };
+            var numA = mapRoman[gradeA.toLowerCase()] || parseInt(gradeA, 10) || 99;
+            var numB = mapRoman[gradeB.toLowerCase()] || parseInt(gradeB, 10) || 99;
+            if (numA !== numB) return numA - numB;
+            var nameA = a.getAttribute('data-name') || '';
+            var nameB = b.getAttribute('data-name') || '';
+            return nameA.localeCompare(nameB);
+        });
+        rows.forEach(function(row, idx) {
+            var input = row.querySelector('.class-order-field');
+            if (input) input.value = idx + 1;
+        });
+    }
+    </script>
     <?php render_footer();
 }
 

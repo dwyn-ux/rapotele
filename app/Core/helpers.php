@@ -489,5 +489,26 @@ if (!function_exists('sibling_assignments_for_assignment')) {
     }
 }
 
+if (!function_exists('class_order_by_clause')) {
+    function class_order_by_clause(string $prefix = 'c'): string
+    {
+        $p = $prefix !== '' ? "{$prefix}." : '';
+        return "COALESCE(NULLIF({$p}display_order, 0), 9999) ASC,
+                CASE 
+                    WHEN {$p}grade IN ('VII', '7') THEN 7
+                    WHEN {$p}grade IN ('VIII', '8') THEN 8
+                    WHEN {$p}grade IN ('IX', '9') THEN 9
+                    WHEN {$p}grade IN ('X', '10') THEN 10
+                    WHEN {$p}grade IN ('XI', '11') THEN 11
+                    WHEN {$p}grade IN ('XII', '12') THEN 12
+                    WHEN ({$p}grade + 0) > 0 THEN ({$p}grade + 0)
+                    ELSE 99
+                END ASC,
+                {$p}name ASC,
+                {$p}id ASC";
+    }
+}
+
+
 
 

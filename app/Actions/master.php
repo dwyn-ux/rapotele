@@ -178,10 +178,12 @@ function action_save_class(): void
     }
     $reportName = trim((string)($_POST['report_name'] ?? ''));
     $physicalGroup = trim((string)($_POST['physical_group'] ?? ''));
+    $displayOrder = (int)($_POST['display_order'] ?? 0);
     $data = [
         trim((string)$_POST['name']),
         $reportName !== '' ? $reportName : null,
         $physicalGroup !== '' ? $physicalGroup : null,
+        $displayOrder,
         trim((string)$_POST['grade']),
         strtoupper(trim((string)($_POST['level'] ?? ''))),
         trim((string)($_POST['major'] ?? '')),
@@ -193,17 +195,40 @@ function action_save_class(): void
     ];
     if ($id > 0) {
         execute_sql(
-            'UPDATE classes SET name = ?, report_name = ?, physical_group = ?, grade = ?, level = ?, major = ?, school_id = ?, homeroom_teacher_id = ?, academic_year = ?, active = ?, updated_at = ? WHERE id = ?',
+            'UPDATE classes SET name = ?, report_name = ?, physical_group = ?, display_order = ?, grade = ?, level = ?, major = ?, school_id = ?, homeroom_teacher_id = ?, academic_year = ?, active = ?, updated_at = ? WHERE id = ?',
             array_merge($data, [$id])
         );
     } else {
         execute_sql(
-            'INSERT INTO classes (name, report_name, physical_group, grade, level, major, school_id, homeroom_teacher_id, academic_year, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO classes (name, report_name, physical_group, display_order, grade, level, major, school_id, homeroom_teacher_id, academic_year, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             $data
         );
     }
     flash('success', 'Data kelas tersimpan.');
     redirect_to('classes');
+}
+
+function action_reorder_classes(): void
+{
+    require_role(['admin']);
+    $orders = $_POST['class_order'] ?? [];
+    if (!is_array($orders)) {
+        $orders = [];
+    }
+    foreach ($orders as $classId => $orderVal) {
+        $cid = (int)$classId;
+        $ord = (int)$orderVal;
+        if ($cid > 0) {
+            execute_sql('UPDATE classes SET display_order = ?, updated_at = ? WHERE id = ?', [$ord, now_string(), $cid]);
+        }
+    }
+    flash('success', '✅ Urutan kelas berhasil diperbarui!');
+    $back = $_POST['redirect_back'] ?? 'classes';
+    if ($back === 'lesson-schedule') {
+        redirect_to('lesson-schedule');
+    } else {
+        redirect_to('classes');
+    }
 }
 
 function action_merge_kbm_classes(): void
