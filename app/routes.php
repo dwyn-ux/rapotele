@@ -10,6 +10,10 @@ return [
         'lupa-password' => 'page_forgot_password',
         'telegram-register' => 'page_telegram_register',
         'telegram-web-login' => 'page_telegram_web_login',
+        'api' => function (): void {
+            require_once __DIR__ . '/Api/mobile.php';
+            mobile_api_dispatch();
+        },
     ],
 
     'private' => [
