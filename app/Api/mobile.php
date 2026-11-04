@@ -186,6 +186,42 @@ function mobile_api_dispatch(): void
                 mobile_api_handle_trigger_schedule();
                 break;
 
+            case 'teacher_attendance':
+                mobile_api_handle_teacher_attendance();
+                break;
+
+            case 'teacher_checkin':
+                mobile_api_handle_teacher_checkin();
+                break;
+
+            case 'teaching_assignments':
+                mobile_api_handle_teaching_assignments();
+                break;
+
+            case 'students_for_attendance':
+                mobile_api_handle_students_for_attendance();
+                break;
+
+            case 'save_student_attendance':
+                mobile_api_handle_save_student_attendance();
+                break;
+
+            case 'journals':
+                mobile_api_handle_journals();
+                break;
+
+            case 'save_journal':
+                mobile_api_handle_save_journal();
+                break;
+
+            case 'grades_data':
+                mobile_api_handle_grades_data();
+                break;
+
+            case 'save_grades':
+                mobile_api_handle_save_grades();
+                break;
+
             default:
                 mobile_api_response(true, [
                     'version' => '1.0.0',
@@ -650,4 +686,429 @@ function mobile_api_handle_trigger_schedule(): void
     $result = schedule_send_due_reminders($now);
 
     mobile_api_response(true, $result, 'Reminder jadwal berhasil dicek & dipicu.');
+}
+
+function mobile_api_handle_teacher_attendance(): void
+{
+    $user = mobile_api_require_auth();
+    $teacherId = !empty($user['teacher_id']) ? (int)$user['teacher_id'] : 0;
+    if ($teacherId <= 0 && $user['role'] === 'admin') {
+        $teacherId = (int)($_GET['teacher_id'] ?? 0);
+    }
+
+    $date = date_ymd($_GET['date'] ?? date('Y-m-d'));
+    $attendance = null;
+    if ($teacherId > 0) {
+        $attendance = fetch_one('SELECT * FROM teacher_attendance WHERE teacher_id = ? AND date = ?', [$teacherId, $date]);
+    }
+
+    if (!function_exists('get_school_profile')) {
+        require_once dirname(__DIR__) . '/Pages/render.php';
+    }
+    $school = function_exists('get_school_profile') ? get_school_profile() : [];
+
+    mobile_api_response(true, [
+        'attendance' => $attendance,
+        'date' => $date,
+        'teacher_id' => $teacherId,
+        'school_lat' => !empty($school['location_lat']) ? (float)$school['location_lat'] : null,
+        'school_lng' => !empty($school['location_lng']) ? (float)$school['location_lng'] : null,
+        'radius_meters' => (int)($school['attendance_radius_meters'] ?? 500),
+    ]);
+}
+
+function mobile_api_handle_teacher_checkin(): void
+{
+    $user = mobile_api_require_auth();
+    $teacherId = !empty($user['teacher_id']) ? (int)$user['teacher_id'] : 0;
+    if ($teacherId <= 0) {
+        mobile_api_response(false, [], 'Akun Anda tidak terhubung dengan data guru.', 400);
+    }
+
+    $type = trim((string)($_POST['type'] ?? 'checkin'));
+    if (!in_array($type, ['checkin', 'checkout'], true)) {
+        mobile_api_response(false, [], 'Jenis absensi harus checkin atau checkout.', 422);
+    }
+
+    $date = date('Y-m-d');
+    $time = date('H:i:s');
+    $lat = !empty($_POST['lat']) ? (float)$_POST['lat'] : null;
+    $lng = !empty($_POST['lng']) ? (float)$_POST['lng'] : null;
+    $status = trim((string)($_POST['status'] ?? 'hadir'));
+    $notes = trim((string)($_POST['notes'] ?? 'Presensi mandiri via Mobile App'));
+
+    $existing = fetch_one('SELECT id, time_in, time_out FROM teacher_attendance WHERE teacher_id = ? AND date = ?', [$teacherId, $date]);
+
+    if ($existing) {
+        if ($type === 'checkout') {
+            execute_sql(
+                'UPDATE teacher_attendance SET time_out = ?, location_lat = ?, location_lng = ?, updated_at = ? WHERE id = ?',
+                [$time, $lat, $lng, now_string(), (int)$existing['id']]
+            );
+            mobile_api_response(true, ['time_out' => $time], 'Check-out berhasil pukul ' . $time);
+        } else {
+            execute_sql(
+                'UPDATE teacher_attendance SET time_in = ?, location_lat = ?, location_lng = ?, notes = ?, updated_at = ? WHERE id = ?',
+                [$time, $lat, $lng, $notes, now_string(), (int)$existing['id']]
+            );
+            mobile_api_response(true, ['time_in' => $time], 'Check-in berhasil diperbarui pukul ' . $time);
+        }
+    } else {
+        execute_sql(
+            'INSERT INTO teacher_attendance (teacher_id, date, status, time_in, location_lat, location_lng, notes, recorded_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [$teacherId, $date, $status, $time, $lat, $lng, $notes, (int)$user['id'], now_string()]
+        );
+        mobile_api_response(true, ['time_in' => $time], 'Check-in berhasil pukul ' . $time);
+    }
+}
+
+function mobile_api_handle_teaching_assignments(): void
+{
+    $user = mobile_api_require_auth();
+    $sql = "SELECT ta.id, ta.teacher_id, ta.class_id, ta.subject_id, ta.academic_year, ta.semester,
+                   c.name AS class_name, c.grade, s.name AS subject_name, s.code AS subject_code
+            FROM teaching_assignments ta
+            JOIN classes c ON c.id = ta.class_id
+            JOIN subjects s ON s.id = ta.subject_id
+            WHERE ta.active = 1";
+    $params = [];
+
+    if ($user['role'] !== 'admin' && !empty($user['teacher_id'])) {
+        $sql .= " AND ta.teacher_id = ?";
+        $params[] = (int)$user['teacher_id'];
+    }
+
+    $sql .= " ORDER BY c.grade, c.name, s.name";
+    $assignments = fetch_all($sql, $params);
+
+    mobile_api_response(true, ['assignments' => $assignments]);
+}
+
+function mobile_api_handle_students_for_attendance(): void
+{
+    $user = mobile_api_require_auth();
+    $assignmentId = (int)($_GET['assignment_id'] ?? 0);
+    if ($assignmentId <= 0) {
+        mobile_api_response(false, [], 'assignment_id wajib diisi.', 422);
+    }
+
+    $assignment = fetch_one(
+        "SELECT ta.*, c.name AS class_name, c.grade, s.name AS subject_name
+         FROM teaching_assignments ta
+         JOIN classes c ON c.id = ta.class_id
+         JOIN subjects s ON s.id = ta.subject_id
+         WHERE ta.id = ?",
+        [$assignmentId]
+    );
+
+    if (!$assignment) {
+        mobile_api_response(false, [], 'Pembelajaran kelas tidak ditemukan.', 404);
+    }
+
+    $date = date_ymd($_GET['date'] ?? date('Y-m-d'));
+    $meetingNo = max(1, (int)($_GET['meeting_no'] ?? 1));
+
+    $session = fetch_one(
+        'SELECT * FROM student_attendance_sessions WHERE assignment_id = ? AND date = ? AND meeting_no = ?',
+        [$assignmentId, $date, $meetingNo]
+    );
+
+    $sessionId = $session['id'] ?? 0;
+
+    $students = fetch_all(
+        "SELECT s.id, s.nis, s.nisn, s.name, s.gender,
+                COALESCE(sae.status, 'hadir') AS status,
+                COALESCE(sae.notes, '') AS notes
+         FROM students s
+         LEFT JOIN student_attendance_entries sae ON sae.student_id = s.id AND sae.session_id = ?
+         WHERE s.class_id = ? AND s.active = 1
+         ORDER BY s.name",
+        [$sessionId, (int)$assignment['class_id']]
+    );
+
+    mobile_api_response(true, [
+        'assignment' => $assignment,
+        'date' => $date,
+        'meeting_no' => $meetingNo,
+        'session' => $session,
+        'students' => $students,
+    ]);
+}
+
+function mobile_api_handle_save_student_attendance(): void
+{
+    $user = mobile_api_require_auth();
+    $assignmentId = (int)($_POST['assignment_id'] ?? 0);
+    $date = date_ymd($_POST['date'] ?? date('Y-m-d'));
+    $meetingNo = max(1, (int)($_POST['meeting_no'] ?? 1));
+    $topic = trim((string)($_POST['topic'] ?? 'Presensi KBM'));
+    $queueWa = !empty($_POST['queue_whatsapp_absence']);
+    $rows = $_POST['rows'] ?? [];
+
+    if ($assignmentId <= 0 || !is_array($rows) || empty($rows)) {
+        mobile_api_response(false, [], 'Data presensi siswa tidak lengkap.', 422);
+    }
+
+    $session = fetch_one(
+        'SELECT id FROM student_attendance_sessions WHERE assignment_id = ? AND date = ? AND meeting_no = ?',
+        [$assignmentId, $date, $meetingNo]
+    );
+
+    $pdo = db();
+    if (!$pdo->beginTransaction()) {
+        mobile_api_response(false, [], 'Gagal memulai transaksi.', 500);
+    }
+
+    try {
+        if ($session) {
+            $sessionId = (int)$session['id'];
+            execute_sql(
+                'UPDATE student_attendance_sessions SET topic = ?, teacher_attended = 1, updated_at = ? WHERE id = ?',
+                [$topic, now_string(), $sessionId]
+            );
+        } else {
+            execute_sql(
+                'INSERT INTO student_attendance_sessions (assignment_id, date, meeting_no, topic, teacher_attended, teacher_status, teacher_time_in, created_by, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)',
+                [$assignmentId, $date, $meetingNo, $topic, 'hadir', date('H:i:s'), (int)$user['id'], now_string()]
+            );
+            $sessionId = (int)$pdo->lastInsertId();
+        }
+
+        $now = now_string();
+        $absentEntryIds = [];
+
+        foreach ($rows as $item) {
+            $studentId = (int)($item['student_id'] ?? 0);
+            $status = strtolower(trim((string)($item['status'] ?? 'hadir')));
+            if (!in_array($status, ['hadir', 'sakit', 'izin', 'alfa'], true)) {
+                $status = 'hadir';
+            }
+            $notes = trim((string)($item['notes'] ?? ''));
+
+            $entry = fetch_one('SELECT id FROM student_attendance_entries WHERE session_id = ? AND student_id = ?', [$sessionId, $studentId]);
+            if ($entry) {
+                execute_sql(
+                    'UPDATE student_attendance_entries SET status = ?, notes = ?, updated_at = ? WHERE id = ?',
+                    [$status, $notes, $now, (int)$entry['id']]
+                );
+                $entryId = (int)$entry['id'];
+            } else {
+                execute_sql(
+                    'INSERT INTO student_attendance_entries (session_id, student_id, status, notes, updated_at) VALUES (?, ?, ?, ?, ?)',
+                    [$sessionId, $studentId, $status, $notes, $now]
+                );
+                $entryId = (int)$pdo->lastInsertId();
+            }
+
+            if ($status !== 'hadir') {
+                $absentEntryIds[] = $entryId;
+            }
+        }
+
+        $pdo->commit();
+
+        // Enqueue WhatsApp notices if selected
+        $waCount = 0;
+        if ($queueWa && !empty($absentEntryIds) && function_exists('whatsapp_enqueue_attendance_notice')) {
+            foreach ($absentEntryIds as $eid) {
+                try {
+                    $waRes = whatsapp_enqueue_attendance_notice($eid, (int)$user['id']);
+                    $waCount += (int)($waRes['queued'] ?? 0);
+                } catch (_) {}
+            }
+        }
+
+        $msg = 'Presensi siswa berhasil disimpan.';
+        if ($waCount > 0) {
+            $msg .= ' ' . $waCount . ' notifikasi WhatsApp ditambahkan ke antrian.';
+        }
+
+        mobile_api_response(true, ['session_id' => $sessionId, 'wa_queued' => $waCount], $msg);
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        mobile_api_response(false, [], 'Gagal menyimpan absensi: ' . $e->getMessage(), 500);
+    }
+}
+
+function mobile_api_handle_journals(): void
+{
+    $user = mobile_api_require_auth();
+    $sql = "SELECT dj.*, c.name AS class_name, s.name AS subject_name, t.name AS teacher_name
+            FROM daily_journals dj
+            JOIN classes c ON c.id = dj.class_id
+            JOIN subjects s ON s.id = dj.subject_id
+            JOIN teachers t ON t.id = dj.teacher_id";
+    $params = [];
+
+    if ($user['role'] !== 'admin' && !empty($user['teacher_id'])) {
+        $sql .= " WHERE dj.teacher_id = ?";
+        $params[] = (int)$user['teacher_id'];
+    }
+
+    $assignmentId = (int)($_GET['assignment_id'] ?? 0);
+    if ($assignmentId > 0) {
+        $sql .= ($params ? " AND" : " WHERE") . " dj.assignment_id = ?";
+        $params[] = $assignmentId;
+    }
+
+    $sql .= " ORDER BY dj.date DESC, dj.id DESC LIMIT 40";
+    $journals = fetch_all($sql, $params);
+
+    mobile_api_response(true, ['journals' => $journals]);
+}
+
+function mobile_api_handle_save_journal(): void
+{
+    $user = mobile_api_require_auth();
+    $id = (int)($_POST['id'] ?? 0);
+    $assignmentId = (int)($_POST['assignment_id'] ?? 0);
+
+    if ($assignmentId <= 0) {
+        mobile_api_response(false, [], 'assignment_id wajib diisi.', 422);
+    }
+
+    $assignment = fetch_one('SELECT * FROM teaching_assignments WHERE id = ?', [$assignmentId]);
+    if (!$assignment) {
+        mobile_api_response(false, [], 'Pembelajaran tidak ditemukan.', 404);
+    }
+
+    $date = date_ymd($_POST['date'] ?? date('Y-m-d'));
+    $meetingNo = max(1, (int)($_POST['meeting_no'] ?? 1));
+    $topic = trim((string)($_POST['topic'] ?? ''));
+    $activities = trim((string)($_POST['activities'] ?? ''));
+    $materials = trim((string)($_POST['materials'] ?? ''));
+    $obstacles = trim((string)($_POST['obstacles'] ?? ''));
+    $followUp = trim((string)($_POST['follow_up'] ?? ''));
+
+    if ($topic === '' || $activities === '') {
+        mobile_api_response(false, [], 'Materi / topik dan kegiatan pembelajaran wajib diisi.', 422);
+    }
+
+    $now = now_string();
+
+    if ($id > 0) {
+        execute_sql(
+            'UPDATE daily_journals SET assignment_id = ?, teacher_id = ?, class_id = ?, subject_id = ?, date = ?, meeting_no = ?, topic = ?, activities = ?, materials = ?, obstacles = ?, follow_up = ?, updated_at = ? WHERE id = ?',
+            [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $date, $meetingNo, $topic, $activities, $materials, $obstacles, $followUp, $now, $id]
+        );
+        mobile_api_response(true, ['id' => $id], 'Jurnal pembelajaran berhasil diperbarui.');
+    } else {
+        execute_sql(
+            'INSERT INTO daily_journals (assignment_id, teacher_id, class_id, subject_id, date, meeting_no, topic, activities, materials, obstacles, follow_up, created_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $date, $meetingNo, $topic, $activities, $materials, $obstacles, $followUp, (int)$user['id'], $now]
+        );
+        mobile_api_response(true, ['id' => (int)db()->lastInsertId()], 'Jurnal pembelajaran berhasil disimpan.');
+    }
+}
+
+function mobile_api_handle_grades_data(): void
+{
+    $user = mobile_api_require_auth();
+    $assignmentId = (int)($_GET['assignment_id'] ?? 0);
+    if ($assignmentId <= 0) {
+        mobile_api_response(false, [], 'assignment_id wajib diisi.', 422);
+    }
+
+    $assignment = fetch_one(
+        "SELECT ta.*, c.name AS class_name, c.grade, s.name AS subject_name
+         FROM teaching_assignments ta
+         JOIN classes c ON c.id = ta.class_id
+         JOIN subjects s ON s.id = ta.subject_id
+         WHERE ta.id = ?",
+        [$assignmentId]
+    );
+
+    if (!$assignment) {
+        mobile_api_response(false, [], 'Pembelajaran tidak ditemukan.', 404);
+    }
+
+    $assessmentType = trim((string)($_GET['assessment_type'] ?? 'UH'));
+    $learningObjectiveId = !empty($_GET['learning_objective_id']) ? (int)$_GET['learning_objective_id'] : null;
+
+    $objectives = fetch_all(
+        'SELECT id, code, description FROM learning_objectives WHERE subject_id = ? AND grade = ? AND active = 1 ORDER BY code',
+        [(int)$assignment['subject_id'], (int)$assignment['grade']]
+    );
+
+    $sql = "SELECT s.id, s.nis, s.name, g.score, g.description
+            FROM students s
+            LEFT JOIN grades g ON g.student_id = s.id AND g.assignment_id = ? AND g.assessment_type = ? ";
+    $params = [$assignmentId, $assessmentType];
+
+    if ($learningObjectiveId !== null) {
+        $sql .= "AND g.learning_objective_id = ? ";
+        $params[] = $learningObjectiveId;
+    } else {
+        $sql .= "AND g.learning_objective_id IS NULL ";
+    }
+
+    $sql .= "WHERE s.class_id = ? AND s.active = 1 ORDER BY s.name";
+    $params[] = (int)$assignment['class_id'];
+
+    $students = fetch_all($sql, $params);
+
+    mobile_api_response(true, [
+        'assignment' => $assignment,
+        'assessment_type' => $assessmentType,
+        'learning_objective_id' => $learningObjectiveId,
+        'objectives' => $objectives,
+        'students' => $students,
+    ]);
+}
+
+function mobile_api_handle_save_grades(): void
+{
+    $user = mobile_api_require_auth();
+    $assignmentId = (int)($_POST['assignment_id'] ?? 0);
+    $assessmentType = trim((string)($_POST['assessment_type'] ?? 'UH'));
+    $learningObjectiveId = !empty($_POST['learning_objective_id']) ? (int)$_POST['learning_objective_id'] : null;
+    $scores = $_POST['scores'] ?? [];
+
+    if ($assignmentId <= 0 || !is_array($scores) || empty($scores)) {
+        mobile_api_response(false, [], 'Data penilaian siswa tidak lengkap.', 422);
+    }
+
+    $pdo = db();
+    if (!$pdo->beginTransaction()) {
+        mobile_api_response(false, [], 'Gagal memulai transaksi.', 500);
+    }
+
+    try {
+        $now = now_string();
+        $userId = (int)$user['id'];
+
+        foreach ($scores as $item) {
+            $studentId = (int)($item['student_id'] ?? 0);
+            $rawScore = $item['score'] ?? null;
+            $score = ($rawScore !== null && $rawScore !== '') ? (float)$rawScore : null;
+
+            $params = [$assignmentId, $studentId, $assessmentType];
+            $objCond = $learningObjectiveId !== null ? 'learning_objective_id = ?' : 'learning_objective_id IS NULL';
+            if ($learningObjectiveId !== null) {
+                $params[] = $learningObjectiveId;
+            }
+
+            $existing = fetch_one("SELECT id FROM grades WHERE assignment_id = ? AND student_id = ? AND assessment_type = ? AND $objCond", $params);
+
+            if ($existing) {
+                execute_sql('UPDATE grades SET score = ?, updated_at = ? WHERE id = ?', [$score, $now, (int)$existing['id']]);
+            } elseif ($score !== null) {
+                $loKey = $learningObjectiveId !== null ? (string)$learningObjectiveId : '';
+                execute_sql(
+                    'INSERT INTO grades (assignment_id, student_id, assessment_type, learning_objective_id, learning_objective_key, score, created_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    [$assignmentId, $studentId, $assessmentType, $learningObjectiveId, $loKey, $score, $userId, $now]
+                );
+            }
+        }
+
+        $pdo->commit();
+        mobile_api_response(true, [], 'Nilai siswa berhasil disimpan.');
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        mobile_api_response(false, [], 'Gagal menyimpan nilai: ' . $e->getMessage(), 500);
+    }
 }

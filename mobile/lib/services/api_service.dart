@@ -5,6 +5,10 @@ import '../models/user.dart';
 import '../models/whatsapp_item.dart';
 import '../models/notification_item.dart';
 import '../models/schedule_item.dart';
+import '../models/teaching_assignment.dart';
+import '../models/attendance_models.dart';
+import '../models/journal_model.dart';
+import '../models/grade_models.dart';
 
 class ApiService {
   static const String _defaultBaseUrl = 'https://raport.smpmuashidiq.sch.id';
@@ -349,6 +353,293 @@ class ApiService {
       return {'success': false, 'message': 'Format respons tidak valid.'};
     } catch (e) {
       return {'success': false, 'message': 'Error: $e'};
+    }
+  }
+
+  // ================= ADMIN & TEACHER ACTIONS =================
+
+  /// Get teacher attendance for today or specific date
+  Future<Map<String, dynamic>> getTeacherAttendance({String? date}) async {
+    try {
+      final query = <String, String>{};
+      if (date != null && date.isNotEmpty) query['date'] = date;
+      final response = await _executeWithFallback('teacher_attendance', queryParams: query);
+      if (response.statusCode == 200) {
+        final dynamic decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['ok'] == true) {
+          final attRaw = decoded['attendance'];
+          TeacherAttendanceModel? attendance;
+          final sLat = decoded['school_lat'] != null ? double.tryParse(decoded['school_lat'].toString()) : null;
+          final sLng = decoded['school_lng'] != null ? double.tryParse(decoded['school_lng'].toString()) : null;
+          final radius = decoded['radius_meters'] is int ? decoded['radius_meters'] as int : int.tryParse(decoded['radius_meters']?.toString() ?? '500') ?? 500;
+
+          if (attRaw is Map<String, dynamic>) {
+            attendance = TeacherAttendanceModel.fromJson(attRaw, schoolLat: sLat, schoolLng: sLng, radiusMeters: radius);
+          }
+
+          return {
+            'success': true,
+            'attendance': attendance,
+            'date': decoded['date']?.toString() ?? '',
+            'school_lat': sLat,
+            'school_lng': sLng,
+            'radius_meters': radius,
+          };
+        }
+      }
+      return {'success': false, 'message': 'Gagal mengambil data presensi guru.'};
+    } catch (e) {
+      return {'success': false, 'message': 'Error presensi: $e'};
+    }
+  }
+
+  /// Teacher check-in or check-out
+  Future<Map<String, dynamic>> teacherCheckIn({
+    required String type, // 'checkin' or 'checkout'
+    double? lat,
+    double? lng,
+    String status = 'hadir',
+    String notes = 'Presensi mandiri via Mobile App',
+  }) async {
+    try {
+      final response = await _executeWithFallback(
+        'teacher_checkin',
+        isPost: true,
+        body: jsonEncode({
+          'type': type,
+          'lat': lat,
+          'lng': lng,
+          'status': status,
+          'notes': notes,
+        }),
+      );
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return {
+          'success': decoded['ok'] == true,
+          'message': decoded['message']?.toString() ?? 'Presensi berhasil dicatat.',
+        };
+      }
+      return {'success': false, 'message': 'Format respons tidak valid.'};
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal check-in: $e'};
+    }
+  }
+
+  /// Get active teaching assignments for current teacher
+  Future<List<TeachingAssignmentModel>> getTeachingAssignments() async {
+    try {
+      final response = await _executeWithFallback('teaching_assignments');
+      if (response.statusCode == 200) {
+        final dynamic decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['ok'] == true) {
+          final list = (decoded['assignments'] as List<dynamic>?) ?? [];
+          return list.map((e) => TeachingAssignmentModel.fromJson(e as Map<String, dynamic>)).toList();
+        }
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Get student roster for attendance session
+  Future<Map<String, dynamic>> getStudentsForAttendance({
+    required int assignmentId,
+    String? date,
+    int? meetingNo,
+  }) async {
+    try {
+      final query = <String, String>{
+        'assignment_id': assignmentId.toString(),
+      };
+      if (date != null && date.isNotEmpty) query['date'] = date;
+      if (meetingNo != null) query['meeting_no'] = meetingNo.toString();
+
+      final response = await _executeWithFallback('students_for_attendance', queryParams: query);
+      if (response.statusCode == 200) {
+        final dynamic decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['ok'] == true) {
+          final studentsRaw = (decoded['students'] as List<dynamic>?) ?? [];
+          final students = studentsRaw.map((e) => StudentAttendanceItem.fromJson(e as Map<String, dynamic>)).toList();
+          final session = decoded['session'] is Map<String, dynamic> ? decoded['session'] as Map<String, dynamic> : null;
+          final assignment = decoded['assignment'] is Map<String, dynamic> ? TeachingAssignmentModel.fromJson(decoded['assignment']) : null;
+
+          return {
+            'success': true,
+            'students': students,
+            'session': session,
+            'assignment': assignment,
+            'date': decoded['date']?.toString() ?? '',
+            'meeting_no': decoded['meeting_no'] is int ? decoded['meeting_no'] : int.tryParse(decoded['meeting_no']?.toString() ?? '1') ?? 1,
+          };
+        }
+      }
+      return {'success': false, 'message': 'Gagal mengambil data siswa.'};
+    } catch (e) {
+      return {'success': false, 'message': 'Error presensi siswa: $e'};
+    }
+  }
+
+  /// Save student attendance session and student rows
+  Future<Map<String, dynamic>> saveStudentAttendance({
+    required int assignmentId,
+    required String date,
+    required int meetingNo,
+    required String topic,
+    required bool queueWhatsapp,
+    required List<StudentAttendanceItem> students,
+  }) async {
+    try {
+      final response = await _executeWithFallback(
+        'save_student_attendance',
+        isPost: true,
+        body: jsonEncode({
+          'assignment_id': assignmentId,
+          'date': date,
+          'meeting_no': meetingNo,
+          'topic': topic,
+          'queue_whatsapp_absence': queueWhatsapp ? 1 : 0,
+          'rows': students.map((s) => s.toMap()).toList(),
+        }),
+      );
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return {
+          'success': decoded['ok'] == true,
+          'message': decoded['message']?.toString() ?? 'Presensi siswa berhasil disimpan.',
+          'wa_queued': decoded['wa_queued'] ?? 0,
+        };
+      }
+      return {'success': false, 'message': 'Respons server tidak valid.'};
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal menyimpan presensi: $e'};
+    }
+  }
+
+  /// Get daily teaching journals
+  Future<List<JournalModel>> getJournals({int? assignmentId}) async {
+    try {
+      final query = <String, String>{};
+      if (assignmentId != null && assignmentId > 0) query['assignment_id'] = assignmentId.toString();
+
+      final response = await _executeWithFallback('journals', queryParams: query);
+      if (response.statusCode == 200) {
+        final dynamic decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['ok'] == true) {
+          final list = (decoded['journals'] as List<dynamic>?) ?? [];
+          return list.map((e) => JournalModel.fromJson(e as Map<String, dynamic>)).toList();
+        }
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Save or update teaching journal
+  Future<Map<String, dynamic>> saveJournal({
+    int? id,
+    required int assignmentId,
+    required String date,
+    required int meetingNo,
+    required String topic,
+    required String activities,
+    String materials = '',
+    String obstacles = '',
+    String followUp = '',
+  }) async {
+    try {
+      final response = await _executeWithFallback(
+        'save_journal',
+        isPost: true,
+        body: jsonEncode({
+          if (id != null && id > 0) 'id': id,
+          'assignment_id': assignmentId,
+          'date': date,
+          'meeting_no': meetingNo,
+          'topic': topic,
+          'activities': activities,
+          'materials': materials,
+          'obstacles': obstacles,
+          'follow_up': followUp,
+        }),
+      );
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return {
+          'success': decoded['ok'] == true,
+          'message': decoded['message']?.toString() ?? 'Jurnal berhasil disimpan.',
+        };
+      }
+      return {'success': false, 'message': 'Respons server tidak valid.'};
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal menyimpan jurnal: $e'};
+    }
+  }
+
+  /// Get grades data for assignment and assessment type
+  Future<Map<String, dynamic>> getGradesData({
+    required int assignmentId,
+    String assessmentType = 'UH',
+    int? learningObjectiveId,
+  }) async {
+    try {
+      final query = <String, String>{
+        'assignment_id': assignmentId.toString(),
+        'assessment_type': assessmentType,
+      };
+      if (learningObjectiveId != null) {
+        query['learning_objective_id'] = learningObjectiveId.toString();
+      }
+
+      final response = await _executeWithFallback('grades_data', queryParams: query);
+      if (response.statusCode == 200) {
+        final dynamic decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['ok'] == true) {
+          final studentsRaw = (decoded['students'] as List<dynamic>?) ?? [];
+          final objRaw = (decoded['objectives'] as List<dynamic>?) ?? [];
+          return {
+            'success': true,
+            'students': studentsRaw.map((e) => GradeStudentItem.fromJson(e as Map<String, dynamic>)).toList(),
+            'objectives': objRaw.map((e) => LearningObjectiveModel.fromJson(e as Map<String, dynamic>)).toList(),
+          };
+        }
+      }
+      return {'success': false, 'message': 'Gagal memuat data nilai.'};
+    } catch (e) {
+      return {'success': false, 'message': 'Error penilaian: $e'};
+    }
+  }
+
+  /// Save student scores
+  Future<Map<String, dynamic>> saveGrades({
+    required int assignmentId,
+    required String assessmentType,
+    int? learningObjectiveId,
+    required List<GradeStudentItem> students,
+  }) async {
+    try {
+      final response = await _executeWithFallback(
+        'save_grades',
+        isPost: true,
+        body: jsonEncode({
+          'assignment_id': assignmentId,
+          'assessment_type': assessmentType,
+          'learning_objective_id': learningObjectiveId,
+          'scores': students.map((s) => s.toMap()).toList(),
+        }),
+      );
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return {
+          'success': decoded['ok'] == true,
+          'message': decoded['message']?.toString() ?? 'Nilai berhasil disimpan.',
+        };
+      }
+      return {'success': false, 'message': 'Respons server tidak valid.'};
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal menyimpan nilai: $e'};
     }
   }
 }

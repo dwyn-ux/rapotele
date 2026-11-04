@@ -43,6 +43,14 @@ class ScheduleItem {
       minutesUntilStart: int.tryParse(json['minutes_until_start']?.toString() ?? '0') ?? 0,
     );
   }
+
+  String get timeRange => '$startTime - $endTime';
+
+  String get remainingLabel {
+    if (status == 'active') return 'Sedang Berlangsung';
+    if (minutesUntilStart > 0) return '$minutesUntilStart mnt lagi';
+    return 'Selesai';
+  }
 }
 
 class DaySchedule {

@@ -3,9 +3,10 @@ import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import 'login_screen.dart';
 import 'tabs/dashboard_tab.dart';
+import 'tabs/attendance_tab.dart';
+import 'tabs/administration_tab.dart';
 import 'tabs/whatsapp_tab.dart';
 import 'tabs/schedule_tab.dart';
-import 'tabs/notifications_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,9 +17,18 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  int _attendanceSubTab = 0;
+  int _adminSubTab = 0;
 
-  void _onTabTapped(int index) {
-    setState(() => _currentIndex = index);
+  void _onTabTapped(int index, {int? subTab}) {
+    setState(() {
+      _currentIndex = index;
+      if (index == 1 && subTab != null) {
+        _attendanceSubTab = subTab;
+      } else if (index == 2 && subTab != null) {
+        _adminSubTab = subTab;
+      }
+    });
   }
 
   void _showSettingsModal() {
@@ -179,9 +189,17 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _currentIndex,
         children: [
           DashboardTab(onTabChange: _onTabTapped),
-          const WhatsAppTab(),
+          AttendanceTab(
+            key: ValueKey('att_$_attendanceSubTab'),
+            initialSubTab: _attendanceSubTab,
+            onNavigateTab: _onTabTapped,
+          ),
+          AdministrationTab(
+            key: ValueKey('admin_$_adminSubTab'),
+            initialSubTab: _adminSubTab,
+          ),
           const ScheduleTab(),
-          const NotificationsTab(),
+          const WhatsAppTab(),
         ],
       ),
       bottomNavigationBar: Container(
@@ -198,13 +216,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          onTap: _onTabTapped,
-          type: BottomNavigationBarThemeData().type ?? BottomNavigationBarType.fixed,
+          onTap: (idx) => _onTabTapped(idx),
+          type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.white,
           selectedItemColor: const Color(0xFF2563EB),
           unselectedItemColor: const Color(0xFF94A3B8),
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-          unselectedLabelStyle: const TextStyle(fontSize: 11),
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+          unselectedLabelStyle: const TextStyle(fontSize: 10),
           elevation: 0,
           items: const [
             BottomNavigationBarItem(
@@ -213,9 +231,14 @@ class _HomeScreenState extends State<HomeScreen> {
               label: 'Beranda',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline_rounded),
-              activeIcon: Icon(Icons.chat_bubble_rounded),
-              label: 'WhatsApp',
+              icon: Icon(Icons.how_to_reg_rounded),
+              activeIcon: Icon(Icons.how_to_reg_rounded),
+              label: 'Presensi',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.assignment_rounded),
+              activeIcon: Icon(Icons.assignment_rounded),
+              label: 'Administrasi',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.calendar_month_outlined),
@@ -223,9 +246,9 @@ class _HomeScreenState extends State<HomeScreen> {
               label: 'Jadwal',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.notifications_none_rounded),
-              activeIcon: Icon(Icons.notifications_active_rounded),
-              label: 'Notifikasi',
+              icon: Icon(Icons.mark_chat_unread_rounded),
+              activeIcon: Icon(Icons.mark_chat_unread_rounded),
+              label: 'WhatsApp',
             ),
           ],
         ),

@@ -19,6 +19,10 @@ class WhatsAppStats {
       totalToday: int.tryParse(json['total_today']?.toString() ?? '0') ?? 0,
     );
   }
+
+  int get pending => totalPending;
+  int get sentToday => totalToday;
+  int get failedToday => totalFailed;
 }
 
 class WhatsAppQueueItem {
