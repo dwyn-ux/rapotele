@@ -252,11 +252,9 @@ function page_student_dashboard(): void
     <?php render_footer();
 }
 
-function page_live_monitor_feed(): void
+function get_live_monitoring_data(): array
 {
-    require_role(['admin', 'guru']);
     require_once APP_ROOT . '/app/Services/schedule.php';
-    header('Content-Type: application/json; charset=utf-8');
 
     $today = (int)date('N');
     $date = date('Y-m-d');
@@ -488,7 +486,7 @@ function page_live_monitor_feed(): void
         ];
     }
 
-    echo json_encode([
+    return [
         'ok' => true,
         'server_time' => date('H:i:s'),
         'date_formatted' => schedule_days()[$today] . ', ' . date('d/m/Y'),
@@ -506,13 +504,23 @@ function page_live_monitor_feed(): void
             'students_alpa' => $totalAlpaStudents,
         ],
         'class_cards' => $classCards,
-    ], JSON_UNESCAPED_UNICODE);
+    ];
+}
+
+function page_live_monitor_feed(): void
+{
+    require_role(['admin', 'guru']);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(get_live_monitoring_data(), JSON_UNESCAPED_UNICODE);
     exit;
 }
 
 function render_live_monitoring_widget(): void
 {
-    $feedUrl = route_url('live-monitor-feed');
+    $initialData = get_live_monitoring_data();
+    $scriptName = (string)($_SERVER['SCRIPT_NAME'] ?? '/index.php');
+    $feedUrl = $scriptName . '?page=live-monitor-feed';
+    $initSummary = $initialData['summary'] ?? [];
     ?>
     <style>
     .live-monitor-panel {
@@ -1036,11 +1044,11 @@ function render_live_monitoring_widget(): void
                     <span>LIVE MONITORING KBM &amp; PRESENSI</span>
                 </div>
                 <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px; display: flex; align-items: center; gap: 8px;">
-                    <span id="live-header-date">Memuat data...</span>
+                    <span id="live-header-date"><?= htmlspecialchars((string)($initialData['date_formatted'] ?? 'Hari Ini')) ?></span>
                     <span>&bull;</span>
                     <span style="display: inline-flex; align-items: center; gap: 4px;">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                        <span id="live-header-time">--:--:--</span>
+                        <span id="live-header-time"><?= htmlspecialchars((string)($initialData['server_time'] ?? date('H:i:s'))) ?></span>
                     </span>
                 </div>
             </div>
@@ -1076,7 +1084,7 @@ function render_live_monitoring_widget(): void
                 </div>
                 <div>
                     <div style="font-size: 0.7rem; color: #64748b; font-weight: 600;">Kelas Aktif</div>
-                    <div style="font-size: 1.15rem; font-weight: 800; color: #0f172a;" id="stat-ongoing">0</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: #0f172a;" id="stat-ongoing"><?= (int)($initSummary['total_ongoing'] ?? 0) ?></div>
                 </div>
             </div>
             <div class="live-stat-card">
@@ -1085,7 +1093,7 @@ function render_live_monitoring_widget(): void
                 </div>
                 <div>
                     <div style="font-size: 0.7rem; color: #64748b; font-weight: 600;">Guru Hadir</div>
-                    <div style="font-size: 1.15rem; font-weight: 800; color: #16a34a;" id="stat-checked-in">0</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: #16a34a;" id="stat-checked-in"><?= (int)($initSummary['total_checked_in'] ?? 0) ?> / <?= (int)($initSummary['total_ongoing'] ?? ($initSummary['total_classes'] ?? 0)) ?></div>
                 </div>
             </div>
             <div class="live-stat-card">
@@ -1094,7 +1102,7 @@ function render_live_monitoring_widget(): void
                 </div>
                 <div>
                     <div style="font-size: 0.7rem; color: #64748b; font-weight: 600;">Belum Masuk</div>
-                    <div style="font-size: 1.15rem; font-weight: 800; color: #dc2626;" id="stat-alert">0</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: #dc2626;" id="stat-alert"><?= (int)($initSummary['total_alert_not_checked_in'] ?? 0) ?></div>
                 </div>
             </div>
             <div class="live-stat-card">
@@ -1104,7 +1112,10 @@ function render_live_monitoring_widget(): void
                 <div>
                     <div style="font-size: 0.7rem; color: #64748b; font-weight: 600;">Siswa Hadir Hari Ini</div>
                     <div style="font-size: 1rem; font-weight: 800; color: #0f172a;" id="stat-students">
-                        0
+                        <span style="color:#16a34a;"><?= (int)($initSummary['students_hadir'] ?? 0) ?> H</span> &nbsp;&bull;&nbsp;
+                        <span style="color:#0284c7;"><?= (int)($initSummary['students_sakit'] ?? 0) ?> S</span> &nbsp;&bull;&nbsp;
+                        <span style="color:#d97706;"><?= (int)($initSummary['students_izin'] ?? 0) ?> I</span> &nbsp;&bull;&nbsp;
+                        <span style="color:#dc2626;"><?= (int)($initSummary['students_alpa'] ?? 0) ?> A</span>
                     </div>
                 </div>
             </div>
@@ -1143,7 +1154,8 @@ function render_live_monitoring_widget(): void
 
     <script>
     (function(){
-        var feedUrl = <?= json_encode($feedUrl) ?>;
+        var initialMonitorData = <?= json_encode($initialData, JSON_UNESCAPED_UNICODE) ?>;
+        var feedUrl = (window.location.pathname || 'index.php') + '?page=live-monitor-feed';
         var countdownSec = 10;
         var curTimer = 10;
         var isPaused = false;
@@ -1152,10 +1164,10 @@ function render_live_monitoring_widget(): void
         var activeStatus = 'all';
         var selectedPeriod = 'current'; // 'current' or integer period_no
 
-        var cachedCards = [];
-        var cachedPeriods = [];
-        var activePeriodNow = null;
-        var latestPeriodToday = null;
+        var cachedCards = initialMonitorData.class_cards || [];
+        var cachedPeriods = initialMonitorData.periods_list || [];
+        var activePeriodNow = initialMonitorData.active_period_now;
+        var latestPeriodToday = initialMonitorData.latest_period_today;
         var intervalId = null;
 
         var countdownEl = document.getElementById('live-countdown');
@@ -1563,9 +1575,13 @@ function render_live_monitoring_widget(): void
             }
         });
 
-        // Initial fetch
-        fetchFeed();
+        // Immediate render with zero network delay
+        updatePeriodDropdown();
+        renderCards();
         startTimer();
+
+        // Silent background refresh
+        fetchFeed();
     })();
     </script>
     <?php
