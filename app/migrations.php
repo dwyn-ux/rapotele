@@ -1216,6 +1216,12 @@ function run_migrations_locked(): void
     migrate_lesson_schedule_schema();
     migrate_foreign_keys();
 
+    // Pastikan level kelas (SMP / SMA) terisi sesuai tingkat kelas
+    if (table_exists('classes') && migration_column_exists('classes', 'level')) {
+        execute_sql("UPDATE classes SET level = 'SMP' WHERE (level IS NULL OR level = '') AND (grade IN ('7', '8', '9', 'VII', 'VIII', 'IX') OR name LIKE 'VII%' OR name LIKE 'VIII%' OR name LIKE 'IX%')");
+        execute_sql("UPDATE classes SET level = 'SMA' WHERE (level IS NULL OR level = '') AND (grade IN ('10', '11', '12', 'X', 'XI', 'XII') OR name LIKE 'X%' OR name LIKE 'XI%' OR name LIKE 'XII%')");
+    }
+
     // Sinkronisasi langsung Dapodik telah dihentikan. Hapus token dan URL lama
     // dari instalasi yang sudah ada agar kredensial tidak tertinggal di database.
     if (table_exists('app_settings')) {

@@ -283,6 +283,19 @@ function page_grades(): void
     }
     $assignments = assignments_for_current_user();
     $assignment = $assignmentId > 0 ? require_assignment_access($assignmentId) : ($assignments[0] ?? null);
+    $levelFilter = strtoupper(trim((string)($_GET['level'] ?? '')));
+    if ($levelFilter !== '' && $assignment) {
+        $curLevel = function_exists('class_level_from_grade_or_name') ? class_level_from_grade_or_name($assignment['class_level'] ?? '', $assignment['grade'] ?? '', $assignment['class_name'] ?? '') : '';
+        if ($assignmentId <= 0 || ($curLevel !== '' && $curLevel !== $levelFilter)) {
+            foreach ($assignments as $cand) {
+                $candLevel = function_exists('class_level_from_grade_or_name') ? class_level_from_grade_or_name($cand['class_level'] ?? '', $cand['grade'] ?? '', $cand['class_name'] ?? '') : '';
+                if ($candLevel === $levelFilter) {
+                    $assignment = $cand;
+                    break;
+                }
+            }
+        }
+    }
     render_header('Input Nilai');
     assignment_picker('grades', $assignments, $assignment ? (int)$assignment['id'] : 0, $assessmentType);
     if (!$assignment) {
@@ -417,6 +430,19 @@ function page_student_attendance(): void
     $meetingNo = max(1, (int)($_GET['meeting_no'] ?? 1));
     $assignments = assignments_for_current_user();
     $assignment = $assignmentId > 0 ? require_assignment_access($assignmentId) : ($assignments[0] ?? null);
+    $levelFilter = strtoupper(trim((string)($_GET['level'] ?? '')));
+    if ($levelFilter !== '' && $assignment) {
+        $curLevel = function_exists('class_level_from_grade_or_name') ? class_level_from_grade_or_name($assignment['class_level'] ?? '', $assignment['grade'] ?? '', $assignment['class_name'] ?? '') : '';
+        if ($assignmentId <= 0 || ($curLevel !== '' && $curLevel !== $levelFilter)) {
+            foreach ($assignments as $cand) {
+                $candLevel = function_exists('class_level_from_grade_or_name') ? class_level_from_grade_or_name($cand['class_level'] ?? '', $cand['grade'] ?? '', $cand['class_name'] ?? '') : '';
+                if ($candLevel === $levelFilter) {
+                    $assignment = $cand;
+                    break;
+                }
+            }
+        }
+    }
     render_header('Absensi Siswa per Mata Pelajaran');
     ?>
     <section class="panel">

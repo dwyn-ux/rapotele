@@ -2,29 +2,52 @@
 
 const SUBJECT_LEVELS = ['SD', 'SMP', 'MTS', 'SMA', 'MA'];
 
+function class_level_from_grade_or_name(?string $level, ?string $grade, ?string $name = ''): string
+{
+    $lvl = strtoupper(trim((string)$level));
+    if ($lvl !== '') {
+        return $lvl;
+    }
+    $g = strtoupper(trim((string)$grade));
+    $n = strtoupper(trim((string)$name));
+    if (in_array($g, ['7', '8', '9', 'VII', 'VIII', 'IX'], true) || str_starts_with($n, 'VII') || str_starts_with($n, 'VIII') || str_starts_with($n, 'IX')) {
+        return 'SMP';
+    }
+    if (in_array($g, ['10', '11', '12', 'X', 'XI', 'XII'], true) || str_starts_with($n, 'X') || str_starts_with($n, 'XI') || str_starts_with($n, 'XII')) {
+        return 'SMA';
+    }
+    return '';
+}
+
 function school_levels(): array
 {
     static $cache = null;
     if ($cache !== null) {
         return $cache;
     }
-    $cache = SUBJECT_LEVELS;
+    $allowed = SUBJECT_LEVELS;
+    $out = [];
     try {
-        $rows = fetch_all("SELECT DISTINCT level FROM classes WHERE active = 1 AND level IS NOT NULL AND level <> '' ORDER BY level");
-        $allowed = SUBJECT_LEVELS;
-        $out = [];
+        $rows = fetch_all("SELECT DISTINCT level, grade, name FROM classes WHERE active = 1");
         foreach ($rows as $r) {
-            $lv = trim((string)($r['level'] ?? ''));
+            $lv = class_level_from_grade_or_name($r['level'] ?? '', $r['grade'] ?? '', $r['name'] ?? '');
             if (in_array($lv, $allowed, true) && !in_array($lv, $out, true)) {
                 $out[] = $lv;
             }
         }
-        if ($out) {
-            $cache = $out;
-        }
     } catch (Throwable) {
         // table/column belum ada atau DB error -> pakai default
     }
+    if (!$out) {
+        $out = $allowed;
+    }
+    $orderMap = ['SD' => 1, 'SMP' => 2, 'MTS' => 3, 'SMA' => 4, 'SMK' => 5, 'MA' => 6];
+    usort($out, function ($a, $b) use ($orderMap) {
+        $oa = $orderMap[$a] ?? 99;
+        $ob = $orderMap[$b] ?? 99;
+        return $oa <=> $ob;
+    });
+    $cache = $out;
     return $cache;
 }
 
@@ -305,19 +328,34 @@ function assignments_for_current_user(): array
         $params[] = (int)(current_user()['teacher_id'] ?? 0);
     }
     try {
-        return fetch_all(
-            "SELECT ta.*, t.name AS teacher_name, c.name AS class_name, c.level AS class_level, c.physical_group, s.name AS subject_name
+        $rows = fetch_all(
+            "SELECT ta.*, t.name AS teacher_name, c.name AS class_name, c.grade, c.level AS class_level, c.physical_group, s.name AS subject_name
              FROM teaching_assignments ta
              JOIN teachers t ON t.id = ta.teacher_id
              JOIN classes c ON c.id = ta.class_id
              JOIN subjects s ON s.id = ta.subject_id
              WHERE $where
-             ORDER BY c.grade, c.name, s.name",
+             ORDER BY 
+                 CASE 
+                     WHEN UPPER(COALESCE(c.level, '')) = 'SMP' OR c.grade IN ('7', '8', '9', 'VII', 'VIII', 'IX') THEN 1 
+                     ELSE 2 
+                 END ASC,
+                 CASE 
+                     WHEN c.grade IN ('VII', '7') THEN 7
+                     WHEN c.grade IN ('VIII', '8') THEN 8
+                     WHEN c.grade IN ('IX', '9') THEN 9
+                     WHEN c.grade IN ('X', '10') THEN 10
+                     WHEN c.grade IN ('XI', '11') THEN 11
+                     WHEN c.grade IN ('XII', '12') THEN 12
+                     WHEN (c.grade + 0) > 0 THEN (c.grade + 0)
+                     ELSE 99
+                 END ASC,
+                 c.name, s.name",
             $params
         );
     } catch (Throwable) {
         $rows = fetch_all(
-            "SELECT ta.*, t.name AS teacher_name, c.name AS class_name, s.name AS subject_name
+            "SELECT ta.*, t.name AS teacher_name, c.name AS class_name, c.grade, s.name AS subject_name
              FROM teaching_assignments ta
              JOIN teachers t ON t.id = ta.teacher_id
              JOIN classes c ON c.id = ta.class_id
@@ -326,10 +364,12 @@ function assignments_for_current_user(): array
              ORDER BY c.grade, c.name, s.name",
             $params
         );
-        foreach ($rows as &$r) { $r['class_level'] = null; $r['physical_group'] = null; }
-        unset($r);
-        return $rows;
     }
+    foreach ($rows as &$r) {
+        $r['class_level'] = class_level_from_grade_or_name($r['class_level'] ?? '', $r['grade'] ?? '', $r['class_name'] ?? '');
+    }
+    unset($r);
+    return $rows;
 }
 
 function learning_objectives_for_assignment(array $assignment): array
@@ -379,8 +419,9 @@ function assignment_cascading_data(array $assignments): array
     foreach ($assignments as $a) {
         $cid = (string)$a['class_id'];
         $sid = (string)$a['subject_id'];
+        $level = class_level_from_grade_or_name($a['class_level'] ?? '', $a['grade'] ?? '', $a['class_name'] ?? '');
         if (!isset($data[$cid])) {
-            $data[$cid] = ['name' => $a['class_name'], 'level' => $a['class_level'] ?? '', 'subjects' => []];
+            $data[$cid] = ['name' => $a['class_name'], 'level' => $level, 'subjects' => []];
         }
         if (!isset($data[$cid]['subjects'][$sid])) {
             $data[$cid]['subjects'][$sid] = ['name' => $a['subject_name'], 'teachers' => []];
@@ -430,7 +471,7 @@ function assignment_picker(string $page, array $assignments, int $selected, stri
             <input type="hidden" name="assignment_id" id="<?= e($pickerId) ?>-assignment" value="<?= e($selected ?: '') ?>">
             <?php if ($extraParam !== ''): ?><input type="hidden" name="type" value="<?= e($extraParam) ?>"><?php endif; ?>
             <label>Jenjang
-                <select id="<?= e($pickerId) ?>-level" data-cascade-level="<?= e($pickerId) ?>">
+                <select id="<?= e($pickerId) ?>-level" name="level" data-cascade-level="<?= e($pickerId) ?>">
                     <option value="">Pilih Jenjang</option>
                     <?php foreach ($levels as $lv): ?>
                         <option value="<?= e($lv) ?>"<?= $preLevel === $lv ? ' selected' : '' ?>><?= e($lv) ?></option>
@@ -482,7 +523,8 @@ function assignment_picker(string $page, array $assignments, int $selected, stri
             subjectEl.disabled = true;
             assignmentEl.value = '';
             if (!levelEl.value) return;
-            classKeys().forEach(function(cid){
+            var keys = classKeys();
+            keys.forEach(function(cid){
                 var opt = document.createElement('option');
                 opt.value = cid;
                 opt.textContent = data[cid].name;
@@ -490,6 +532,8 @@ function assignment_picker(string $page, array $assignments, int $selected, stri
             });
             if (preClass && data[preClass] && (!levelEl.value || data[preClass].level === levelEl.value)) {
                 classEl.value = preClass;
+            } else if (keys.length > 0) {
+                classEl.value = keys[0];
             }
             updateSubjects();
         }
@@ -573,7 +617,7 @@ function render_cascading_assignment_selects(array $assignments, int $selected, 
     <div class="cascade-assignment" id="<?= e($pickerId) ?>">
         <input type="hidden" name="assignment_id" id="<?= e($pickerId) ?>-assignment" value="<?= e($selected ?: '') ?>">
         <label>Jenjang
-            <select id="<?= e($pickerId) ?>-level" data-cascade-inline-level="<?= e($pickerId) ?>">
+            <select id="<?= e($pickerId) ?>-level" name="level" data-cascade-inline-level="<?= e($pickerId) ?>">
                 <option value="">Pilih Jenjang</option>
                 <?php foreach ($levels as $lv): ?>
                     <option value="<?= e($lv) ?>"<?= $preLevel === $lv ? ' selected' : '' ?>><?= e($lv) ?></option>
@@ -622,6 +666,8 @@ function render_cascading_assignment_selects(array $assignments, int $selected, 
             });
             if (preClass && data[preClass] && data[preClass].level === levelEl.value) {
                 classEl.value = preClass;
+            } else if (keys.length > 0) {
+                classEl.value = keys[0];
             }
             updateSubjects();
         }
@@ -632,16 +678,16 @@ function render_cascading_assignment_selects(array $assignments, int $selected, 
             if (!cid || !data[cid]) { subjectEl.disabled = true; return; }
             subjectEl.disabled = false;
             var subjects = data[cid].subjects;
-            Object.keys(subjects).sort(function(a,b){ return subjects[a].name.localeCompare(subjects[b].name); }).forEach(function(sid){
+            var sids = Object.keys(subjects).sort(function(a,b){ return subjects[a].name.localeCompare(subjects[b].name); });
+            sids.forEach(function(sid){
                 var opt = document.createElement('option');
                 opt.value = sid; opt.textContent = subjects[sid].name;
                 subjectEl.appendChild(opt);
             });
             if (preSubject && subjects[preSubject]) {
                 subjectEl.value = preSubject;
-            } else {
-                var keys = Object.keys(subjects);
-                if (keys.length === 1) subjectEl.value = keys[0];
+            } else if (sids.length > 0) {
+                subjectEl.value = sids[0];
             }
             selectAssignment();
         }
@@ -649,7 +695,9 @@ function render_cascading_assignment_selects(array $assignments, int $selected, 
             var cid = classEl.value, sid = subjectEl.value;
             if (!cid || !sid || !data[cid] || !data[cid].subjects[sid]) { assignmentEl.value = ''; return; }
             var teachers = data[cid].subjects[sid].teachers;
-            assignmentEl.value = teachers[0].id;
+            if (teachers && teachers.length > 0) {
+                assignmentEl.value = teachers[0].id;
+            }
         }
         levelEl.addEventListener('change', function(){ preClass = 0; preSubject = 0; updateClasses(); });
         classEl.addEventListener('change', function(){ preSubject = 0; updateSubjects(); });

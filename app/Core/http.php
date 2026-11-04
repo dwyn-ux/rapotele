@@ -223,9 +223,14 @@ function app_render_exception(Throwable $exception): void
 {
     http_response_code(500);
     $debug = app_debug();
+    $isAdmin = function_exists('is_admin') && is_admin();
     $message = friendly_error($exception);
     if (!$debug) {
-        $message = 'Aplikasi gagal memproses halaman.';
+        if ($isAdmin) {
+            $message = $exception->getMessage() . ' (' . basename($exception->getFile()) . ':' . $exception->getLine() . ')';
+        } else {
+            $message = 'Aplikasi gagal memproses halaman.';
+        }
     }
     $renderAuthenticatedShell = false;
     try {
@@ -237,7 +242,7 @@ function app_render_exception(Throwable $exception): void
     if ($renderAuthenticatedShell) {
         render_header('Terjadi Kesalahan');
         echo '<section class="panel"><h3>Aplikasi gagal memproses halaman.</h3><p>' . e($message) . '</p>';
-        if ($debug) {
+        if ($debug || $isAdmin) {
             echo '<pre style="background:#f5f5f5;padding:1rem;overflow:auto;font-size:.75rem;">' . e($exception->getTraceAsString()) . '</pre>';
         }
         render_footer();
@@ -246,7 +251,7 @@ function app_render_exception(Throwable $exception): void
 
     render_public_header('Terjadi Kesalahan');
     echo '<h1>Terjadi Kesalahan</h1><p>' . e($message) . '</p>';
-    if ($debug) {
+    if ($debug || $isAdmin) {
         echo '<pre style="background:#f5f5f5;padding:1rem;overflow:auto;font-size:.75rem;">' . e($exception->getTraceAsString()) . '</pre>';
     }
     render_public_footer();

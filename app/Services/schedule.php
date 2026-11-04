@@ -123,7 +123,9 @@ function schedule_time_for_period(int $period, ?int $dayOfWeek = null): array
 {
     $school = get_school_profile();
     $startTime = trim((string)($school['start_time'] ?? '07:00'));
-    [$startHour, $startMin] = array_map('intval', explode(':', $startTime));
+    $parts = explode(':', $startTime);
+    $startHour = (int)($parts[0] ?? 7);
+    $startMin = (int)($parts[1] ?? 0);
     $baseMinute = $startHour * 60 + $startMin;
     $duration = schedule_period_duration($dayOfWeek ?? 1);
 
@@ -1741,8 +1743,14 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
         $dayCounts[(int)$r['day_of_week']] = (int)$r['cnt'];
     }
 
-    $orderClause = function_exists('class_order_by_clause') ? class_order_by_clause() : 'display_order ASC, grade, name';
-    $allClasses = fetch_all('SELECT id, name, grade, level, physical_group, display_order FROM classes WHERE active = 1 ORDER BY ' . $orderClause);
+    $orderClause = function_exists('class_order_by_clause') ? class_order_by_clause() : 'grade, name';
+    $hasDisplayOrder = function_exists('table_column_exists') && table_column_exists('classes', 'display_order');
+    $displayOrderCol = $hasDisplayOrder ? ', display_order' : ', 0 AS display_order';
+    $hasLevel = function_exists('table_column_exists') && table_column_exists('classes', 'level');
+    $levelCol = $hasLevel ? ', level' : ", '' AS level";
+    $hasPhysicalGroup = function_exists('table_column_exists') && table_column_exists('classes', 'physical_group');
+    $physicalGroupCol = $hasPhysicalGroup ? ', physical_group' : ", '' AS physical_group";
+    $allClasses = fetch_all('SELECT id, name, grade' . $levelCol . $physicalGroupCol . $displayOrderCol . ' FROM classes WHERE active = 1 ORDER BY ' . $orderClause);
 
     ?>
     <style>
@@ -2671,8 +2679,12 @@ function action_save_schedule_daily_matrix(): void
         $existing[(int)$row['class_id']][(int)$row['period_no']] = $row;
     }
 
-    $orderClause = function_exists('class_order_by_clause') ? class_order_by_clause() : 'display_order ASC, grade, name';
-    $allClasses = fetch_all('SELECT id, name, grade, physical_group, display_order FROM classes WHERE active = 1 ORDER BY ' . $orderClause);
+    $orderClause = function_exists('class_order_by_clause') ? class_order_by_clause() : 'grade, name';
+    $hasDisplayOrder = function_exists('table_column_exists') && table_column_exists('classes', 'display_order');
+    $displayOrderCol = $hasDisplayOrder ? ', display_order' : ', 0 AS display_order';
+    $hasPhysicalGroup = function_exists('table_column_exists') && table_column_exists('classes', 'physical_group');
+    $physicalGroupCol = $hasPhysicalGroup ? ', physical_group' : ", '' AS physical_group";
+    $allClasses = fetch_all('SELECT id, name, grade' . $physicalGroupCol . $displayOrderCol . ' FROM classes WHERE active = 1 ORDER BY ' . $orderClause);
     $saved = 0;
     $deleted = 0;
     $errors = [];
