@@ -274,25 +274,40 @@ function migrate_lesson_schedule_schema(): void
 
     $pdo = db();
     if (db_driver() === 'mysql') {
-        $indexRows = fetch_all(
-            "SELECT INDEX_NAME, NON_UNIQUE, SEQ_IN_INDEX, COLUMN_NAME
-             FROM INFORMATION_SCHEMA.STATISTICS
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lesson_schedules'
-             ORDER BY INDEX_NAME, SEQ_IN_INDEX"
-        );
-        $indexes = [];
-        foreach ($indexRows as $row) {
-            $name = (string)$row['INDEX_NAME'];
-            $position = (int)$row['SEQ_IN_INDEX'];
-            $indexes[$name]['unique'] = (int)$row['NON_UNIQUE'] === 0;
-            $indexes[$name]['columns'][$position] = (string)$row['COLUMN_NAME'];
-        }
-        foreach ($indexes as $name => $index) {
-            ksort($index['columns']);
-            $columns = array_values($index['columns']);
-            if ($index['unique'] && $columns === ['teacher_id', 'day_of_week', 'period_no']) {
-                $pdo->exec('ALTER TABLE ' . db_identifier('lesson_schedules') . ' DROP INDEX ' . db_identifier($name));
+        try {
+            $indexRows = fetch_all('SHOW INDEX FROM ' . db_identifier('lesson_schedules'));
+            $indexes = [];
+            foreach ($indexRows as $row) {
+                $name = (string)($row['Key_name'] ?? $row['KEY_NAME'] ?? '');
+                $position = (int)($row['Seq_in_index'] ?? $row['SEQ_IN_INDEX'] ?? 0);
+                $nonUnique = (int)($row['Non_unique'] ?? $row['NON_UNIQUE'] ?? 1);
+                $col = (string)($row['Column_name'] ?? $row['COLUMN_NAME'] ?? '');
+                $indexes[$name]['unique'] = ($nonUnique === 0);
+                $indexes[$name]['columns'][$position] = $col;
             }
+
+            foreach ($indexes as $name => $index) {
+                ksort($index['columns']);
+                $columns = array_values($index['columns']);
+                if ($index['unique'] && $columns === ['teacher_id', 'day_of_week', 'period_no']) {
+                    // Create non-unique teacher lookup index first so foreign key constraints on teacher_id aren't broken
+                    try {
+                        $pdo->exec('CREATE INDEX ' . db_identifier('idx_ls_teacher_fk') . ' ON ' . db_identifier('lesson_schedules') . ' (teacher_id)');
+                    } catch (Throwable) {
+                        // Ignore if already exists
+                    }
+                    try {
+                        $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+                        $pdo->exec('ALTER TABLE ' . db_identifier('lesson_schedules') . ' DROP INDEX ' . db_identifier($name));
+                    } finally {
+                        try {
+                            $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+                        } catch (Throwable) {}
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('migrate_lesson_schedule_schema mysql error: ' . $e->getMessage());
         }
         return;
     }
