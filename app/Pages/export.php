@@ -213,38 +213,26 @@ function page_export_csv(): void
         $endDate = date_ymd((string)($_GET['end_date'] ?? date('Y-m-d')));
         $teacherId = (int)($_GET['teacher_id'] ?? 0);
         $classId = (int)($_GET['class_id'] ?? 0);
+        $statusFilter = (string)($_GET['status_filter'] ?? 'all');
 
-        $where = 'tta.date >= ? AND tta.date <= ?';
-        $params = [$startDate, $endDate];
-        if ($teacherId > 0) {
-            $where .= ' AND tta.teacher_id = ?';
-            $params[] = $teacherId;
-        }
-        if ($classId > 0) {
-            $where .= ' AND tta.class_id = ?';
-            $params[] = $classId;
-        }
+        $rows = get_rekap_guru_jadwal_data($startDate, $endDate, $teacherId, $classId, $statusFilter);
 
-        $rows = fetch_all(
-            "SELECT tta.*, t.name AS teacher_name, t.nip,
-                    c.name AS class_name,
-                    s.name AS subject_name,
-                    ls.period_no, ls.start_time, ls.end_time
-             FROM teacher_teaching_attendance tta
-             JOIN teachers t ON t.id = tta.teacher_id
-             JOIN classes c ON c.id = tta.class_id
-             JOIN subjects s ON s.id = tta.subject_id
-             LEFT JOIN lesson_schedules ls ON ls.id = tta.schedule_id
-             WHERE $where
-             ORDER BY tta.date DESC, ls.period_no ASC, t.name ASC",
-            $params
-        );
-
-        $headers = ['No', 'Tanggal', 'Jam Ke', 'Waktu', 'NIP', 'Nama Guru', 'Kelas', 'Mata Pelajaran', 'Status', 'Jam Masuk', 'Jam Pulang', 'Catatan'];
+        $headers = ['No', 'Tanggal', 'Jam Ke', 'Waktu', 'NIP', 'Nama Guru', 'Kelas', 'Mata Pelajaran', 'Status Kehadiran', 'Jam Masuk', 'Siswa Diabsen', 'Catatan'];
         $renderer = function (array $r): array {
             static $no = 0;
             $no++;
             $waktu = trim(substr((string)($r['start_time'] ?? ''), 0, 5) . ' - ' . substr((string)($r['end_time'] ?? ''), 0, 5));
+            $st = (string)($r['status'] ?? 'belum_hadir');
+            $statusLabel = match ($st) {
+                'hadir' => 'Hadir Mengajar',
+                'hadir_sekolah' => 'Hadir di Sekolah',
+                'inval' => 'Guru Pengganti (Inval)',
+                'izin' => 'Izin',
+                'sakit' => 'Sakit',
+                'dinas' => 'Tugas/Dinas',
+                'terjadwal' => 'Terjadwal',
+                default => 'Belum Hadir',
+            };
             return [
                 $no,
                 $r['date'],
@@ -254,9 +242,9 @@ function page_export_csv(): void
                 $r['teacher_name'],
                 $r['class_name'],
                 $r['subject_name'],
-                ucfirst((string)($r['status'] ?? 'hadir')),
+                $statusLabel,
                 substr((string)($r['time_in'] ?? '-'), 0, 5),
-                substr((string)($r['time_out'] ?? '-'), 0, 5),
+                $r['total_students'] > 0 ? $r['total_students'] . ' Siswa' : '-',
                 $r['notes'] ?: '-',
             ];
         };
