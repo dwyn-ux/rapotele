@@ -1104,6 +1104,75 @@ function render_live_monitoring_widget(): void
         font-weight: 600;
         cursor: pointer;
     }
+    .live-select-period-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.78rem;
+        padding: 5px 10px;
+        border-radius: 6px;
+        border: 1px solid #cbd5e1;
+        background: #f8fafc;
+        color: #0f172a;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .live-select-period-btn:hover {
+        background: #e2e8f0;
+        border-color: #94a3b8;
+    }
+    .live-period-dropdown-menu {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 5px);
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px -5px rgba(0,0,0,0.25);
+        z-index: 99999;
+        min-width: 270px;
+        max-width: 360px;
+        max-height: 320px;
+        overflow-y: auto;
+        padding: 5px;
+    }
+    .live-period-dropdown-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 10px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #1e293b;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.12s ease;
+        text-align: left;
+        width: 100%;
+        box-sizing: border-box;
+        border: none;
+        background: transparent;
+    }
+    .live-period-dropdown-item:hover {
+        background: #f1f5f9;
+        color: #0284c7;
+    }
+    .live-period-dropdown-item.is-selected {
+        background: #e0f2fe;
+        color: #0369a1;
+        font-weight: 700;
+    }
+    .live-period-dropdown-item .badge-act {
+        background: #dbeafe;
+        color: #1d4ed8;
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 700;
+        margin-left: 6px;
+        flex-shrink: 0;
+    }
 
     /* Cards Container */
     .live-cards-container {
@@ -1510,6 +1579,36 @@ function render_live_monitoring_widget(): void
         border-color: #334155 !important;
         color: #f8fafc !important;
     }
+    .live-monitor-panel.is-fullscreen .live-select-period-btn {
+        background: #1e293b !important;
+        border-color: #334155 !important;
+        color: #f8fafc !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-select-period-btn:hover {
+        background: #334155 !important;
+        border-color: #475569 !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-period-dropdown-menu {
+        background: #0f172a !important;
+        border-color: #334155 !important;
+        box-shadow: 0 10px 25px -5px rgba(0,0,0,0.7) !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-period-dropdown-item {
+        color: #cbd5e1 !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-period-dropdown-item:hover {
+        background: #1e293b !important;
+        color: #38bdf8 !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-period-dropdown-item.is-selected {
+        background: #1e3a8a !important;
+        color: #93c5fd !important;
+    }
+    .live-monitor-panel.is-fullscreen .live-period-dropdown-item .badge-act {
+        background: #1e3a8a !important;
+        color: #93c5fd !important;
+        border: 1px solid #3b82f6 !important;
+    }
     .live-monitor-panel.is-fullscreen .live-cards-container {
         flex: 1 !important;
         height: auto !important;
@@ -1654,11 +1753,19 @@ function render_live_monitoring_widget(): void
                 <button type="button" class="live-filter-btn" data-status="present" style="color: #15803d;">Hadir</button>
             </div>
 
-            <div style="display: flex; align-items: center; gap: 6px;">
-                <label for="live-period-select" style="font-size: 0.75rem; font-weight: 700; color: #64748b;">Jam Pelajaran:</label>
-                <select id="live-period-select" class="live-select-period">
-                    <option value="current">⚡ Jam Saat Ini (Otomatis)</option>
-                </select>
+            <div style="display: flex; align-items: center; gap: 6px; position: relative;">
+                <label style="font-size: 0.75rem; font-weight: 700; color: #64748b;">Jam Pelajaran:</label>
+                <div class="live-period-dropdown-box" style="position: relative;">
+                    <button type="button" id="live-period-dropdown-btn" class="live-select-period-btn" aria-haspopup="listbox" aria-expanded="false" title="Pilih jam pelajaran yang ingin dipantau">
+                        <span id="live-period-btn-text">⚡ Jam Saat Ini (Otomatis)</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-left:4px;"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div id="live-period-dropdown-menu" class="live-period-dropdown-menu" style="display: none;">
+                    </div>
+                    <select id="live-period-select" style="display: none;">
+                        <option value="current">⚡ Jam Saat Ini (Otomatis)</option>
+                    </select>
+                </div>
             </div>
         </div>
 
@@ -1760,8 +1867,7 @@ function render_live_monitoring_widget(): void
         }
 
         function updatePeriodDropdown() {
-            if (!periodSelect) return;
-            var currentVal = periodSelect.value;
+            var currentVal = selectedPeriod || 'current';
             var autoLabel = '⚡ Jam Saat Ini (Otomatis)';
             if (activePeriodNow) {
                 autoLabel = '⚡ Jam Saat Ini (Jam ke-' + activePeriodNow + ')';
@@ -1773,14 +1879,65 @@ function render_live_monitoring_widget(): void
                 autoLabel = '⚡ Jam Saat Ini (Istirahat)';
             }
 
-            var html = '<option value="current">' + autoLabel + '</option>';
-            cachedPeriods.forEach(function(p){
-                var isSelected = (currentVal == p.period_no) ? ' selected' : '';
-                var actBadge = p.is_activity ? ' - 🚩 ' + p.activity_name : '';
-                html += '<option value="' + p.period_no + '"' + isSelected + '>Jam ke-' + p.period_no + ' (' + p.start_time + ' - ' + p.end_time + ')' + actBadge + '</option>';
-            });
-            periodSelect.innerHTML = html;
-            if (currentVal) periodSelect.value = currentVal;
+            var btnTextEl = document.getElementById('live-period-btn-text');
+            if (btnTextEl) {
+                if (currentVal === 'current') {
+                    btnTextEl.textContent = autoLabel;
+                } else {
+                    var foundP = null;
+                    for (var i = 0; i < cachedPeriods.length; i++) {
+                        if (cachedPeriods[i].period_no == currentVal) {
+                            foundP = cachedPeriods[i];
+                            break;
+                        }
+                    }
+                    if (foundP) {
+                        btnTextEl.textContent = 'Jam ke-' + foundP.period_no + ' (' + foundP.start_time + ' - ' + foundP.end_time + ')' + (foundP.is_activity ? ' 🚩 ' + foundP.activity_name : '');
+                    } else {
+                        btnTextEl.textContent = autoLabel;
+                    }
+                }
+            }
+
+            var menuEl = document.getElementById('live-period-dropdown-menu');
+            if (menuEl) {
+                var menuHtml = '<button type="button" class="live-period-dropdown-item' + (currentVal === 'current' ? ' is-selected' : '') + '" data-value="current">' +
+                    '<span>' + escapeHtml(autoLabel) + '</span>' +
+                    '</button>';
+
+                cachedPeriods.forEach(function(p){
+                    var isSel = (currentVal == p.period_no);
+                    var actSpan = p.is_activity ? '<span class="badge-act">🚩 ' + escapeHtml(p.activity_name) + '</span>' : '';
+                    menuHtml += '<button type="button" class="live-period-dropdown-item' + (isSel ? ' is-selected' : '') + '" data-value="' + p.period_no + '">' +
+                        '<span>Jam ke-' + p.period_no + ' (' + p.start_time + ' - ' + p.end_time + ')</span>' +
+                        actSpan +
+                        '</button>';
+                });
+                menuEl.innerHTML = menuHtml;
+
+                menuEl.querySelectorAll('.live-period-dropdown-item').forEach(function(item){
+                    item.addEventListener('click', function(e){
+                        e.stopPropagation();
+                        var val = item.getAttribute('data-value') || 'current';
+                        selectedPeriod = val;
+                        if (periodSelect) periodSelect.value = val;
+                        menuEl.style.display = 'none';
+                        updatePeriodDropdown();
+                        renderCards();
+                    });
+                });
+            }
+
+            if (periodSelect) {
+                var html = '<option value="current">' + escapeHtml(autoLabel) + '</option>';
+                cachedPeriods.forEach(function(p){
+                    var isSelected = (currentVal == p.period_no) ? ' selected' : '';
+                    var actBadge = p.is_activity ? ' - 🚩 ' + p.activity_name : '';
+                    html += '<option value="' + p.period_no + '"' + isSelected + '>Jam ke-' + p.period_no + ' (' + p.start_time + ' - ' + p.end_time + ')' + escapeHtml(actBadge) + '</option>';
+                });
+                periodSelect.innerHTML = html;
+                if (currentVal) periodSelect.value = currentVal;
+            }
         }
 
         function renderCardHtml(card, targetPeriod) {
@@ -2129,7 +2286,31 @@ function render_live_monitoring_widget(): void
         if (periodSelect) {
             periodSelect.addEventListener('change', function(){
                 selectedPeriod = periodSelect.value;
+                updatePeriodDropdown();
                 renderCards();
+            });
+        }
+
+        var dropdownBtn = document.getElementById('live-period-dropdown-btn');
+        var dropdownMenu = document.getElementById('live-period-dropdown-menu');
+        if (dropdownBtn && dropdownMenu) {
+            dropdownBtn.addEventListener('click', function(e){
+                e.stopPropagation();
+                var isHidden = (dropdownMenu.style.display === 'none' || dropdownMenu.style.display === '');
+                dropdownMenu.style.display = isHidden ? 'block' : 'none';
+                dropdownBtn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+            });
+            document.addEventListener('click', function(e){
+                if (!dropdownMenu.contains(e.target) && e.target !== dropdownBtn) {
+                    dropdownMenu.style.display = 'none';
+                    dropdownBtn.setAttribute('aria-expanded', 'false');
+                }
+            });
+            document.addEventListener('keydown', function(e){
+                if (e.key === 'Escape' && dropdownMenu.style.display === 'block') {
+                    dropdownMenu.style.display = 'none';
+                    dropdownBtn.setAttribute('aria-expanded', 'false');
+                }
             });
         }
 
@@ -2173,8 +2354,9 @@ function render_live_monitoring_widget(): void
             }
 
             if (isFs) {
-                if (panelEl.requestFullscreen) {
-                    panelEl.requestFullscreen().catch(function(){});
+                var reqTarget = panelEl;
+                if (reqTarget.requestFullscreen) {
+                    reqTarget.requestFullscreen().catch(function(){});
                 }
             } else {
                 if (document.fullscreenElement && document.exitFullscreen) {

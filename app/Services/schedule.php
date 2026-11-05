@@ -2103,6 +2103,23 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
         font-weight: 600;
         color: #0369a1;
     }
+    .matrix-activity-select {
+        width: 100% !important;
+        font-size: 0.74rem !important;
+        padding: 4px 6px !important;
+        border-radius: 6px !important;
+        cursor: pointer !important;
+        position: relative !important;
+        z-index: 10 !important;
+        pointer-events: auto !important;
+        box-sizing: border-box !important;
+        display: block !important;
+    }
+    .matrix-activity-select:focus {
+        border-color: #0284c7 !important;
+        outline: none !important;
+        box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.25) !important;
+    }
     .matrix-slot-select.is-conflict {
         border-color: #ef4444 !important;
         background: #fee2e2 !important;
