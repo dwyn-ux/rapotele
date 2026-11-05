@@ -72,6 +72,8 @@ return [
         'import-bulk' => 'page_import_bulk',
         'grades' => 'page_grades',
         'deskripsi-nilai' => 'page_deskripsi_nilai',
+        'rekap-kehadiran' => 'page_rekap_kehadiran',
+        'teaching-wizard' => 'page_teaching_wizard',
         'student-attendance' => 'page_student_attendance',
         'teacher-attendance' => 'page_teacher_attendance',
         'teacher-attendance-self' => 'page_teacher_attendance_self',

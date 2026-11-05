@@ -36,6 +36,7 @@ app/storage/uploads/*
 !/app/storage/uploads/signatures/.keep
 /tests/_case_*.php
 /storage/*.sqlite.bak*
+/test-output/
 /mobile/build/
 /mobile/.dart_tool/
 nul

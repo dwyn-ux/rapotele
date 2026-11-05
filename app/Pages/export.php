@@ -150,6 +150,183 @@ function page_export_csv(): void
         export_csv($headerCells, $students, $renderer, 'Absensi_' . $assignment['class_name'] . '_' . $assignment['subject_name'] . '.csv');
     }
 
+    if ($type === 'rekap_guru_harian') {
+        require_role(['admin', 'guru', 'kepsek', 'pengawas']);
+        $startDate = date_ymd((string)($_GET['start_date'] ?? date('Y-m-01')));
+        $endDate = date_ymd((string)($_GET['end_date'] ?? date('Y-m-d')));
+        $teacherId = (int)($_GET['teacher_id'] ?? 0);
+
+        $where = 't.active = 1';
+        $params = [$startDate, $endDate];
+        if ($teacherId > 0) {
+            $where .= ' AND t.id = ?';
+            $params[] = $teacherId;
+        }
+
+        $summaryRows = fetch_all(
+            "SELECT t.id, t.name, t.nip,
+                    COUNT(ta.id) AS total_recorded,
+                    SUM(CASE WHEN ta.status = 'hadir' THEN 1 ELSE 0 END) AS count_hadir,
+                    SUM(CASE WHEN ta.status = 'terlambat' THEN 1 ELSE 0 END) AS count_terlambat,
+                    SUM(CASE WHEN ta.status = 'izin' THEN 1 ELSE 0 END) AS count_izin,
+                    SUM(CASE WHEN ta.status = 'sakit' THEN 1 ELSE 0 END) AS count_sakit,
+                    SUM(CASE WHEN ta.status = 'dinas' THEN 1 ELSE 0 END) AS count_dinas,
+                    SUM(CASE WHEN ta.status = 'alpa' THEN 1 ELSE 0 END) AS count_alpa
+             FROM teachers t
+             LEFT JOIN teacher_attendance ta ON ta.teacher_id = t.id AND ta.date >= ? AND ta.date <= ?
+             WHERE $where
+             GROUP BY t.id, t.name, t.nip
+             ORDER BY t.name",
+            $params
+        );
+
+        $headers = ['No', 'NIP', 'Nama Guru', 'Hadir', 'Terlambat', 'Izin', 'Sakit', 'Dinas', 'Alpa', 'Total Hadir', 'Total Hari', 'Persentase Hadir (%)'];
+        $renderer = function (array $row): array {
+            static $no = 0;
+            $no++;
+            $masuk = (int)$row['count_hadir'] + (int)$row['count_terlambat'];
+            $total = (int)$row['total_recorded'];
+            $pct = $total > 0 ? round(($masuk / $total) * 100, 1) : 0;
+            return [
+                $no,
+                $row['nip'] ?: '-',
+                $row['name'],
+                (int)$row['count_hadir'],
+                (int)$row['count_terlambat'],
+                (int)$row['count_izin'],
+                (int)$row['count_sakit'],
+                (int)$row['count_dinas'],
+                (int)$row['count_alpa'],
+                $masuk,
+                $total,
+                $pct . '%',
+            ];
+        };
+
+        $filename = 'Rekap_Kehadiran_Guru_Harian_' . $startDate . '_sd_' . $endDate . '.csv';
+        export_csv($headers, $summaryRows, $renderer, $filename);
+    }
+
+    if ($type === 'rekap_guru_jadwal') {
+        require_role(['admin', 'guru', 'kepsek', 'pengawas']);
+        $startDate = date_ymd((string)($_GET['start_date'] ?? date('Y-m-01')));
+        $endDate = date_ymd((string)($_GET['end_date'] ?? date('Y-m-d')));
+        $teacherId = (int)($_GET['teacher_id'] ?? 0);
+        $classId = (int)($_GET['class_id'] ?? 0);
+
+        $where = 'tta.date >= ? AND tta.date <= ?';
+        $params = [$startDate, $endDate];
+        if ($teacherId > 0) {
+            $where .= ' AND tta.teacher_id = ?';
+            $params[] = $teacherId;
+        }
+        if ($classId > 0) {
+            $where .= ' AND tta.class_id = ?';
+            $params[] = $classId;
+        }
+
+        $rows = fetch_all(
+            "SELECT tta.*, t.name AS teacher_name, t.nip,
+                    c.name AS class_name,
+                    s.name AS subject_name,
+                    ls.period_no, ls.start_time, ls.end_time
+             FROM teacher_teaching_attendance tta
+             JOIN teachers t ON t.id = tta.teacher_id
+             JOIN classes c ON c.id = tta.class_id
+             JOIN subjects s ON s.id = tta.subject_id
+             LEFT JOIN lesson_schedules ls ON ls.id = tta.schedule_id
+             WHERE $where
+             ORDER BY tta.date DESC, ls.period_no ASC, t.name ASC",
+            $params
+        );
+
+        $headers = ['No', 'Tanggal', 'Jam Ke', 'Waktu', 'NIP', 'Nama Guru', 'Kelas', 'Mata Pelajaran', 'Status', 'Jam Masuk', 'Jam Pulang', 'Catatan'];
+        $renderer = function (array $r): array {
+            static $no = 0;
+            $no++;
+            $waktu = trim(substr((string)($r['start_time'] ?? ''), 0, 5) . ' - ' . substr((string)($r['end_time'] ?? ''), 0, 5));
+            return [
+                $no,
+                $r['date'],
+                'Jam ke-' . (int)($r['period_no'] ?? 1),
+                $waktu ?: '-',
+                $r['nip'] ?: '-',
+                $r['teacher_name'],
+                $r['class_name'],
+                $r['subject_name'],
+                ucfirst((string)($r['status'] ?? 'hadir')),
+                substr((string)($r['time_in'] ?? '-'), 0, 5),
+                substr((string)($r['time_out'] ?? '-'), 0, 5),
+                $r['notes'] ?: '-',
+            ];
+        };
+
+        $filename = 'Rekap_Kehadiran_Guru_Per_Jadwal_' . $startDate . '_sd_' . $endDate . '.csv';
+        export_csv($headers, $rows, $renderer, $filename);
+    }
+
+    if ($type === 'rekap_siswa_harian') {
+        require_role(['admin', 'guru', 'kepsek', 'pengawas']);
+        $startDate = date_ymd((string)($_GET['start_date'] ?? date('Y-m-01')));
+        $endDate = date_ymd((string)($_GET['end_date'] ?? date('Y-m-d')));
+        $classId = (int)($_GET['class_id'] ?? 0);
+
+        $where = 's.active = 1';
+        $params = [$startDate, $endDate];
+        if ($classId > 0) {
+            $where .= ' AND s.class_id = ?';
+            $params[] = $classId;
+        }
+
+        $students = fetch_all(
+            "SELECT s.id, s.name, s.nis, s.nisn, c.name AS class_name, c.grade,
+                    COUNT(e.id) AS total_recorded,
+                    SUM(CASE WHEN e.status = 'hadir' THEN 1 ELSE 0 END) AS count_hadir,
+                    SUM(CASE WHEN e.status = 'sakit' THEN 1 ELSE 0 END) AS count_sakit,
+                    SUM(CASE WHEN e.status = 'izin' THEN 1 ELSE 0 END) AS count_izin,
+                    SUM(CASE WHEN e.status = 'alpa' THEN 1 ELSE 0 END) AS count_alpa,
+                    SUM(CASE WHEN e.status = 'terlambat' THEN 1 ELSE 0 END) AS count_terlambat
+             FROM students s
+             JOIN classes c ON c.id = s.class_id
+             LEFT JOIN (
+                 SELECT sub_e.id, sub_e.student_id, sub_e.status
+                 FROM student_attendance_entries sub_e
+                 JOIN student_attendance_sessions sub_s ON sub_s.id = sub_e.session_id
+                 WHERE sub_s.date >= ? AND sub_s.date <= ?
+             ) e ON e.student_id = s.id
+             WHERE $where
+             GROUP BY s.id, s.name, s.nis, s.nisn, c.name, c.grade
+             ORDER BY c.grade, c.name, s.name",
+            $params
+        );
+
+        $headers = ['No', 'NIS', 'NISN', 'Nama Siswa', 'Kelas', 'Hadir', 'Sakit', 'Izin', 'Alpa', 'Terlambat', 'Total Sesi', 'Persentase Hadir (%)'];
+        $renderer = function (array $st): array {
+            static $no = 0;
+            $no++;
+            $tot = (int)$st['total_recorded'];
+            $hadir = (int)$st['count_hadir'];
+            $pct = $tot > 0 ? round(($hadir / $tot) * 100, 1) : 0;
+            return [
+                $no,
+                $st['nis'] ?: '-',
+                $st['nisn'] ?: '-',
+                $st['name'],
+                $st['class_name'],
+                (int)$st['count_hadir'],
+                (int)$st['count_sakit'],
+                (int)$st['count_izin'],
+                (int)$st['count_alpa'],
+                (int)$st['count_terlambat'],
+                $tot,
+                $pct . '%',
+            ];
+        };
+
+        $filename = 'Rekap_Kehadiran_Siswa_Harian_' . $startDate . '_sd_' . $endDate . '.csv';
+        export_csv($headers, $students, $renderer, $filename);
+    }
+
     http_response_code(400);
     exit('Tipe export tidak dikenal.');
 }

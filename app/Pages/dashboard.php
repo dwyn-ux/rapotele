@@ -78,6 +78,11 @@ function page_dashboard(): void
         <?php render_live_monitoring_widget(); ?>
     <?php endif; ?>
 
+    <!-- Alur Mengajar Hari Ini untuk Guru -->
+    <?php if (user_role() === 'guru' || (int)(current_user()['teacher_id'] ?? 0) > 0): ?>
+        <?php render_teacher_teaching_flow_widget(); ?>
+    <?php endif; ?>
+
     <!-- Two Column Layout -->
     <div class="grid two">
         <!-- Activity Timeline -->
@@ -631,6 +636,235 @@ function get_live_monitoring_data(): array
         ],
         'class_cards' => $classCards,
     ];
+}
+
+function render_teacher_teaching_flow_widget(): void
+{
+    $user = current_user();
+    $teacherId = (int)($user['teacher_id'] ?? 0);
+    $date = date('Y-m-d');
+    $dow = (int)(new DateTimeImmutable($date))->format('N');
+    $dayNames = [1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu', 4 => 'Kamis', 5 => 'Jumat', 6 => 'Sabtu', 7 => 'Minggu'];
+    $dayName = $dayNames[$dow] ?? '-';
+
+    if ($teacherId <= 0) {
+        if (is_admin()) {
+            return;
+        }
+        echo '<div class="alert warning" style="margin-bottom:1.5rem;">Akun Anda belum terhubung dengan data guru. Hubungi Admin untuk menghubungkan data guru di menu Data Pengguna.</div>';
+        return;
+    }
+
+    if (!table_exists('lesson_schedules')) {
+        return;
+    }
+
+    $schedules = fetch_all(
+        'SELECT ls.id AS schedule_id, ls.assignment_id, ls.teacher_id, ls.class_id, ls.subject_id,
+                ls.day_of_week, ls.period_no, ls.start_time, ls.end_time,
+                c.name AS class_name, c.grade, s.name AS subject_name,
+                t.name AS teacher_name
+         FROM lesson_schedules ls
+         JOIN classes c ON c.id = ls.class_id
+         JOIN subjects s ON s.id = ls.subject_id
+         JOIN teachers t ON t.id = ls.teacher_id
+         WHERE ls.teacher_id = ? AND ls.day_of_week = ?
+         ORDER BY ls.period_no, ls.start_time',
+        [$teacherId, $dow]
+    );
+
+    // Grouping jadwal berturut-turut untuk kelas & mapel yang sama
+    $grouped = [];
+    foreach ($schedules as $sched) {
+        $k = $sched['class_id'] . '_' . $sched['subject_id'] . '_' . $sched['assignment_id'];
+        if (!isset($grouped[$k])) {
+            $grouped[$k] = [
+                'schedule_id' => (int)$sched['schedule_id'],
+                'assignment_id' => (int)$sched['assignment_id'],
+                'class_name' => $sched['class_name'],
+                'subject_name' => $sched['subject_name'],
+                'periods' => [(int)$sched['period_no']],
+                'start_time' => $sched['start_time'],
+                'end_time' => $sched['end_time'],
+            ];
+        } else {
+            $grouped[$k]['periods'][] = (int)$sched['period_no'];
+            if (!empty($sched['end_time'])) {
+                $grouped[$k]['end_time'] = $sched['end_time'];
+            }
+        }
+    }
+
+    ?>
+    <section class="panel" style="margin-bottom:1.5rem;border:2px solid var(--primary-light,#3b82f6);border-radius:12px;background:#fff;box-shadow:0 10px 25px -5px rgba(37,99,235,.08);">
+        <div class="panel-heading" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;border-bottom:1px solid #e2e8f0;padding-bottom:.85rem;margin-bottom:1.25rem;">
+            <div class="panel-title" style="display:flex;align-items:center;gap:8px;">
+                <div style="background:var(--primary-lighter,#dbeafe);color:var(--primary,#2563eb);width:34px;height:34px;border-radius:8px;display:grid;place-items:center;">
+                    <i data-lucide="calendar-check" style="width:18px;height:18px;"></i>
+                </div>
+                <div>
+                    <h3 style="margin:0;font-size:1.15rem;font-weight:700;color:var(--text,#1e293b);">
+                        Jadwal & Alur Mengajar Hari Ini
+                    </h3>
+                    <div style="font-size:.82rem;color:var(--text-muted,#64748b);">
+                        <?= e($dayName) ?>, <?= e(date('d F Y', strtotime($date))) ?> &bull; Tuntunan berurutan: Absen Guru &rarr; Absen Siswa &rarr; Jurnal
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex;gap:6px;">
+                <a href="<?= e(route_url('rekap-kehadiran', ['tab' => 'guru-jadwal', 'teacher_id' => $teacherId])) ?>" class="button small" style="display:inline-flex;align-items:center;gap:4px;">
+                    <i data-lucide="bar-chart-2" style="width:14px;height:14px;"></i> Rekap Saya
+                </a>
+                <a href="<?= e(route_url('lesson-schedule')) ?>" class="button small" style="display:inline-flex;align-items:center;gap:4px;">
+                    <i data-lucide="calendar-days" style="width:14px;height:14px;"></i> Jadwal Mingguan
+                </a>
+            </div>
+        </div>
+
+        <?php if (empty($grouped)): ?>
+            <div style="text-align:center;padding:2rem 1rem;color:var(--text-muted,#64748b);">
+                <div style="background:#f1f5f9;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;margin:0 auto 10px;color:#64748b;">
+                    <i data-lucide="coffee" style="width:24px;height:24px;"></i>
+                </div>
+                <h4 style="margin:0 0 4px;font-size:1.05rem;color:var(--text,#1e293b);font-weight:600;">Tidak Ada Jadwal Mengajar Hari Ini</h4>
+                <p style="margin:0;font-size:.88rem;">
+                    Anda tidak memiliki jadwal tatap muka di kelas untuk hari <?= e($dayName) ?>. Selamat beristirahat atau persiapkan materi pelajaran berikutnya.
+                </p>
+            </div>
+        <?php else: ?>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:1rem;">
+                <?php foreach ($grouped as $item):
+                    $assignmentId = $item['assignment_id'];
+                    $scheduleId = $item['schedule_id'];
+                    $periodsStr = count($item['periods']) > 1
+                        ? 'Jam ke-' . min($item['periods']) . ' - ' . max($item['periods'])
+                        : 'Jam ke-' . $item['periods'][0];
+                    $timeStr = trim(substr((string)($item['start_time'] ?? ''), 0, 5) . ' - ' . substr((string)($item['end_time'] ?? ''), 0, 5));
+
+                    // Cek Sesi Kehadiran
+                    $session = fetch_one(
+                        'SELECT * FROM student_attendance_sessions WHERE assignment_id = ? AND date = ? ORDER BY meeting_no DESC LIMIT 1',
+                        [$assignmentId, $date]
+                    );
+                    $teacherAttended = !empty($session['teacher_attended']);
+                    $meetingNo = (int)($session['meeting_no'] ?? 1);
+
+                    // Cek Absensi Siswa
+                    $studentEntriesCount = 0;
+                    if ($session) {
+                        $studentEntriesCount = (int)(fetch_one('SELECT COUNT(*) as cnt FROM student_attendance_entries WHERE session_id = ?', [(int)$session['id']]['cnt'] ?? 0));
+                    }
+
+                    // Cek Jurnal Harian
+                    $journal = fetch_one(
+                        'SELECT * FROM daily_journals WHERE assignment_id = ? AND date = ? ORDER BY id DESC LIMIT 1',
+                        [$assignmentId, $date]
+                    );
+                    $journalStatus = (string)($journal['status'] ?? ($journal ? 'completed' : 'none'));
+
+                    // Tentukan Step Aksi Utama
+                    if (!$teacherAttended) {
+                        $targetStep = 1;
+                        $actionBtnText = '🚀 Masuk Kelas & Absen';
+                        $actionBtnClass = 'primary';
+                    } elseif ($studentEntriesCount === 0) {
+                        $targetStep = 2;
+                        $actionBtnText = '📋 Lanjut Absen Siswa';
+                        $actionBtnClass = 'primary';
+                    } elseif ($journalStatus === 'draft') {
+                        $targetStep = 3;
+                        $actionBtnText = '📝 Lanjutkan Jurnal';
+                        $actionBtnClass = 'warning';
+                    } elseif ($journalStatus === 'completed') {
+                        $targetStep = 3;
+                        $actionBtnText = '✓ Selesai (Lihat / Edit)';
+                        $actionBtnClass = 'success';
+                    } else {
+                        $targetStep = 3;
+                        $actionBtnText = '✍️ Tulis Jurnal';
+                        $actionBtnClass = 'primary';
+                    }
+
+                    $wizardUrl = route_url('teaching-wizard', [
+                        'assignment_id' => $assignmentId,
+                        'schedule_id' => $scheduleId,
+                        'date' => $date,
+                        'meeting_no' => $meetingNo,
+                        'step' => $targetStep,
+                    ]);
+
+                    $allDone = ($teacherAttended && $studentEntriesCount > 0 && $journalStatus === 'completed');
+                ?>
+                    <div style="border:1.5px solid <?= $allDone ? '#86efac' : '#e2e8f0' ?>;border-radius:10px;padding:1rem 1.15rem;background:<?= $allDone ? '#f0fdf4' : '#fff' ?>;display:flex;flex-direction:column;justify-content:space-between;gap:12px;">
+                        <div>
+                            <!-- Header Jam & Kelas -->
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                <span style="font-size:.8rem;font-weight:700;color:var(--primary,#2563eb);background:var(--primary-lighter,#dbeafe);padding:2px 8px;border-radius:6px;">
+                                    <?= e($periodsStr) ?> <?= $timeStr ? '(' . e($timeStr) . ')' : '' ?>
+                                </span>
+                                <span class="badge info" style="font-weight:700;font-size:.82rem;">
+                                    <?= e($item['class_name']) ?>
+                                </span>
+                            </div>
+
+                            <!-- Judul Mapel -->
+                            <h4 style="margin:0 0 10px;font-size:1.1rem;font-weight:700;color:var(--text,#1e293b);">
+                                <?= e($item['subject_name']) ?>
+                            </h4>
+
+                            <!-- 3 Langkah Status Bar -->
+                            <div style="display:flex;flex-direction:column;gap:5px;background:rgba(241,245,249,.7);padding:8px 10px;border-radius:8px;font-size:.82rem;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;">
+                                    <span style="color:#64748b;display:inline-flex;align-items:center;gap:4px;">
+                                        <i data-lucide="user-check" style="width:13px;height:13px;"></i> 1. Absen Guru:
+                                    </span>
+                                    <?php if ($teacherAttended): ?>
+                                        <span style="color:#15803d;font-weight:700;">✓ Hadir (<?= e(substr((string)($session['teacher_time_in'] ?? '-'), 0, 5)) ?>)</span>
+                                    <?php else: ?>
+                                        <span style="color:#b45309;font-weight:600;">Belum Hadir</span>
+                                    <?php endif; ?>
+                                </div>
+
+                                <div style="display:flex;justify-content:space-between;align-items:center;">
+                                    <span style="color:#64748b;display:inline-flex;align-items:center;gap:4px;">
+                                        <i data-lucide="users" style="width:13px;height:13px;"></i> 2. Absen Murid:
+                                    </span>
+                                    <?php if ($studentEntriesCount > 0): ?>
+                                        <span style="color:#15803d;font-weight:700;">✓ <?= $studentEntriesCount ?> Siswa</span>
+                                    <?php else: ?>
+                                        <span style="color:<?= $teacherAttended ? '#b45309' : '#94a3b8' ?>;font-weight:500;">
+                                            <?= $teacherAttended ? 'Belum Diabsen' : 'Terkunci' ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+
+                                <div style="display:flex;justify-content:space-between;align-items:center;">
+                                    <span style="color:#64748b;display:inline-flex;align-items:center;gap:4px;">
+                                        <i data-lucide="book-open" style="width:13px;height:13px;"></i> 3. Jurnal Kelas:
+                                    </span>
+                                    <?php if ($journalStatus === 'completed'): ?>
+                                        <span style="color:#15803d;font-weight:700;">✓ Selesai</span>
+                                    <?php elseif ($journalStatus === 'draft'): ?>
+                                        <span style="color:#2563eb;font-weight:700;">📝 Draft (Lanjut)</span>
+                                    <?php else: ?>
+                                        <span style="color:#94a3b8;font-weight:500;">Belum Diisi</span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Button -->
+                        <div>
+                            <a href="<?= e($wizardUrl) ?>" class="button <?= $actionBtnClass ?>" style="width:100%;text-align:center;justify-content:center;font-weight:700;display:inline-flex;align-items:center;gap:6px;padding:.6rem 1rem;">
+                                <?= $actionBtnText ?>
+                            </a>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </section>
+    <?php
 }
 
 function page_live_monitor_feed(): void

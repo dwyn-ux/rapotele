@@ -218,6 +218,17 @@ function action_save_student_attendance(): void
         }
     }
 
+    if (($_POST['return_to'] ?? '') === 'teaching-wizard') {
+        flash('success', 'Absensi siswa tersimpan. Silakan lanjutkan pengisian jurnal mengajar.');
+        redirect_to('teaching-wizard', [
+            'assignment_id' => (int)$assignment['id'],
+            'schedule_id' => (int)($_POST['schedule_id'] ?? 0),
+            'date' => $date,
+            'meeting_no' => $meetingNo,
+            'step' => 3,
+        ]);
+    }
+
     flash('success', 'Absensi siswa tersimpan.');
     redirect_to('student-attendance', ['assignment_id' => (int)$assignment['id'], 'date' => $date, 'meeting_no' => $meetingNo]);
 }
@@ -339,6 +350,17 @@ function action_checkin_teacher_classroom(): void
         } catch (Throwable) {
             // Non-blocking sync
         }
+    }
+
+    if (($_POST['return_to'] ?? '') === 'teaching-wizard') {
+        flash('success', 'Kehadiran guru di kelas berhasil dikonfirmasi. Silakan lanjutkan presensi siswa.');
+        redirect_to('teaching-wizard', [
+            'assignment_id' => (int)$assignment['id'],
+            'schedule_id' => (int)($_POST['schedule_id'] ?? 0),
+            'date' => $date,
+            'meeting_no' => $meetingNo,
+            'step' => 2,
+        ]);
     }
 
     flash('success', 'Kehadiran guru di kelas berhasil dikonfirmasi dengan lokasi GPS. Form absensi siswa sekarang dapat diisi.');
@@ -529,6 +551,9 @@ function action_save_journal(): void
         }
         require_assignment_access((int)$existing['assignment_id']);
     }
+    $status = in_array($_POST['status'] ?? '', ['draft', 'completed'], true) ? (string)$_POST['status'] : 'completed';
+    $hasStatus = function_exists('table_column_exists') && table_column_exists('daily_journals', 'status');
+
     $data = [
         (int)$assignment['id'],
         (int)$assignment['teacher_id'],
@@ -544,17 +569,52 @@ function action_save_journal(): void
         (int)current_user()['id'],
         now_string(),
     ];
-    if ($id > 0) {
-        execute_sql(
-            'UPDATE daily_journals SET assignment_id = ?, teacher_id = ?, class_id = ?, subject_id = ?, date = ?, meeting_no = ?, topic = ?, activities = ?, materials = ?, obstacles = ?, follow_up = ?, created_by = ?, updated_at = ? WHERE id = ?',
-            array_merge($data, [$id])
-        );
-    } else {
-        execute_sql(
-            'INSERT INTO daily_journals (assignment_id, teacher_id, class_id, subject_id, date, meeting_no, topic, activities, materials, obstacles, follow_up, created_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            $data
-        );
+    if ($hasStatus) {
+        $data[] = $status;
     }
+
+    if ($id > 0) {
+        if ($hasStatus) {
+            execute_sql(
+                'UPDATE daily_journals SET assignment_id = ?, teacher_id = ?, class_id = ?, subject_id = ?, date = ?, meeting_no = ?, topic = ?, activities = ?, materials = ?, obstacles = ?, follow_up = ?, created_by = ?, updated_at = ?, status = ? WHERE id = ?',
+                array_merge($data, [$id])
+            );
+        } else {
+            execute_sql(
+                'UPDATE daily_journals SET assignment_id = ?, teacher_id = ?, class_id = ?, subject_id = ?, date = ?, meeting_no = ?, topic = ?, activities = ?, materials = ?, obstacles = ?, follow_up = ?, created_by = ?, updated_at = ? WHERE id = ?',
+                array_merge($data, [$id])
+            );
+        }
+    } else {
+        if ($hasStatus) {
+            execute_sql(
+                'INSERT INTO daily_journals (assignment_id, teacher_id, class_id, subject_id, date, meeting_no, topic, activities, materials, obstacles, follow_up, created_by, updated_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                $data
+            );
+        } else {
+            execute_sql(
+                'INSERT INTO daily_journals (assignment_id, teacher_id, class_id, subject_id, date, meeting_no, topic, activities, materials, obstacles, follow_up, created_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                $data
+            );
+        }
+    }
+
+    if (($_POST['return_to'] ?? '') === 'teaching-wizard') {
+        if ($status === 'draft') {
+            flash('info', 'Draft jurnal berhasil disimpan. Anda dapat melanjutkannya kapan saja.');
+            redirect_to('teaching-wizard', [
+                'assignment_id' => (int)$assignment['id'],
+                'schedule_id' => (int)($_POST['schedule_id'] ?? 0),
+                'date' => date_ymd($_POST['date'] ?? null),
+                'meeting_no' => positive_int_value(array_key_exists('meeting_no', $_POST) ? $_POST['meeting_no'] : 1, 'Nomor pertemuan tidak valid.'),
+                'step' => 3,
+            ]);
+        } else {
+            flash('success', 'Alur mengajar selesai! Kehadiran guru, absensi siswa, dan jurnal kelas berhasil disimpan.');
+            redirect_to('dashboard');
+        }
+    }
+
     flash('success', 'Jurnal tersimpan.');
     redirect_to('journals');
 }

@@ -31,6 +31,8 @@ function render_header(string $title): void
             'journals' => ['Jurnal Harian', 'journals', 'book'],
         ],
         'Presensi & Absensi' => [
+            'teaching-wizard' => ['Alur Mengajar Kelas', 'teaching-wizard', 'sparkles'],
+            'rekap-kehadiran' => ['Rekap Kehadiran Lengkap', 'rekap-kehadiran', 'bar-chart-2'],
             'student-attendance' => ['Absensi Siswa/Mapel', 'student-attendance', 'clipboard-check'],
             'teacher-attendance-self' => ['Absensi Kehadiran Guru', 'teacher-attendance-self', 'clock'],
             'teacher-attendance' => ['Rekap Absensi Mengajar', 'teacher-attendance', 'check-square'],
@@ -118,6 +120,7 @@ function render_header(string $title): void
                 'journals' => ['Jurnal Harian', 'journals', 'book'],
             ],
             'Presensi & Absensi' => [
+                'rekap-kehadiran' => ['Rekap Kehadiran Lengkap', 'rekap-kehadiran', 'bar-chart-2'],
                 'student-attendance' => ['Absensi Siswa/Mapel', 'student-attendance', 'clipboard-check'],
                 'teacher-attendance' => ['Rekap Absensi Mengajar', 'teacher-attendance', 'check-square'],
             ],

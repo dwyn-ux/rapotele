@@ -15,6 +15,12 @@ function page_reports(): void
     $students = $class ? fetch_all('SELECT * FROM students WHERE class_id = ? AND active = 1 ORDER BY name', [$classId]) : [];
     render_header('Laporan');
     ?>
+    <div class="no-print" style="margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <h2 style="margin:0;font-size:1.3rem;font-weight:700;">Laporan Akademik & Rekap Rapor</h2>
+        <a href="<?= e(route_url('rekap-kehadiran')) ?>" class="button success" style="display:inline-flex;align-items:center;gap:.4rem;">
+            <i data-lucide="bar-chart-2" style="width:16px;height:16px;"></i> Rekapitulasi Kehadiran Guru & Siswa &rarr;
+        </a>
+    </div>
     <section class="panel no-print">
         <form method="get" class="grid four">
             <input type="hidden" name="page" value="reports">
