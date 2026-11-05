@@ -97,9 +97,51 @@ function render_header(string $title): void
                 'profile' => ['Profil Pengguna', 'profile', 'user'],
             ],
         ];
+    } elseif (user_role() === 'pengawas') {
+        // Pengawas khusus Live Monitoring KBM & Presensi, tanpa menu lain
+        $menuGroups = [
+            'Pemantauan' => [
+                'dashboard' => ['Live Monitoring KBM', 'dashboard', 'activity'],
+            ],
+            'Pengaturan' => [
+                'profile' => ['Profil Pengguna', 'profile', 'user'],
+            ],
+        ];
+    } elseif (user_role() === 'kepsek') {
+        // Kepala Sekolah memantau KBM, jadwal, absensi, penilaian, dan laporan rapor
+        $menuGroups = [
+            'Menu Utama' => [
+                'dashboard' => ['Dashboard & Live Monitor', 'dashboard', 'layout-dashboard'],
+            ],
+            'Jadwal & Pembelajaran' => [
+                'lesson-schedule' => ['Jadwal Pelajaran', 'lesson-schedule', 'calendar-days'],
+                'journals' => ['Jurnal Harian', 'journals', 'book'],
+            ],
+            'Presensi & Absensi' => [
+                'student-attendance' => ['Absensi Siswa/Mapel', 'student-attendance', 'clipboard-check'],
+                'teacher-attendance' => ['Rekap Absensi Mengajar', 'teacher-attendance', 'check-square'],
+            ],
+            'Penilaian' => [
+                'status-penilaian' => ['Status Penilaian', 'status-penilaian', 'bar-chart'],
+                'deskripsi-nilai' => ['Deskripsi Nilai', 'deskripsi-nilai', 'file-text'],
+            ],
+            'Kedisiplinan & BK' => [
+                'violations' => ['Pelanggaran Siswa', 'violations', 'alert-triangle'],
+            ],
+            'Cetak Rapor' => [
+                'laporan-belajar' => ['Laporan Hasil Belajar', 'laporan-belajar', 'file-check'],
+                'cetak-nilai-rapor' => ['Cetak Rapor', 'cetak-nilai-rapor', 'printer'],
+                'cetak-leger-rapor' => ['Leger Rapor', 'cetak-leger-rapor', 'list'],
+                'cetak-leger-pts' => ['Leger PTS', 'cetak-leger-pts', 'list'],
+                'reports' => ['Laporan Ringkas', 'reports', 'pie-chart'],
+            ],
+            'Pengaturan' => [
+                'profile' => ['Profil Pengguna', 'profile', 'user'],
+            ],
+        ];
     }
 
-    if (!is_admin()) {
+    if (!is_admin() && !in_array(user_role(), ['siswa', 'pengawas', 'kepsek'], true)) {
         foreach ([
             'update-data', 'teachers', 'classes', 'gabung-kelas', 'subjects', 'data-ekskul', 'data-kelompok',
             'gabung-mapel', 'data-mapping', 'data-logo-ttd', 'tanggal-rapor', 'foto-siswa',
@@ -113,15 +155,17 @@ function render_header(string $title): void
             }
             unset($groupItems);
         }
-    } else {
+    } elseif (is_admin()) {
         $menuGroups['Pengaturan']['users'] = ['Data Pengguna', 'users', 'shield'];
     }
 
     if (!function_exists('is_bk') || !is_bk()) {
-        foreach ($menuGroups as &$groupItems) {
-            unset($groupItems['violations']);
+        if (!in_array(user_role(), ['admin', 'kepsek'], true)) {
+            foreach ($menuGroups as &$groupItems) {
+                unset($groupItems['violations']);
+            }
+            unset($groupItems);
         }
-        unset($groupItems);
     }
     $menuGroups['Pengaturan']['profile'] = ['Profil Pengguna', 'profile', 'user'];
 
@@ -210,6 +254,7 @@ function render_header(string $title): void
                     <?php endforeach; ?>
                 </div>
             </nav>
+            <?php if (user_role() !== 'pengawas'): ?>
             <div class="sidebar-help">
                 <div class="sidebar-help-title">Butuh Bantuan?</div>
                 <p>Hubungi admin atau lihat panduan penggunaan.</p>
@@ -218,6 +263,7 @@ function render_header(string $title): void
                     Lihat Panduan
                 </a>
             </div>
+            <?php endif; ?>
         </aside>
         <div class="sidebar-backdrop" data-sidebar-close></div>
         <div class="main">

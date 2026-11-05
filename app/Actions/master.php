@@ -609,12 +609,12 @@ function action_save_user(): void
     $id = (int)($_POST['id'] ?? 0);
     $password = (string)($_POST['password'] ?? '');
     $role = (string)$_POST['role'];
-    if (!in_array($role, ['admin', 'guru', 'siswa'], true)) {
+    if (!in_array($role, ['admin', 'kepsek', 'pengawas', 'guru', 'siswa'], true)) {
         throw new RuntimeException('Role pengguna tidak valid.');
     }
-    $teacherId = $role === 'siswa' ? null : ((int)($_POST['teacher_id'] ?? 0) ?: null);
+    $teacherId = in_array($role, ['siswa', 'pengawas'], true) ? null : ((int)($_POST['teacher_id'] ?? 0) ?: null);
     $studentId = $role === 'siswa' ? ((int)($_POST['student_id'] ?? 0) ?: null) : null;
-    $telegramChatId = $role === 'siswa' ? '' : trim((string)($_POST['telegram_chat_id'] ?? ''));
+    $telegramChatId = in_array($role, ['siswa', 'pengawas'], true) ? '' : trim((string)($_POST['telegram_chat_id'] ?? ''));
     if ($role === 'siswa' && !$studentId) {
         throw new RuntimeException('Siswa terkait wajib dipilih untuk akun siswa.');
     }

@@ -1550,7 +1550,13 @@ function page_users(): void
             <label>Password <input type="password" name="password" placeholder="<?= $edit ? 'Kosongkan jika tidak diganti' : '' ?>"></label>
             <label class="span-2">Nama <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
             <label>Email <input type="email" name="email" value="<?= e($edit['email'] ?? '') ?>"></label>
-            <label>Role <select name="role"><?= options(['admin' => 'Admin', 'guru' => 'Guru', 'operator' => 'Operator', 'siswa' => 'Siswa'], $edit['role'] ?? 'guru') ?></select></label>
+            <label>Role <select name="role"><?= options([
+                'admin' => 'Admin',
+                'kepsek' => 'Kepala Sekolah',
+                'pengawas' => 'Pengawas (Khusus Live Monitor)',
+                'guru' => 'Guru',
+                'siswa' => 'Siswa',
+            ], $edit['role'] ?? 'guru') ?></select></label>
             <label>Guru Terkait <select name="teacher_id"><option value="">-</option><?= options($teachers, $edit['teacher_id'] ?? '') ?></select></label>
             <label>Siswa Terkait <select name="student_id"><option value="">-</option><?= options($students, $edit['student_id'] ?? '') ?></select></label>
             <label>Telegram Chat ID <input type="text" name="telegram_chat_id" value="<?= e($edit['telegram_chat_id'] ?? '') ?>" placeholder="Kosong untuk role siswa"></label>

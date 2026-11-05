@@ -36,17 +36,41 @@ function is_admin(): bool
     return user_role() === 'admin';
 }
 
+function is_kepsek(): bool
+{
+    return user_role() === 'kepsek';
+}
+
+function is_pengawas(): bool
+{
+    return user_role() === 'pengawas';
+}
+
 function require_role(array $roles): void
 {
     require_login();
-    if (!in_array(user_role(), $roles, true)) {
-        render_access_denied('Anda login sebagai ' . user_role() . '. Halaman ini hanya untuk: ' . implode(', ', $roles) . '.');
+    $role = user_role();
+    if ($role === 'admin') {
+        return;
+    }
+    if ($role === 'kepsek') {
+        if (in_array('admin', $roles, true) || in_array('guru', $roles, true) || in_array('kepsek', $roles, true)) {
+            return;
+        }
+    }
+    if ($role === 'pengawas') {
+        if (in_array('pengawas', $roles, true)) {
+            return;
+        }
+    }
+    if (!in_array($role, $roles, true)) {
+        render_access_denied('Anda login sebagai ' . $role . '. Halaman ini hanya untuk: ' . implode(', ', $roles) . '.');
     }
 }
 
 function classes_for_homeroom_current_user(): array
 {
-    if (is_admin()) {
+    if (is_admin() || is_kepsek()) {
         return fetch_all('SELECT * FROM classes WHERE active = 1 ORDER BY grade, name');
     }
 
@@ -60,7 +84,7 @@ function classes_for_homeroom_current_user(): array
 
 function require_homeroom_access(int $classId): void
 {
-    if (is_admin()) {
+    if (is_admin() || is_kepsek()) {
         return;
     }
 

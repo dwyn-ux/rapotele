@@ -7,6 +7,11 @@ function page_dashboard(): void
         return;
     }
 
+    if (user_role() === 'pengawas') {
+        page_pengawas_dashboard();
+        return;
+    }
+
     $user = current_user();
     $cards = [
         ['Guru', (int)db()->query('SELECT COUNT(*) FROM teachers WHERE active = 1')->fetchColumn(), 'blue', 'users'],
@@ -68,8 +73,10 @@ function page_dashboard(): void
         <?php endforeach; ?>
     </div>
 
-    <!-- Live Classroom & Attendance Monitor Widget -->
-    <?php render_live_monitoring_widget(); ?>
+    <!-- Live Classroom & Attendance Monitor Widget (Hanya Admin & Kepsek di Dashboard Umum) -->
+    <?php if (in_array(user_role(), ['admin', 'kepsek'], true)): ?>
+        <?php render_live_monitoring_widget(); ?>
+    <?php endif; ?>
 
     <!-- Two Column Layout -->
     <div class="grid two">
@@ -250,6 +257,28 @@ function page_student_dashboard(): void
     </section>
 
     <?php render_footer();
+}
+
+function page_pengawas_dashboard(): void
+{
+    require_role(['pengawas', 'admin', 'kepsek']);
+    $user = current_user();
+    render_header('Live Monitoring KBM');
+    ?>
+    <section class="hero" style="margin-bottom: 1.25rem;">
+        <div>
+            <div class="eyebrow" style="color: #38bdf8;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                Portal Pengawas Sekolah
+            </div>
+            <h2>Live Pemantauan KBM &amp; Presensi Sekolah</h2>
+            <p>Selamat datang, <?= e($user['name'] ?? 'Pengawas') ?>. Pantau kehadiran guru mengajar dan presensi siswa di seluruh kelas secara real-time.</p>
+        </div>
+    </section>
+
+    <?php
+    render_live_monitoring_widget();
+    render_footer();
 }
 
 function get_live_monitoring_data(): array
@@ -510,7 +539,7 @@ function get_live_monitoring_data(): array
 
 function page_live_monitor_feed(): void
 {
-    require_role(['admin', 'guru']);
+    require_role(['admin', 'kepsek', 'pengawas']);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(get_live_monitoring_data(), JSON_UNESCAPED_UNICODE);
     exit;
