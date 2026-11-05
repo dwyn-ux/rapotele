@@ -625,6 +625,7 @@ function action_save_user(): void
     if ($password !== '') {
         validate_password_strength($password);
     }
+    $isActive = isset($_POST['active']) ? 1 : ($id === 0 && !isset($_POST['_submitted_active']) ? 1 : 0);
     $base = [
         $username,
         trim((string)$_POST['name']),
@@ -633,7 +634,7 @@ function action_save_user(): void
         $teacherId,
         $studentId,
         $telegramChatId,
-        isset($_POST['active']) ? 1 : 0,
+        $isActive,
         now_string(),
     ];
 
@@ -660,6 +661,26 @@ function action_save_user(): void
     }
 
     flash('success', 'Data pengguna tersimpan.');
+    redirect_to('users');
+}
+
+function action_toggle_user_active(): void
+{
+    require_role(['admin']);
+    $id = (int)($_POST['id'] ?? 0);
+    if ($id <= 0) {
+        throw new RuntimeException('ID pengguna tidak valid.');
+    }
+    if ($id === (int)current_user()['id']) {
+        throw new RuntimeException('Tidak dapat mengubah status akun sendiri.');
+    }
+    $user = fetch_one('SELECT id, name, active FROM users WHERE id = ?', [$id]);
+    if (!$user) {
+        throw new RuntimeException('Pengguna tidak ditemukan.');
+    }
+    $newStatus = (int)$user['active'] === 1 ? 0 : 1;
+    execute_sql('UPDATE users SET active = ?, updated_at = ? WHERE id = ?', [$newStatus, now_string(), $id]);
+    flash('success', 'Status akun ' . $user['name'] . ' berhasil diubah menjadi ' . ($newStatus ? 'Aktif' : 'Nonaktif') . '.');
     redirect_to('users');
 }
 

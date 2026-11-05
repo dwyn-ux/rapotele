@@ -1544,28 +1544,54 @@ function page_users(): void
     render_header('Data Pengguna');
     input_panel_start($edit ? 'Edit Pengguna' : 'Input Pengguna', 'Tambah Pengguna', (bool)$edit || isset($_GET['add']));
     ?>
-        <form method="post" class="grid four">
-            <?= csrf_field() ?><input type="hidden" name="action" value="save_user"><input type="hidden" name="id" value="<?= e($edit['id'] ?? 0) ?>">
-            <label>Username <input type="text" name="username" required value="<?= e($edit['username'] ?? '') ?>"></label>
-            <label>Password <input type="password" name="password" placeholder="<?= $edit ? 'Kosongkan jika tidak diganti' : '' ?>"></label>
-            <label class="span-2">Nama <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>"></label>
-            <label>Email <input type="email" name="email" value="<?= e($edit['email'] ?? '') ?>"></label>
-            <label>Role <select name="role"><?= options([
+        <form method="post" class="grid four" id="form-user">
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="save_user">
+            <input type="hidden" name="id" value="<?= e($edit['id'] ?? 0) ?>">
+            <input type="hidden" name="_submitted_active" value="1">
+            <label>Username <input type="text" name="username" required value="<?= e($edit['username'] ?? '') ?>" placeholder="contoh: pengawas1"></label>
+            <label>Password <input type="password" name="password" placeholder="<?= $edit ? 'Kosongkan jika tidak diganti' : 'Minimal 6 karakter' ?>"></label>
+            <label class="span-2">Nama Lengkap <input type="text" name="name" required value="<?= e($edit['name'] ?? '') ?>" placeholder="contoh: Drs. H. Ahmad Fauzi (Pengawas)"></label>
+            <label>Email <input type="email" name="email" value="<?= e($edit['email'] ?? '') ?>" placeholder="Opsional"></label>
+            <label>Role <select name="role" id="user-role-select"><?= options([
                 'admin' => 'Admin',
                 'kepsek' => 'Kepala Sekolah',
                 'pengawas' => 'Pengawas (Khusus Live Monitor)',
                 'guru' => 'Guru',
                 'siswa' => 'Siswa',
             ], $edit['role'] ?? 'guru') ?></select></label>
-            <label>Guru Terkait <select name="teacher_id"><option value="">-</option><?= options($teachers, $edit['teacher_id'] ?? '') ?></select></label>
-            <label>Siswa Terkait <select name="student_id"><option value="">-</option><?= options($students, $edit['student_id'] ?? '') ?></select></label>
-            <label>Telegram Chat ID <input type="text" name="telegram_chat_id" value="<?= e($edit['telegram_chat_id'] ?? '') ?>" placeholder="Kosong untuk role siswa"></label>
-            <label class="check"><input type="checkbox" name="active" <?= checked($edit['active'] ?? 1) ?>> Aktif</label>
+            <label>Guru Terkait <select name="teacher_id"><option value="">- Tidak Perlu (Strip) -</option><?= options($teachers, $edit['teacher_id'] ?? '') ?></select><small style="display:block;font-size:0.75rem;color:#64748b;margin-top:2px;">(Pilih "-" jika Pengawas atau Admin)</small></label>
+            <label>Siswa Terkait <select name="student_id"><option value="">- Tidak Perlu (Strip) -</option><?= options($students, $edit['student_id'] ?? '') ?></select><small style="display:block;font-size:0.75rem;color:#64748b;margin-top:2px;">(Hanya untuk akun siswa)</small></label>
+            <label>Telegram Chat ID <input type="text" name="telegram_chat_id" value="<?= e($edit['telegram_chat_id'] ?? '') ?>" placeholder="Opsional"></label>
+            <label class="check" style="display:flex;align-items:center;gap:8px;padding-top:1.2rem;">
+                <input type="checkbox" name="active" value="1" <?= checked($edit ? ($edit['active'] ?? 1) : 1) ?>>
+                <strong style="color:#0f172a;">Akun Aktif (Bisa Login)</strong>
+            </label>
             <div class="actions span-2"><button class="button primary">Simpan</button><a class="button" href="<?= e(route_url('users')) ?>">Reset</a></div>
         </form>
     <?php input_panel_end(); ?>
     <?php table_panel('Daftar Pengguna', ['Username', 'Nama', 'Role', 'Guru/Siswa', 'Telegram', 'Status', 'Aksi'], $rows, function ($row) { ?>
-        <td><?= e($row['username']) ?></td><td><?= e($row['name']) ?></td><td><?= e($row['role']) ?></td><td><?= e($row['role'] === 'siswa' ? $row['student_name'] : $row['teacher_name']) ?></td><td><?= e($row['telegram_chat_id']) ?></td><td><?= status_badge((int)$row['active']) ?></td><td><?= row_actions('users', (int)$row['id'], 'delete_user') ?></td>
+        <td><strong><?= e($row['username']) ?></strong></td>
+        <td><?= e($row['name']) ?></td>
+        <td><span class="badge" style="font-weight:700;background:rgba(2,132,199,0.1);color:#0284c7;"><?= e(strtoupper($row['role'])) ?></span></td>
+        <td><?= e($row['role'] === 'siswa' ? ($row['student_name'] ?: '-') : ($row['role'] === 'pengawas' ? '-' : ($row['teacher_name'] ?: '-'))) ?></td>
+        <td><?= e($row['telegram_chat_id'] ?: '-') ?></td>
+        <td>
+            <?php if ((int)$row['active'] === 1): ?>
+                <span class="badge ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Aktif</span>
+            <?php else: ?>
+                <div style="display:inline-flex;align-items:center;gap:6px;">
+                    <span class="badge off"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Nonaktif</span>
+                    <form method="post" style="display:inline;margin:0;">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="action" value="toggle_user_active">
+                        <input type="hidden" name="id" value="<?= (int)$row['id'] ?>">
+                        <button type="submit" class="button small ok" style="padding:2px 8px;font-size:0.75rem;border-radius:4px;" title="Klik untuk mengaktifkan akun ini">Aktifkan</button>
+                    </form>
+                </div>
+            <?php endif; ?>
+        </td>
+        <td><?= row_actions('users', (int)$row['id'], 'delete_user') ?></td>
     <?php }, '', true); ?>
     <?php render_footer();
 }
