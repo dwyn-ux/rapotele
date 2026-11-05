@@ -52,6 +52,7 @@ function schedule_activity_options(): array
     return [
         'pelajaran' => '📚 Pelajaran (KBM Normal)',
         'Upacara Bendera' => '🚩 Upacara Bendera',
+        'Ekstrakurikuler' => '🏆 Ekstrakurikuler',
         'Jum\'at Sehat' => '🏃 Jum\'at Sehat',
         'Jum\'at Bersih' => '🧹 Jum\'at Bersih',
         'Sholat Dhuha / Pengajian' => '🕌 Sholat Dhuha / Pengajian',
@@ -2104,21 +2105,17 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
         color: #0369a1;
     }
     .matrix-activity-select {
-        width: 100% !important;
-        font-size: 0.74rem !important;
-        padding: 4px 6px !important;
-        border-radius: 6px !important;
-        cursor: pointer !important;
-        position: relative !important;
-        z-index: 10 !important;
-        pointer-events: auto !important;
-        box-sizing: border-box !important;
-        display: block !important;
+        width: 100%;
+        font-size: 0.74rem;
+        padding: 5px 6px;
+        border-radius: 6px;
+        cursor: pointer;
+        box-sizing: border-box;
     }
     .matrix-activity-select:focus {
-        border-color: #0284c7 !important;
-        outline: none !important;
-        box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.25) !important;
+        border-color: #0284c7;
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.25);
     }
     .matrix-slot-select.is-conflict {
         border-color: #ef4444 !important;
@@ -2462,6 +2459,7 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                                 elseif (stripos($curAct, 'Dhuha') !== false || stripos($curAct, 'Pengajian') !== false || stripos($curAct, 'Sholat') !== false) $actIcon = '🕌';
                                 elseif (stripos($curAct, 'Literasi') !== false || stripos($curAct, 'Apel') !== false) $actIcon = '📖';
                                 elseif (stripos($curAct, 'Upacara') !== false) $actIcon = '🚩';
+                                elseif (stripos($curAct, 'Ekstrakurikuler') !== false || stripos($curAct, 'Ekskul') !== false) $actIcon = '🏆';
                                 else $actIcon = '⭐';
                             }
                             ?>
@@ -2478,11 +2476,12 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                                     </div>
                                     <div style="margin-top:6px;">
                                         <select name="period_activity[<?= $p ?>]"
-                                                class="matrix-activity-select"
+                                                class="matrix-activity-select no-search-select"
+                                                data-no-search="true"
                                                 data-period="<?= $p ?>"
                                                 onchange="matrixActivityChanged(<?= $p ?>, this.value)"
-                                                style="width:100%;font-size:0.72rem;padding:3px 4px;border-radius:5px;border:1px solid <?= $curAct ? '#3b82f6' : '#cbd5e1' ?>;background:<?= $curAct ? '#eff6ff' : '#ffffff' ?>;color:<?= $curAct ? '#1e40af' : '#475569' ?>;font-weight:<?= $curAct ? '700' : '600' ?>;"
-                                                title="Pilih jenis kegiatan pada jam ini (Pelajaran atau Kegiatan Sekolah seperti Upacara, Jum'at Sehat, dll)">
+                                                style="width:100%;font-size:0.75rem;padding:5px 6px;border-radius:6px;border:1px solid <?= $curAct ? '#3b82f6' : '#cbd5e1' ?>;background:<?= $curAct ? '#eff6ff' : '#ffffff' ?>;color:<?= $curAct ? '#1e40af' : '#475569' ?>;font-weight:<?= $curAct ? '700' : '600' ?>;cursor:pointer;"
+                                                title="Pilih jenis kegiatan pada jam ini (Pelajaran atau Kegiatan Sekolah seperti Upacara, Jum'at Sehat, Ekstrakurikuler, dll)">
                                             <?php foreach ($activityOptions as $actKey => $actLabel):
                                                 $isActSel = ($curAct ? ($actKey === $curAct || (!isset($activityOptions[$curAct]) && $actKey === 'custom')) : ($actKey === 'pelajaran'));
                                             ?>
@@ -2704,6 +2703,7 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                 else if (val.indexOf('Bersih') !== -1) icon = '🧹';
                 else if (val.indexOf('Dhuha') !== -1 || val.indexOf('Pengajian') !== -1 || val.indexOf('Sholat') !== -1) icon = '🕌';
                 else if (val.indexOf('Literasi') !== -1 || val.indexOf('Apel') !== -1) icon = '📖';
+                else if (val.indexOf('Ekstrakurikuler') !== -1 || val.indexOf('Ekskul') !== -1) icon = '🏆';
 
                 if (val === 'custom') {
                     actName = (customInput && customInput.value.trim()) ? customInput.value.trim() : 'Kegiatan Khusus';

@@ -4228,10 +4228,8 @@ body.app-modal-open {
 }
 
 .matrix-activity-select {
-  cursor: pointer !important;
-  position: relative !important;
-  z-index: 10 !important;
-  pointer-events: auto !important;
+  cursor: pointer;
+  width: 100%;
 }
 
 

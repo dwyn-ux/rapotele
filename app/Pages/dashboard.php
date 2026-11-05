@@ -1995,6 +1995,7 @@ function render_live_monitoring_widget(): void
                     else if (aName.indexOf('Bersih') !== -1) actIcon = '🧹';
                     else if (aName.indexOf('Dhuha') !== -1 || aName.indexOf('Pengajian') !== -1 || aName.indexOf('Sholat') !== -1) actIcon = '🕌';
                     else if (aName.indexOf('Literasi') !== -1 || aName.indexOf('Apel') !== -1) actIcon = '📖';
+                    else if (aName.indexOf('Ekstrakurikuler') !== -1 || aName.indexOf('Ekskul') !== -1) actIcon = '🏆';
 
                     statusPill = '<div class="live-status-pill pill-present" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af;">' +
                         '<span>' + actIcon + ' KEGIATAN: ' + escapeHtml(aName).toUpperCase() + '</span>' +
