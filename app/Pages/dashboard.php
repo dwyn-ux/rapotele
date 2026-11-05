@@ -306,17 +306,21 @@ function get_live_monitoring_data(): array
         [$today]
     );
 
-    // Get today's classroom sessions
+    // Get today's classroom sessions (with joined teacher and class for reliable matching)
     $sessions = fetch_all(
-        'SELECT id, assignment_id, meeting_no, teacher_attended, teacher_status, teacher_time_in, teacher_lat, teacher_lng, teacher_notes
-         FROM student_attendance_sessions
-         WHERE date = ?',
+        'SELECT sas.id, sas.assignment_id, sas.meeting_no, sas.teacher_attended, sas.teacher_status, sas.teacher_time_in, sas.teacher_lat, sas.teacher_lng, sas.teacher_notes,
+                ta.teacher_id, ta.class_id, ta.subject_id
+         FROM student_attendance_sessions sas
+         JOIN teaching_assignments ta ON ta.id = sas.assignment_id
+         WHERE sas.date = ?',
         [$date]
     );
     $sessionByAssignment = [];
+    $sessionByClassSubject = [];
     $sessionIds = [];
     foreach ($sessions as $sess) {
         $sessionByAssignment[(int)$sess['assignment_id']] = $sess;
+        $sessionByClassSubject[(int)$sess['class_id']][(int)$sess['subject_id']] = $sess;
         $sessionIds[] = (int)$sess['id'];
     }
 
@@ -341,6 +345,15 @@ function get_live_monitoring_data(): array
     $teachingAttBySchedule = [];
     foreach ($teachingAtt as $ta) {
         $teachingAttBySchedule[(int)$ta['schedule_id']] = $ta;
+    }
+
+    // Get today's daily teacher attendance (Presensi Harian Guru Datang di Sekolah / Mobile)
+    $dailyTeacherAtt = fetch_all("SELECT teacher_id, status, time_in, location_lat, location_lng FROM teacher_attendance WHERE date = ?", [$date]);
+    $dailyTeacherAttById = [];
+    foreach ($dailyTeacherAtt as $dta) {
+        if ($dta['status'] === 'hadir') {
+            $dailyTeacherAttById[(int)$dta['teacher_id']] = $dta;
+        }
     }
 
     // Index schedules by class_id and period_no
@@ -369,6 +382,8 @@ function get_live_monitoring_data(): array
         $schedId = (int)$row['id'];
         $asgnId = (int)$row['assignment_id'];
         $classId = (int)$row['class_id'];
+        $teacherId = (int)$row['teacher_id'];
+        $subjectId = (int)$row['subject_id'];
 
         $timeStatus = 'upcoming';
         if ($timeNow >= $start && $timeNow <= $end) {
@@ -377,13 +392,16 @@ function get_live_monitoring_data(): array
             $timeStatus = 'finished';
         }
 
-        $sess = $sessionByAssignment[$asgnId] ?? null;
+        $sess = $sessionByAssignment[$asgnId] 
+            ?? ($sessionByClassSubject[$classId][$subjectId] ?? null);
         $tAtt = $teachingAttBySchedule[$schedId] ?? null;
+        $teacherDaily = $dailyTeacherAttById[$teacherId] ?? null;
 
         $isCheckedIn = false;
         $checkinTime = '';
         $checkinStatus = '';
         $checkinNotes = '';
+        $checkinType = 'none'; // 'classroom', 'teaching_recap', 'daily_school'
         $hasGps = false;
         $lat = null;
         $lng = null;
@@ -392,6 +410,7 @@ function get_live_monitoring_data(): array
 
         if ($sess && (!empty($sess['teacher_attended']) || !empty($sess['teacher_time_in']))) {
             $isCheckedIn = true;
+            $checkinType = 'classroom';
             $meetingNo = (int)($sess['meeting_no'] ?? 1);
             $checkinTime = (string)($sess['teacher_time_in'] ?: '');
             $checkinStatus = (string)($sess['teacher_status'] ?: 'hadir');
@@ -406,9 +425,22 @@ function get_live_monitoring_data(): array
             }
         } elseif ($tAtt && !empty($tAtt['status']) && $tAtt['status'] !== 'belum input') {
             $isCheckedIn = true;
+            $checkinType = 'teaching_recap';
             $checkinTime = (string)($tAtt['time_in'] ?: '');
             $checkinStatus = (string)$tAtt['status'];
             $checkinNotes = (string)($tAtt['notes'] ?: '');
+        } elseif ($teacherDaily) {
+            // Guru sudah melakukan presensi masuk di sekolah hari ini
+            $isCheckedIn = true;
+            $checkinType = 'daily_school';
+            $checkinTime = (string)($teacherDaily['time_in'] ?: '');
+            $checkinStatus = 'hadir';
+            $checkinNotes = 'Hadir di sekolah';
+            if (!empty($teacherDaily['location_lat']) && !empty($teacherDaily['location_lng'])) {
+                $hasGps = true;
+                $lat = (float)$teacherDaily['location_lat'];
+                $lng = (float)$teacherDaily['location_lng'];
+            }
         }
 
         $schedulesByClass[$classId][$p] = [
@@ -422,6 +454,7 @@ function get_live_monitoring_data(): array
             'teacher_name' => $row['teacher_name'],
             'meeting_no' => $meetingNo,
             'is_checked_in' => $isCheckedIn,
+            'checkin_type' => $checkinType,
             'checkin_time' => $checkinTime,
             'checkin_status' => $checkinStatus,
             'checkin_notes' => $checkinNotes,
@@ -1373,9 +1406,17 @@ function render_live_monitoring_widget(): void
 
             // Foot
             cHtml += '<div class="live-card-foot">';
-            cHtml += '<span style="font-size: 0.7rem; color: #94a3b8;">Presensi</span>';
+            var hasStudents = (studentStats.hadir + studentStats.sakit + studentStats.izin + studentStats.alpa) > 0;
+            if (hasStudents) {
+                cHtml += '<span style="font-size: 0.7rem; color: #16a34a; font-weight: 700;">' + svgCheck + ' Siswa Diabsen</span>';
+            } else if (slot && slot.is_checked_in) {
+                cHtml += '<span style="font-size: 0.7rem; color: #d97706; font-weight: 600;">⏳ Belum Absen Siswa</span>';
+            } else {
+                cHtml += '<span style="font-size: 0.7rem; color: #94a3b8;">Presensi</span>';
+            }
+
             if (attUrl && attUrl !== '#') {
-                cHtml += '<a href="' + attUrl + '" class="live-btn-detail" title="Buka Detail Presensi"><span>Detail Siswa</span>' + svgExtLink + '</a>';
+                cHtml += '<a href="' + attUrl + '" class="live-btn-detail" title="Buka Presensi"><span>' + (hasStudents ? 'Detail Siswa' : 'Input Absen') + '</span>' + svgExtLink + '</a>';
             } else {
                 cHtml += '<span style="font-size: 0.7rem; color: #cbd5e1;">Belum Ada Sesi</span>';
             }
