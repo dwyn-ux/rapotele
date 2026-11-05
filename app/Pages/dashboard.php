@@ -543,6 +543,36 @@ function get_live_monitoring_data(): array
     $availablePeriodKeys = array_keys($periodsToday);
     $latestPeriodToday = !empty($availablePeriodKeys) ? end($availablePeriodKeys) : 1;
 
+    // Determine overall school day state
+    $schoolStartTime = null;
+    $schoolEndTime = null;
+    foreach ($periodsToday as $pData) {
+        if ($schoolStartTime === null || $pData['start_time'] < $schoolStartTime) {
+            $schoolStartTime = $pData['start_time'];
+        }
+        if ($schoolEndTime === null || $pData['end_time'] > $schoolEndTime) {
+            $schoolEndTime = $pData['end_time'];
+        }
+    }
+
+    $schoolDayState = 'in_session';
+    $schoolDayStateLabel = 'KBM Sedang Berlangsung';
+    if (empty($periodsToday)) {
+        $schoolDayState = 'no_schedules_today';
+        $schoolDayStateLabel = 'Tidak Ada Jadwal KBM Hari Ini';
+    } elseif ($schoolStartTime !== null && $timeNow < $schoolStartTime) {
+        $schoolDayState = 'before_school';
+        $schoolDayStateLabel = 'KBM Belum Dimulai (Masuk ' . $schoolStartTime . ')';
+    } elseif ($schoolEndTime !== null && $timeNow > $schoolEndTime) {
+        $schoolDayState = 'after_school';
+        $schoolDayStateLabel = 'KBM Hari Ini Selesai';
+    } elseif ($activePeriodNow === null) {
+        $schoolDayState = 'break_time';
+        $schoolDayStateLabel = 'Waktu Istirahat';
+    } else {
+        $schoolDayStateLabel = 'KBM Jam ke-' . $activePeriodNow;
+    }
+
     foreach ($classes as $c) {
         $cid = (int)$c['id'];
         $cName = $c['name'];
@@ -566,6 +596,9 @@ function get_live_monitoring_data(): array
             $classStudentSum = $todayClassStats;
         }
 
+        $firstSlot = !empty($classSlots) ? reset($classSlots) : null;
+        $latestSlot = !empty($classSlots) ? end($classSlots) : null;
+
         // Find active slot right now
         $currentSlot = null;
         if ($activePeriodNow && isset($classSlots[$activePeriodNow])) {
@@ -582,10 +615,15 @@ function get_live_monitoring_data(): array
         // Find next slot if no current slot
         $nextSlot = null;
         if (!$currentSlot) {
-            foreach ($classSlots as $s) {
-                if ($s['time_status'] === 'upcoming') {
-                    $nextSlot = $s;
-                    break;
+            if ($schoolDayState === 'before_school') {
+                // Saat sebelum jam sekolah mulai, slot berikutnya selalu slot pertama kelas hari ini
+                $nextSlot = $firstSlot;
+            } else {
+                foreach ($classSlots as $s) {
+                    if ($s['time_status'] === 'upcoming') {
+                        $nextSlot = $s;
+                        break;
+                    }
                 }
             }
         }
@@ -599,7 +637,6 @@ function get_live_monitoring_data(): array
             }
         }
 
-        $firstSlot = !empty($classSlots) ? reset($classSlots) : null;
         $defaultAttUrl = $firstSlot['attendance_url'] ?? route_url('student-attendance');
 
         $classCards[] = [
@@ -608,9 +645,10 @@ function get_live_monitoring_data(): array
             'class_level' => $cLevel,
             'has_schedule_today' => !empty($classSlots),
             'slots' => $classSlots,
+            'first_slot' => $firstSlot,
             'current_slot' => $currentSlot,
             'next_slot' => $nextSlot,
-            'latest_slot' => !empty($classSlots) ? end($classSlots) : null,
+            'latest_slot' => $latestSlot,
             'class_student_sum' => $classStudentSum,
             'today_student_stats' => $todayClassStats,
             'default_attendance_url' => $defaultAttUrl,
@@ -621,6 +659,10 @@ function get_live_monitoring_data(): array
         'ok' => true,
         'server_time' => date('H:i:s'),
         'date_formatted' => schedule_days()[$today] . ', ' . date('d/m/Y'),
+        'school_day_state' => $schoolDayState,
+        'school_day_state_label' => $schoolDayStateLabel,
+        'school_start_time' => $schoolStartTime,
+        'school_end_time' => $schoolEndTime,
         'active_period_now' => $activePeriodNow,
         'latest_period_today' => $latestPeriodToday,
         'periods_list' => array_values($periodsToday),
@@ -1449,12 +1491,16 @@ function render_live_monitoring_widget(): void
                     <span class="live-dot-pulse"></span>
                     <span>LIVE MONITORING KBM &amp; PRESENSI</span>
                 </div>
-                <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px; display: flex; align-items: center; gap: 8px;">
+                <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <span id="live-header-date"><?= htmlspecialchars((string)($initialData['date_formatted'] ?? 'Hari Ini')) ?></span>
                     <span>&bull;</span>
                     <span style="display: inline-flex; align-items: center; gap: 4px;">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                         <span id="live-header-time"><?= htmlspecialchars((string)($initialData['server_time'] ?? date('H:i:s'))) ?></span>
+                    </span>
+                    <span>&bull;</span>
+                    <span id="live-header-state" style="background: rgba(56,189,248,0.18); border: 1px solid rgba(56,189,248,0.4); color: #38bdf8; padding: 1px 8px; border-radius: 5px; font-weight: 700; font-size: 0.74rem;">
+                        <?= htmlspecialchars((string)($initialData['school_day_state_label'] ?? '')) ?>
                     </span>
                 </div>
             </div>
@@ -1574,6 +1620,8 @@ function render_live_monitoring_widget(): void
         var cachedPeriods = initialMonitorData.periods_list || [];
         var activePeriodNow = initialMonitorData.active_period_now;
         var latestPeriodToday = initialMonitorData.latest_period_today;
+        var schoolDayState = initialMonitorData.school_day_state || 'in_session';
+        var schoolDayStateLabel = initialMonitorData.school_day_state_label || '';
         var intervalId = null;
 
         var countdownEl = document.getElementById('live-countdown');
@@ -1584,6 +1632,7 @@ function render_live_monitoring_widget(): void
         var cardsContainer = document.getElementById('live-cards-container');
         var dateEl = document.getElementById('live-header-date');
         var timeEl = document.getElementById('live-header-time');
+        var stateEl = document.getElementById('live-header-state');
         var periodSelect = document.getElementById('live-period-select');
 
         var svgPlay = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
@@ -1610,9 +1659,12 @@ function render_live_monitoring_widget(): void
                     cachedPeriods = data.periods_list || [];
                     activePeriodNow = data.active_period_now;
                     latestPeriodToday = data.latest_period_today;
+                    schoolDayState = data.school_day_state || 'in_session';
+                    schoolDayStateLabel = data.school_day_state_label || '';
 
                     if (dateEl) dateEl.textContent = data.date_formatted || '';
                     if (timeEl) timeEl.textContent = data.server_time || '';
+                    if (stateEl) stateEl.textContent = schoolDayStateLabel;
 
                     // Update summary numbers
                     var sm = data.summary || {};
@@ -1643,7 +1695,18 @@ function render_live_monitoring_widget(): void
         function updatePeriodDropdown() {
             if (!periodSelect) return;
             var currentVal = periodSelect.value;
-            var html = '<option value="current">⚡ Jam Saat Ini ' + (activePeriodNow ? '(Jam ke-' + activePeriodNow + ')' : '(Otomatis)') + '</option>';
+            var autoLabel = '⚡ Jam Saat Ini (Otomatis)';
+            if (activePeriodNow) {
+                autoLabel = '⚡ Jam Saat Ini (Jam ke-' + activePeriodNow + ')';
+            } else if (schoolDayState === 'before_school') {
+                autoLabel = '⚡ Jam Saat Ini (Belum Mulai)';
+            } else if (schoolDayState === 'after_school') {
+                autoLabel = '⚡ Jam Saat Ini (KBM Selesai)';
+            } else if (schoolDayState === 'break_time') {
+                autoLabel = '⚡ Jam Saat Ini (Istirahat)';
+            }
+
+            var html = '<option value="current">' + autoLabel + '</option>';
             cachedPeriods.forEach(function(p){
                 var isSelected = (currentVal == p.period_no) ? ' selected' : '';
                 html += '<option value="' + p.period_no + '"' + isSelected + '>Jam ke-' + p.period_no + ' (' + p.start_time + ' - ' + p.end_time + ')</option>';
@@ -1663,6 +1726,8 @@ function render_live_monitoring_widget(): void
                     isLiveCurrent = true;
                 } else if (card.next_slot) {
                     slot = card.next_slot;
+                } else if (card.first_slot && schoolDayState === 'before_school') {
+                    slot = card.first_slot;
                 } else if (card.latest_slot) {
                     slot = card.latest_slot;
                 }
@@ -1711,11 +1776,29 @@ function render_live_monitoring_widget(): void
                         svgAlert +
                         '<span>BELUM HADIR (ALERT)</span>' +
                         '</div>';
+                } else if (schoolDayState === 'before_school') {
+                    cardClass = 'status-neutral';
+                    statusPill = '<div class="live-status-pill pill-neutral">' +
+                        svgClock +
+                        '<span>KBM BELUM MULAI (Jam ' + slot.period_no + ' &bull; ' + slot.start_time + ')</span>' +
+                        '</div>';
+                } else if (schoolDayState === 'after_school') {
+                    cardClass = 'status-neutral';
+                    statusPill = '<div class="live-status-pill pill-neutral">' +
+                        svgCheck +
+                        '<span>KBM HARI INI SELESAI</span>' +
+                        '</div>';
+                } else if (schoolDayState === 'break_time') {
+                    cardClass = 'status-neutral';
+                    statusPill = '<div class="live-status-pill pill-neutral">' +
+                        svgClock +
+                        '<span>ISTIRAHAT (Masuk ' + slot.start_time + ')</span>' +
+                        '</div>';
                 } else if (slot.time_status === 'upcoming') {
                     cardClass = 'status-neutral';
                     statusPill = '<div class="live-status-pill pill-neutral">' +
                         svgClock +
-                        '<span>JAM BERIKUTNYA</span>' +
+                        '<span>JAM BERIKUTNYA (' + slot.start_time + ')</span>' +
                         '</div>';
                 } else {
                     cardClass = 'status-neutral';
@@ -1725,10 +1808,31 @@ function render_live_monitoring_widget(): void
                         '</div>';
                 }
             } else {
-                statusPill = '<div class="live-status-pill pill-neutral">' +
-                    svgClock +
-                    '<span>KOSONG / ISTIRAHAT</span>' +
-                    '</div>';
+                if (!card.has_schedule_today) {
+                    periodLabel = 'Tidak ada KBM';
+                    statusPill = '<div class="live-status-pill pill-neutral">' +
+                        svgClock +
+                        '<span>TIDAK ADA JADWAL HARI INI</span>' +
+                        '</div>';
+                } else if (schoolDayState === 'after_school') {
+                    periodLabel = 'KBM Selesai';
+                    statusPill = '<div class="live-status-pill pill-neutral">' +
+                        svgCheck +
+                        '<span>KBM HARI INI SELESAI</span>' +
+                        '</div>';
+                } else if (schoolDayState === 'before_school') {
+                    periodLabel = 'Belum Mulai';
+                    statusPill = '<div class="live-status-pill pill-neutral">' +
+                        svgClock +
+                        '<span>KBM BELUM DIMULAI</span>' +
+                        '</div>';
+                } else {
+                    periodLabel = 'Jam Kosong';
+                    statusPill = '<div class="live-status-pill pill-neutral">' +
+                        svgClock +
+                        '<span>KOSONG / ISTIRAHAT</span>' +
+                        '</div>';
+                }
             }
 
             // Fallback to today's recorded class attendance if this slot has no attendance
