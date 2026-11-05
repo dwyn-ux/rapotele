@@ -1049,47 +1049,63 @@ function render_live_monitoring_widget(): void
     /* Subgrids for SMP and SMA */
     .live-cards-row {
         display: grid;
-        gap: 10px;
-        grid-template-columns: repeat(var(--cols, 6), minmax(0, 1fr));
+        gap: 14px;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     }
-    .live-cards-row.grid-smp {
-        grid-template-columns: repeat(var(--cols, 6), minmax(0, 1fr));
-    }
+    .live-cards-row.grid-smp,
     .live-cards-row.grid-sma {
-        grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     }
 
-    @media (max-width: 900px) {
-        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-smp { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
-        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-sma { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+    /* In standard view (not fullscreen), 3 columns on standard desktop/laptop */
+    @media (min-width: 1024px) {
+        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-smp {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        }
+        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-sma {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        }
     }
-    @media (max-width: 640px) {
-        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-smp { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-sma { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    @media (min-width: 1700px) {
+        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-smp,
+        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-sma {
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
+        }
     }
-    @media (max-width: 420px) {
-        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-smp { grid-template-columns: 1fr !important; }
-        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-sma { grid-template-columns: 1fr !important; }
+    @media (max-width: 1023px) {
+        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-smp,
+        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-sma {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 12px;
+        }
+    }
+    @media (max-width: 600px) {
+        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-smp,
+        .live-monitor-panel:not(.is-fullscreen) .live-cards-row.grid-sma {
+            grid-template-columns: 1fr !important;
+            gap: 10px;
+        }
     }
 
-    /* Compact Class Card */
+    /* Class Card */
     .live-class-card {
         background: #ffffff;
         border-radius: 12px;
-        padding: 10px 12px;
-        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
-        border: 2px solid #e2e8f0;
+        padding: 12px 14px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+        border: 1.5px solid #e2e8f0;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        gap: 8px;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
-        min-height: 155px;
+        gap: 10px;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+        min-height: 180px;
         box-sizing: border-box;
     }
     .live-class-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 14px -2px rgba(15, 23, 42, 0.08);
+        box-shadow: 0 8px 18px -4px rgba(15, 23, 42, 0.1);
+        border-color: #cbd5e1;
     }
 
     /* Red Card (Teacher absent during active class) */
@@ -1117,7 +1133,8 @@ function render_live_monitoring_widget(): void
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
+        min-width: 0;
     }
     .live-card-title {
         font-size: 1.05rem;
@@ -1127,13 +1144,16 @@ function render_live_monitoring_widget(): void
         align-items: center;
         gap: 6px;
         line-height: 1.2;
+        white-space: nowrap;
+        min-width: 0;
     }
     .live-badge-level {
         font-size: 0.65rem;
         font-weight: 700;
-        padding: 1px 6px;
+        padding: 2px 6px;
         border-radius: 4px;
         text-transform: uppercase;
+        flex-shrink: 0;
     }
     .level-smp {
         background: #e0f2fe;
@@ -1146,36 +1166,39 @@ function render_live_monitoring_widget(): void
         border: 1px solid #ddd6fe;
     }
     .live-card-period {
-        font-size: 0.68rem;
+        font-size: 0.72rem;
         font-weight: 600;
-        color: #64748b;
+        color: #475569;
         background: #f1f5f9;
-        padding: 2px 6px;
-        border-radius: 4px;
+        border: 1px solid #e2e8f0;
+        padding: 3px 8px;
+        border-radius: 6px;
         display: inline-flex;
         align-items: center;
-        gap: 3px;
+        gap: 4px;
         white-space: nowrap;
+        flex-shrink: 0;
     }
 
     /* Status Banner Pill */
     .live-status-pill {
         display: inline-flex;
         align-items: center;
-        gap: 5px;
-        padding: 3px 8px;
+        gap: 6px;
+        padding: 4px 10px;
         border-radius: 6px;
-        font-size: 0.72rem;
+        font-size: 0.74rem;
         font-weight: 700;
         width: 100%;
         box-sizing: border-box;
-        height: 24px;
+        min-height: 26px;
         justify-content: center;
+        letter-spacing: 0.2px;
     }
     .live-status-pill.pill-alert {
         background: #fee2e2;
         color: #b91c1c;
-        border: 1px solid #fecaca;
+        border: 1px solid #fca5a5;
         animation: cardAlertGlow 1.8s infinite;
     }
     @keyframes cardAlertGlow {
@@ -1185,33 +1208,34 @@ function render_live_monitoring_widget(): void
     .live-status-pill.pill-present {
         background: #dcfce7;
         color: #15803d;
-        border: 1px solid #bbf7d0;
+        border: 1px solid #86efac;
     }
     .live-status-pill.pill-neutral {
         background: #f1f5f9;
-        color: #64748b;
+        color: #475569;
         border: 1px solid #e2e8f0;
     }
 
     /* Lesson info */
     .live-lesson-info {
         background: #f8fafc;
-        border: 1px solid #f1f5f9;
+        border: 1px solid #e2e8f0;
         border-radius: 8px;
-        padding: 6px 8px;
+        padding: 8px 10px;
         display: flex;
         flex-direction: column;
-        gap: 3px;
-        font-size: 0.78rem;
+        gap: 4px;
+        font-size: 0.8rem;
     }
     .live-info-row {
         display: flex;
         align-items: center;
-        gap: 6px;
-        color: #334155;
+        gap: 7px;
+        color: #475569;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        min-width: 0;
     }
     .live-info-row svg {
         flex-shrink: 0;
@@ -1221,20 +1245,22 @@ function render_live_monitoring_widget(): void
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        min-width: 0;
     }
     .live-info-row strong {
         color: #0f172a;
+        font-weight: 600;
     }
 
     /* Student attendance numbers strip (Numbers only + 1-letter labels) */
     .live-student-strip {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        gap: 4px;
+        gap: 6px;
     }
     .live-st-box {
-        border-radius: 6px;
-        padding: 4px 2px;
+        border-radius: 8px;
+        padding: 6px 4px;
         text-align: center;
         display: flex;
         flex-direction: column;
@@ -1243,16 +1269,17 @@ function render_live_monitoring_widget(): void
         border: 1px solid;
     }
     .live-st-num {
-        font-size: 0.96rem;
+        font-size: 1.05rem;
         font-weight: 800;
-        line-height: 1;
+        line-height: 1.1;
     }
     .live-st-lbl {
-        font-size: 0.6rem;
+        font-size: 0.65rem;
         font-weight: 700;
-        margin-top: 1px;
+        margin-top: 2px;
         opacity: 0.9;
         text-transform: uppercase;
+        letter-spacing: 0.3px;
     }
     .st-box-h {
         background: #f0fdf4;
@@ -1280,22 +1307,30 @@ function render_live_monitoring_widget(): void
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding-top: 4px;
+        padding-top: 8px;
         border-top: 1px dashed #e2e8f0;
+        margin-top: auto;
+        gap: 8px;
     }
     .live-btn-detail {
-        font-size: 0.72rem;
+        font-size: 0.74rem;
         font-weight: 600;
         color: #0284c7;
+        background: #f0f9ff;
+        border: 1px solid #bae6fd;
         text-decoration: none;
         display: inline-flex;
         align-items: center;
-        gap: 3px;
-        padding: 2px 5px;
-        border-radius: 4px;
+        gap: 4px;
+        padding: 3px 8px;
+        border-radius: 6px;
+        transition: all 0.15s ease;
+        white-space: nowrap;
     }
     .live-btn-detail:hover {
-        background: #e0f2fe;
+        background: #0284c7;
+        color: #ffffff;
+        border-color: #0284c7;
     }
 
     /* Fullscreen / 1 Layar Penuh (TV Wallboard / Command Center Mode) */
@@ -1369,10 +1404,10 @@ function render_live_monitoring_widget(): void
     .live-monitor-panel.is-fullscreen .live-cards-container {
         flex: 1 !important;
         height: auto !important;
-        padding: 10px 18px !important;
+        padding: 12px 18px !important;
         background: #0b1120 !important;
-        overflow: hidden !important;
-        justify-content: space-evenly !important;
+        overflow-y: auto !important;
+        justify-content: flex-start !important;
     }
     .live-monitor-panel.is-fullscreen .live-level-title-text {
         color: #cbd5e1 !important;
@@ -1380,14 +1415,28 @@ function render_live_monitoring_widget(): void
     .live-monitor-panel.is-fullscreen .live-level-line {
         background: #334155 !important;
     }
-    .live-monitor-panel.is-fullscreen .live-cards-row.grid-smp {
-        grid-template-columns: repeat(var(--cols, 6), minmax(0, 1fr)) !important;
+    @media (min-width: 1200px) {
+        .live-monitor-panel.is-fullscreen .live-cards-row.grid-smp {
+            grid-template-columns: repeat(var(--cols, 6), minmax(0, 1fr)) !important;
+        }
+        .live-monitor-panel.is-fullscreen .live-cards-row.grid-sma {
+            grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr)) !important;
+        }
     }
-    .live-monitor-panel.is-fullscreen .live-cards-row.grid-sma {
-        grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr)) !important;
+    @media (max-width: 1199px) {
+        .live-monitor-panel.is-fullscreen .live-cards-row.grid-smp,
+        .live-monitor-panel.is-fullscreen .live-cards-row.grid-sma {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        }
+    }
+    @media (max-width: 680px) {
+        .live-monitor-panel.is-fullscreen .live-cards-row.grid-smp,
+        .live-monitor-panel.is-fullscreen .live-cards-row.grid-sma {
+            grid-template-columns: 1fr !important;
+        }
     }
     .live-monitor-panel.is-fullscreen .live-class-card {
-        height: 100% !important;
+        min-height: 180px !important;
         box-sizing: border-box !important;
     }
     </style>
@@ -1818,7 +1867,7 @@ function render_live_monitoring_widget(): void
                 html += '<span class="live-level-title-text">Kelas SMP (' + smpCards.length + ' Kelas)</span>';
                 html += '<span class="live-level-line"></span>';
                 html += '</div>';
-                html += '<div class="live-cards-row grid-smp" style="--cols: ' + smpCols + '; grid-template-columns: repeat(' + smpCols + ', minmax(0, 1fr));">';
+                html += '<div class="live-cards-row grid-smp" style="--cols: ' + smpCols + ';">';
                 smpCards.forEach(function(c){ html += renderCardHtml(c, targetPeriod); });
                 html += '</div>';
                 html += '</div>';
@@ -1827,14 +1876,14 @@ function render_live_monitoring_widget(): void
             // Section SMA
             if (smaCards.length > 0) {
                 var smaCols = Math.max(1, smaCards.length);
-                var topMargin = (smpCards.length > 0) ? ' style="margin-top: 12px;"' : '';
+                var topMargin = (smpCards.length > 0) ? ' style="margin-top: 14px;"' : '';
                 html += '<div class="live-level-section"' + topMargin + '>';
                 html += '<div class="live-level-title-bar">';
                 html += '<span class="live-level-pill pill-sma">SMA</span>';
                 html += '<span class="live-level-title-text">Kelas SMA (' + smaCards.length + ' Kelas)</span>';
                 html += '<span class="live-level-line"></span>';
                 html += '</div>';
-                html += '<div class="live-cards-row grid-sma" style="--cols: ' + smaCols + '; grid-template-columns: repeat(' + smaCols + ', minmax(0, 1fr));">';
+                html += '<div class="live-cards-row grid-sma" style="--cols: ' + smaCols + ';">';
                 smaCards.forEach(function(c){ html += renderCardHtml(c, targetPeriod); });
                 html += '</div>';
                 html += '</div>';
