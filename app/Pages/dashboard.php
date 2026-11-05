@@ -520,6 +520,66 @@ function get_live_monitoring_data(): array
         ];
     }
 
+    // Integrate today's school-wide period activities (Upacara, Jum'at Sehat, dll)
+    $todayActivities = function_exists('schedule_get_period_activities')
+        ? (schedule_get_period_activities()[(string)$today] ?? [])
+        : [];
+
+    foreach ($todayActivities as $actP => $actName) {
+        $p = (int)$actP;
+        $actName = trim((string)$actName);
+        if ($actName === '' || strtolower($actName) === 'pelajaran' || strtolower($actName) === 'normal') continue;
+
+        [$actStart, $actEnd] = schedule_time_for_period($p, $today);
+        if (!isset($periodsToday[$p])) {
+            $periodsToday[$p] = [
+                'period_no' => $p,
+                'start_time' => $actStart,
+                'end_time' => $actEnd,
+            ];
+        }
+        $periodsToday[$p]['is_activity'] = true;
+        $periodsToday[$p]['activity_name'] = $actName;
+
+        if ($timeNow >= $periodsToday[$p]['start_time'] && $timeNow <= $periodsToday[$p]['end_time']) {
+            $activePeriodNow = $p;
+        }
+
+        $actTimeStatus = 'upcoming';
+        if ($timeNow >= $periodsToday[$p]['start_time'] && $timeNow <= $periodsToday[$p]['end_time']) {
+            $actTimeStatus = 'ongoing';
+        } elseif ($timeNow > $periodsToday[$p]['end_time']) {
+            $actTimeStatus = 'finished';
+        }
+
+        foreach ($classes as $c) {
+            $cid = (int)$c['id'];
+            $schedulesByClass[$cid][$p] = [
+                'id' => 0,
+                'assignment_id' => 0,
+                'period_no' => $p,
+                'start_time' => $periodsToday[$p]['start_time'],
+                'end_time' => $periodsToday[$p]['end_time'],
+                'time_status' => $actTimeStatus,
+                'subject_name' => $actName,
+                'teacher_name' => 'Seluruh Guru & Siswa',
+                'is_activity' => true,
+                'activity_name' => $actName,
+                'meeting_no' => 1,
+                'is_checked_in' => true,
+                'checkin_type' => 'school_activity',
+                'checkin_time' => '',
+                'checkin_status' => 'kegiatan',
+                'checkin_notes' => $actName,
+                'has_gps' => false,
+                'lat' => null,
+                'lng' => null,
+                'student_stats' => ['hadir' => 0, 'sakit' => 0, 'izin' => 0, 'alpa' => 0],
+                'attendance_url' => route_url('student-attendance', ['date' => $date]),
+            ];
+        }
+    }
+
     ksort($periodsToday);
 
     // Calculate total distinct student attendance for today across entire school
@@ -555,6 +615,10 @@ function get_live_monitoring_data(): array
         }
     }
 
+    $activeActivityName = ($activePeriodNow && !empty($periodsToday[$activePeriodNow]['activity_name']))
+        ? $periodsToday[$activePeriodNow]['activity_name']
+        : null;
+
     $schoolDayState = 'in_session';
     $schoolDayStateLabel = 'KBM Sedang Berlangsung';
     if (empty($periodsToday)) {
@@ -566,6 +630,9 @@ function get_live_monitoring_data(): array
     } elseif ($schoolEndTime !== null && $timeNow > $schoolEndTime) {
         $schoolDayState = 'after_school';
         $schoolDayStateLabel = 'KBM Hari Ini Selesai';
+    } elseif ($activeActivityName) {
+        $schoolDayState = 'school_activity';
+        $schoolDayStateLabel = 'Kegiatan: ' . $activeActivityName;
     } elseif ($activePeriodNow === null) {
         $schoolDayState = 'break_time';
         $schoolDayStateLabel = 'Waktu Istirahat';
@@ -1709,7 +1776,8 @@ function render_live_monitoring_widget(): void
             var html = '<option value="current">' + autoLabel + '</option>';
             cachedPeriods.forEach(function(p){
                 var isSelected = (currentVal == p.period_no) ? ' selected' : '';
-                html += '<option value="' + p.period_no + '"' + isSelected + '>Jam ke-' + p.period_no + ' (' + p.start_time + ' - ' + p.end_time + ')</option>';
+                var actBadge = p.is_activity ? ' - 🚩 ' + p.activity_name : '';
+                html += '<option value="' + p.period_no + '"' + isSelected + '>Jam ke-' + p.period_no + ' (' + p.start_time + ' - ' + p.end_time + ')' + actBadge + '</option>';
             });
             periodSelect.innerHTML = html;
             if (currentVal) periodSelect.value = currentVal;
@@ -1762,7 +1830,19 @@ function render_live_monitoring_widget(): void
                     }
                 }
 
-                if (slot.is_checked_in) {
+                if (slot.is_activity) {
+                    cardClass = 'status-present';
+                    var actIcon = '🚩';
+                    var aName = slot.activity_name || 'Kegiatan';
+                    if (aName.indexOf('Sehat') !== -1 || aName.indexOf('Senam') !== -1) actIcon = '🏃';
+                    else if (aName.indexOf('Bersih') !== -1) actIcon = '🧹';
+                    else if (aName.indexOf('Dhuha') !== -1 || aName.indexOf('Pengajian') !== -1 || aName.indexOf('Sholat') !== -1) actIcon = '🕌';
+                    else if (aName.indexOf('Literasi') !== -1 || aName.indexOf('Apel') !== -1) actIcon = '📖';
+
+                    statusPill = '<div class="live-status-pill pill-present" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af;">' +
+                        '<span>' + actIcon + ' KEGIATAN: ' + escapeHtml(aName).toUpperCase() + '</span>' +
+                        '</div>';
+                } else if (slot.is_checked_in) {
                     cardClass = 'status-present';
                     var inTime = slot.checkin_time ? ' (' + slot.checkin_time.substring(0, 5) + ')' : '';
                     var gpsIcon = slot.has_gps ? ' ' + svgPin : '';

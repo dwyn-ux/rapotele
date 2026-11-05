@@ -47,6 +47,64 @@ function schedule_period_times(): array
     ];
 }
 
+function schedule_activity_options(): array
+{
+    return [
+        'pelajaran' => '📚 Pelajaran (KBM Normal)',
+        'Upacara Bendera' => '🚩 Upacara Bendera',
+        'Jum\'at Sehat' => '🏃 Jum\'at Sehat',
+        'Jum\'at Bersih' => '🧹 Jum\'at Bersih',
+        'Sholat Dhuha / Pengajian' => '🕌 Sholat Dhuha / Pengajian',
+        'Literasi / Apel Pagi' => '📖 Literasi / Apel Pagi',
+        'Senam Bersama' => '🤸 Senam Bersama',
+        'custom' => '✏️ Kegiatan Khusus / Lainnya...',
+    ];
+}
+
+function schedule_get_period_activities(): array
+{
+    $raw = function_exists('get_app_setting') ? get_app_setting('schedule_period_activities', '') : '';
+    if (!$raw) {
+        return [];
+    }
+    $decoded = json_decode((string)$raw, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function schedule_save_period_activities(array $activities): void
+{
+    if (function_exists('set_app_setting')) {
+        set_app_setting('schedule_period_activities', json_encode($activities, JSON_UNESCAPED_UNICODE));
+    }
+}
+
+function schedule_get_activity_for_period(int $dayOfWeek, int $periodNo): ?string
+{
+    $all = schedule_get_period_activities();
+    $act = trim((string)($all[(string)$dayOfWeek][(string)$periodNo] ?? ''));
+    if ($act === '' || strtolower($act) === 'pelajaran' || strtolower($act) === 'normal') {
+        return null;
+    }
+    return $act;
+}
+
+function schedule_get_custom_period_times(): array
+{
+    $raw = function_exists('get_app_setting') ? get_app_setting('schedule_custom_period_times', '') : '';
+    if (!$raw) {
+        return [];
+    }
+    $decoded = json_decode((string)$raw, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function schedule_save_custom_period_times(array $times): void
+{
+    if (function_exists('set_app_setting')) {
+        set_app_setting('schedule_custom_period_times', json_encode($times, JSON_UNESCAPED_UNICODE));
+    }
+}
+
 function schedule_is_short_day(int $dayOfWeek): bool
 {
     $school = get_school_profile();
@@ -167,6 +225,14 @@ function schedule_day_has_custom_breaks(int $dayOfWeek): bool
 
 function schedule_time_for_period(int $period, ?int $dayOfWeek = null): array
 {
+    $custom = schedule_get_custom_period_times();
+    if ($dayOfWeek !== null && !empty($custom[(string)$dayOfWeek][(string)$period]['start']) && !empty($custom[(string)$dayOfWeek][(string)$period]['end'])) {
+        return [
+            substr((string)$custom[(string)$dayOfWeek][(string)$period]['start'], 0, 5),
+            substr((string)$custom[(string)$dayOfWeek][(string)$period]['end'], 0, 5),
+        ];
+    }
+
     $school = get_school_profile();
     $startTime = trim((string)($school['start_time'] ?? '07:00'));
     $parts = explode(':', $startTime);
@@ -1375,10 +1441,16 @@ function render_lesson_schedule_teacher_page(?int $customTeacherId = null): void
                                     $isLocked = $current && (int)$current['locked'] === 1;
                                     [$dayStart, $dayEnd] = schedule_time_for_period($p, $dayNum);
                                     $dayBreak = schedule_break_minutes_for_after($p, $dayNum);
+                                    $actForPeriod = schedule_get_activity_for_period($dayNum, $p);
                                 ?>
-                                    <td style="padding:6px;vertical-align:middle;text-align:center;<?= $currentAssignmentId > 0 ? 'background:#f0fdf4;' : '' ?>">
+                                    <td style="padding:6px;vertical-align:middle;text-align:center;<?= $actForPeriod !== null ? 'background:#f0f9ff;' : ($currentAssignmentId > 0 ? 'background:#f0fdf4;' : '') ?>">
                                         <div style="font-size:0.72rem;color:var(--text-muted,#64748b);font-weight:600;margin-bottom:3px;"><?= e($dayStart . ' - ' . $dayEnd) ?></div>
-                                        <?php if ($isLocked): ?>
+                                        <?php if ($actForPeriod !== null): ?>
+                                            <div style="background:#e0f2fe;border:1px solid #7dd3fc;color:#0369a1;padding:6px 8px;border-radius:6px;font-size:0.78rem;font-weight:700;line-height:1.3;" title="Kegiatan Sekolah / Bersama">
+                                                🚩 <?= e($actForPeriod) ?>
+                                            </div>
+                                            <div style="font-size:0.68rem;color:#0284c7;margin-top:2px;font-weight:600;">Kegiatan Bersama</div>
+                                        <?php elseif ($isLocked): ?>
                                             <div style="background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;padding:6px 8px;border-radius:6px;font-size:0.78rem;font-weight:600;line-height:1.3;" title="Jadwal ini dikunci oleh admin">
                                                 🔒 <?= e($current['class_name'] . ' - ' . $current['subject_name']) ?>
                                                 <input type="hidden" name="teacher_slot[<?= $dayNum ?>][<?= $p ?>]" value="<?= $currentAssignmentId ?>">
@@ -1490,6 +1562,33 @@ function render_lesson_schedule_student_page(): void
         'Kelas' => (string)($student['class_name'] ?? '-'),
         'Slot Pelajaran' => count($rows),
     ]);
+
+    $activities = schedule_get_period_activities();
+    $hasActivities = false;
+    foreach ($activities as $d => $pList) {
+        if (!empty($pList)) {
+            $hasActivities = true;
+            break;
+        }
+    }
+    if ($hasActivities) {
+        $days = schedule_days();
+        echo '<div style="margin:16px 0;background:#f0f9ff;border:1px solid #bae6fd;border-left:4px solid #0284c7;padding:12px 16px;border-radius:8px;">';
+        echo '<div style="font-weight:700;color:#0369a1;margin-bottom:8px;font-size:0.9rem;display:flex;align-items:center;gap:6px;">';
+        echo '🚩 Kegiatan Rutin Mingguan Sekolah</div>';
+        echo '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
+        foreach ($activities as $d => $pList) {
+            $dName = $days[(int)$d] ?? "Hari $d";
+            foreach ($pList as $p => $act) {
+                [$tS, $tE] = schedule_time_for_period((int)$p, (int)$d);
+                echo '<span style="background:#ffffff;border:1px solid #7dd3fc;color:#0369a1;padding:4px 10px;border-radius:6px;font-size:0.8rem;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,0.03);">';
+                echo e("{$dName} Jam ke-{$p} ({$tS} - {$tE}): {$act}");
+                echo '</span>';
+            }
+        }
+        echo '</div></div>';
+    }
+
     render_lesson_schedule_table($rows, false);
 }
 
@@ -2324,7 +2423,10 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                         </tr>
                     </thead>
                     <tbody>
-                        <?php for ($p = 1; $p <= $maxPeriods; $p++): ?>
+                        <?php
+                        $dayActivities = schedule_get_period_activities()[(string)$filterDay] ?? [];
+                        $activityOptions = schedule_activity_options();
+                        for ($p = 1; $p <= $maxPeriods; $p++): ?>
                             <?php
                             [$defaultStart, $defaultEnd] = schedule_time_for_period($p, $filterDay);
                             // Cek jika ada custom time yang tersimpan di baris ini
@@ -2335,6 +2437,16 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                                     break;
                                 }
                             }
+                            $curAct = $dayActivities[(string)$p] ?? null;
+                            $actIcon = '🚩';
+                            if ($curAct) {
+                                if (stripos($curAct, 'Sehat') !== false || stripos($curAct, 'Senam') !== false) $actIcon = '🏃';
+                                elseif (stripos($curAct, 'Bersih') !== false) $actIcon = '🧹';
+                                elseif (stripos($curAct, 'Dhuha') !== false || stripos($curAct, 'Pengajian') !== false || stripos($curAct, 'Sholat') !== false) $actIcon = '🕌';
+                                elseif (stripos($curAct, 'Literasi') !== false || stripos($curAct, 'Apel') !== false) $actIcon = '📖';
+                                elseif (stripos($curAct, 'Upacara') !== false) $actIcon = '🚩';
+                                else $actIcon = '⭐';
+                            }
                             ?>
                             <tr>
                                 <td class="schedule-matrix-sticky-col" data-period-row="<?= $p ?>">
@@ -2343,9 +2455,45 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                                         <span class="row-conflict-badge" data-period-badge="<?= $p ?>" style="display:none;background:#ef4444;color:#fff;font-size:0.65rem;padding:1px 5px;border-radius:4px;font-weight:700;" title="Ada guru bentrok di jam ini!">Bentrok!</span>
                                     </div>
                                     <div class="schedule-matrix-time-box">
-                                        <input type="time" name="slot_time[<?= $p ?>][start]" value="<?= e($defaultStart) ?>" class="schedule-matrix-time-input">
+                                        <input type="time" name="slot_time[<?= $p ?>][start]" value="<?= e($defaultStart) ?>" class="schedule-matrix-time-input" title="Jam Mulai">
                                         <span style="font-size:0.75rem;color:var(--text-muted);">-</span>
-                                        <input type="time" name="slot_time[<?= $p ?>][end]" value="<?= e($defaultEnd) ?>" class="schedule-matrix-time-input">
+                                        <input type="time" name="slot_time[<?= $p ?>][end]" value="<?= e($defaultEnd) ?>" class="schedule-matrix-time-input" title="Jam Selesai">
+                                    </div>
+                                    <div style="margin-top:6px;">
+                                        <select name="period_activity[<?= $p ?>]"
+                                                class="matrix-activity-select"
+                                                data-period="<?= $p ?>"
+                                                onchange="matrixActivityChanged(<?= $p ?>, this.value)"
+                                                style="width:100%;font-size:0.72rem;padding:3px 4px;border-radius:5px;border:1px solid <?= $curAct ? '#3b82f6' : '#cbd5e1' ?>;background:<?= $curAct ? '#eff6ff' : '#ffffff' ?>;color:<?= $curAct ? '#1e40af' : '#475569' ?>;font-weight:<?= $curAct ? '700' : '600' ?>;"
+                                                title="Pilih jenis kegiatan pada jam ini (Pelajaran atau Kegiatan Sekolah seperti Upacara, Jum'at Sehat, dll)">
+                                            <?php foreach ($activityOptions as $actKey => $actLabel):
+                                                $isActSel = ($curAct ? ($actKey === $curAct || (!isset($activityOptions[$curAct]) && $actKey === 'custom')) : ($actKey === 'pelajaran'));
+                                            ?>
+                                                <option value="<?= e($actKey) ?>" <?= $isActSel ? 'selected' : '' ?>><?= e($actLabel) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <input type="text"
+                                               name="period_activity_custom[<?= $p ?>]"
+                                               id="activity-custom-input-<?= $p ?>"
+                                               value="<?= (!isset($activityOptions[$curAct]) && $curAct) ? e($curAct) : '' ?>"
+                                               placeholder="Ketik kegiatan..."
+                                               oninput="matrixCustomActivityTyped(<?= $p ?>, this.value)"
+                                               style="display:<?= (!isset($activityOptions[$curAct]) && $curAct) ? 'block' : 'none' ?>;width:100%;font-size:0.72rem;padding:3px 5px;margin-top:3px;border-radius:4px;border:1px solid #93c5fd;box-sizing:border-box;">
+                                    </div>
+                                </td>
+                                <td colspan="<?= count($allClasses) ?>"
+                                    class="matrix-activity-banner"
+                                    id="activity-banner-<?= $p ?>"
+                                    style="display:<?= $curAct ? '' : 'none' ?>;background:linear-gradient(90deg, #eff6ff 0%, #f0fdf4 100%);border-left:4px solid #3b82f6;text-align:center;padding:12px 16px !important;color:#1e40af;font-weight:700;font-size:0.88rem;">
+                                    <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;">
+                                        <span style="font-size:1.2rem;" class="act-banner-icon"><?= e($actIcon) ?></span>
+                                        <span style="font-size:0.95rem;font-weight:800;color:#1e3a8a;" class="act-banner-name"><?= e($curAct ?: 'Kegiatan Bersama') ?></span>
+                                        <span style="font-size:0.72rem;background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:999px;font-weight:600;border:1px solid #bfdbfe;">
+                                            Kegiatan Bersama Seluruh Kelas
+                                        </span>
+                                        <span style="font-size:0.72rem;color:#64748b;font-weight:normal;">
+                                            (Pilih "Pelajaran" di dropdown sebelah kiri jika ingin mengisi mapel per kelas)
+                                        </span>
                                     </div>
                                 </td>
                                 <?php foreach ($allClasses as $cls): ?>
@@ -2355,7 +2503,7 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
                                     $curAsgnId = $cur ? (int)$cur['assignment_id'] : 0;
                                     $clsAssignments = $assignmentsByClass[$cid] ?? [];
                                     ?>
-                                    <td class="schedule-matrix-cell" data-class-id="<?= $cid ?>" data-period="<?= $p ?>">
+                                    <td class="schedule-matrix-cell" data-class-id="<?= $cid ?>" data-period="<?= $p ?>" style="<?= $curAct ? 'display:none;' : '' ?>">
                                         <select name="matrix_slot[<?= $cid ?>][<?= $p ?>]"
                                                 class="matrix-slot-select <?= $curAsgnId > 0 ? 'is-filled' : '' ?>"
                                                 data-period="<?= $p ?>"
@@ -2520,6 +2668,67 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
             }
         }
 
+        function matrixActivityChanged(period, val) {
+            var customInput = document.getElementById('activity-custom-input-' + period);
+            if (val === 'custom') {
+                if (customInput) customInput.style.display = 'block';
+            } else {
+                if (customInput) customInput.style.display = 'none';
+            }
+
+            var banner = document.getElementById('activity-banner-' + period);
+            var cells = document.querySelectorAll('td.schedule-matrix-cell[data-period="' + period + '"]');
+            var selectEl = document.querySelector('select[name="period_activity[' + period + ']"]');
+
+            if (val !== 'pelajaran') {
+                var actName = val;
+                var icon = '🚩';
+                if (val.indexOf('Sehat') !== -1 || val.indexOf('Senam') !== -1) icon = '🏃';
+                else if (val.indexOf('Bersih') !== -1) icon = '🧹';
+                else if (val.indexOf('Dhuha') !== -1 || val.indexOf('Pengajian') !== -1 || val.indexOf('Sholat') !== -1) icon = '🕌';
+                else if (val.indexOf('Literasi') !== -1 || val.indexOf('Apel') !== -1) icon = '📖';
+
+                if (val === 'custom') {
+                    actName = (customInput && customInput.value.trim()) ? customInput.value.trim() : 'Kegiatan Khusus';
+                    icon = '⭐';
+                }
+
+                if (selectEl) {
+                    selectEl.style.background = '#eff6ff';
+                    selectEl.style.borderColor = '#3b82f6';
+                    selectEl.style.color = '#1e40af';
+                    selectEl.style.fontWeight = '700';
+                }
+
+                if (banner) {
+                    banner.style.display = '';
+                    var nameEl = banner.querySelector('.act-banner-name');
+                    var iconEl = banner.querySelector('.act-banner-icon');
+                    if (nameEl) nameEl.textContent = actName;
+                    if (iconEl) iconEl.textContent = icon;
+                }
+                cells.forEach(function(c) { c.style.display = 'none'; });
+            } else {
+                if (selectEl) {
+                    selectEl.style.background = '#ffffff';
+                    selectEl.style.borderColor = '#cbd5e1';
+                    selectEl.style.color = '#475569';
+                    selectEl.style.fontWeight = '600';
+                }
+                if (banner) banner.style.display = 'none';
+                cells.forEach(function(c) { c.style.display = ''; });
+            }
+            checkMatrixConflicts();
+        }
+
+        function matrixCustomActivityTyped(period, text) {
+            var banner = document.getElementById('activity-banner-' + period);
+            if (banner) {
+                var nameEl = banner.querySelector('.act-banner-name');
+                if (nameEl) nameEl.textContent = text.trim() || 'Kegiatan Khusus';
+            }
+        }
+
         function checkMatrixConflicts() {
             var selects = document.querySelectorAll('.matrix-slot-select');
             var byPeriod = {};
@@ -2538,6 +2747,11 @@ function render_schedule_grid_form(int $maxPeriod = 8): void
             var totalConflicts = 0;
 
             Object.keys(byPeriod).forEach(function(p) {
+                var actSel = document.querySelector('select[name="period_activity[' + p + ']"]');
+                if (actSel && actSel.value !== 'pelajaran') {
+                    // Jam ini adalah kegiatan sekolah (Upacara, Jum'at Sehat, dll), lewati cek bentrok KBM
+                    return;
+                }
                 var periodSelects = byPeriod[p];
                 var teacherCounts = {};
                 periodSelects.forEach(function(sel) {
@@ -2750,6 +2964,50 @@ function action_save_schedule_daily_matrix(): void
     $school = get_school_profile();
     $maxPeriods = (int)($school['max_periods'] ?? 10);
 
+    // 1. Simpan Jenis Kegiatan per Jam Pelajaran untuk hari ini
+    $periodActivities = schedule_get_period_activities();
+    $dayActivities = $_POST['period_activity'] ?? [];
+    $customActivities = $_POST['period_activity_custom'] ?? [];
+
+    if (!isset($periodActivities[(string)$day])) {
+        $periodActivities[(string)$day] = [];
+    }
+
+    $activeActivitiesToday = [];
+    for ($p = 1; $p <= $maxPeriods; $p++) {
+        $act = trim((string)($dayActivities[$p] ?? 'pelajaran'));
+        if ($act === 'custom') {
+            $act = trim((string)($customActivities[$p] ?? ''));
+        }
+        if ($act === '' || strtolower($act) === 'pelajaran' || strtolower($act) === 'normal') {
+            unset($periodActivities[(string)$day][(string)$p]);
+        } else {
+            $periodActivities[(string)$day][(string)$p] = $act;
+            $activeActivitiesToday[$p] = $act;
+        }
+    }
+    if (empty($periodActivities[(string)$day])) {
+        unset($periodActivities[(string)$day]);
+    }
+    schedule_save_period_activities($periodActivities);
+
+    // 2. Simpan Custom Time per Jam Pelajaran untuk hari ini
+    $allCustomTimes = schedule_get_custom_period_times();
+    if (!isset($allCustomTimes[(string)$day])) {
+        $allCustomTimes[(string)$day] = [];
+    }
+    for ($p = 1; $p <= $maxPeriods; $p++) {
+        $cStart = schedule_normalize_time($slotTimes[$p]['start'] ?? '') ?? null;
+        $cEnd = schedule_normalize_time($slotTimes[$p]['end'] ?? '') ?? null;
+        if ($cStart !== null && $cEnd !== null) {
+            $allCustomTimes[(string)$day][(string)$p] = [
+                'start' => $cStart,
+                'end' => $cEnd,
+            ];
+        }
+    }
+    schedule_save_custom_period_times($allCustomTimes);
+
     $existing = [];
     foreach (fetch_all('SELECT id, assignment_id, teacher_id, class_id, subject_id, day_of_week, period_no, start_time, end_time, locked FROM lesson_schedules WHERE day_of_week = ?', [$day]) as $row) {
         $existing[(int)$row['class_id']][(int)$row['period_no']] = $row;
@@ -2779,6 +3037,16 @@ function action_save_schedule_daily_matrix(): void
 
                 $current = $existing[$classId][$p] ?? null;
                 $currentAssignmentId = $current ? (int)$current['assignment_id'] : 0;
+
+                // Jika jam ini diset sebagai kegiatan bersama sekolah (Upacara, Jum'at Sehat, dll)
+                if (isset($activeActivitiesToday[$p])) {
+                    if ($current && (int)$current['locked'] === 0) {
+                        execute_sql('DELETE FROM lesson_schedules WHERE id = ?', [(int)$current['id']]);
+                        unset($existing[$classId][$p]);
+                        $deleted++;
+                    }
+                    continue;
+                }
 
                 if ($assignmentId === 0 && !$current) {
                     continue;
@@ -3025,6 +3293,19 @@ function action_save_teacher_schedule_matrix(): void
 
                 $current = $existing[$day][$p] ?? null;
                 $currentAssignmentId = $current ? (int)$current['assignment_id'] : 0;
+
+                $actForPeriod = schedule_get_activity_for_period($day, $p);
+                if ($actForPeriod !== null) {
+                    if ($assignmentId > 0) {
+                        $errors[] = "Hari {$dayName} Jam ke-{$p} adalah Kegiatan Bersama ({$actForPeriod}), tidak dapat diisi jam pelajaran.";
+                    }
+                    if ($current && (int)$current['locked'] === 0) {
+                        execute_sql('DELETE FROM lesson_schedules WHERE id = ?', [(int)$current['id']]);
+                        unset($existing[$day][$p]);
+                        $deleted++;
+                    }
+                    continue;
+                }
 
                 // 1. Both empty
                 if ($assignmentId === 0 && !$current) {
