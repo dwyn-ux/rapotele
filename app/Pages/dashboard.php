@@ -311,17 +311,27 @@ function get_live_monitoring_data(): array
         'SELECT sas.id, sas.assignment_id, sas.meeting_no, sas.teacher_attended, sas.teacher_status, sas.teacher_time_in, sas.teacher_lat, sas.teacher_lng, sas.teacher_notes,
                 ta.teacher_id, ta.class_id, ta.subject_id
          FROM student_attendance_sessions sas
-         JOIN teaching_assignments ta ON ta.id = sas.assignment_id
-         WHERE sas.date = ?',
+         LEFT JOIN teaching_assignments ta ON ta.id = sas.assignment_id
+         WHERE sas.date = ?
+         ORDER BY sas.id DESC',
         [$date]
     );
     $sessionByAssignment = [];
     $sessionByClassSubject = [];
     $sessionIds = [];
     foreach ($sessions as $sess) {
-        $sessionByAssignment[(int)$sess['assignment_id']] = $sess;
-        $sessionByClassSubject[(int)$sess['class_id']][(int)$sess['subject_id']] = $sess;
-        $sessionIds[] = (int)$sess['id'];
+        $sid = (int)$sess['id'];
+        $asgnId = (int)$sess['assignment_id'];
+        $classId = (int)($sess['class_id'] ?? 0);
+        $subjectId = (int)($sess['subject_id'] ?? 0);
+
+        if (!isset($sessionByAssignment[$asgnId])) {
+            $sessionByAssignment[$asgnId] = $sess;
+        }
+        if ($classId > 0 && $subjectId > 0 && !isset($sessionByClassSubject[$classId][$subjectId])) {
+            $sessionByClassSubject[$classId][$subjectId] = $sess;
+        }
+        $sessionIds[] = $sid;
     }
 
     $studentCountsBySession = [];
@@ -336,8 +346,44 @@ function get_live_monitoring_data(): array
         );
         foreach ($entries as $e) {
             $sid = (int)$e['session_id'];
-            $st = strtolower((string)$e['status']);
-            $studentCountsBySession[$sid][$st] = (int)$e['count'];
+            $st = strtolower(trim((string)$e['status']));
+            if ($st === 'alfa') $st = 'alpa';
+            if (!isset($studentCountsBySession[$sid])) {
+                $studentCountsBySession[$sid] = ['hadir' => 0, 'sakit' => 0, 'izin' => 0, 'alpa' => 0];
+            }
+            if ($st === 'terlambat') {
+                $studentCountsBySession[$sid]['hadir'] += (int)$e['count'];
+            } elseif (isset($studentCountsBySession[$sid][$st])) {
+                $studentCountsBySession[$sid][$st] += (int)$e['count'];
+            }
+        }
+    }
+
+    // Direct query for student attendance today grouped by student class
+    // This is 100% reliable and captures any student attendance recorded today
+    $classStudentTodayStats = [];
+    if (table_exists('student_attendance_entries') && table_exists('student_attendance_sessions')) {
+        $todayStudentRows = fetch_all(
+            'SELECT s.class_id, sae.status, COUNT(DISTINCT sae.student_id) as total
+             FROM student_attendance_entries sae
+             JOIN student_attendance_sessions sas ON sas.id = sae.session_id
+             JOIN students s ON s.id = sae.student_id
+             WHERE sas.date = ?
+             GROUP BY s.class_id, sae.status',
+            [$date]
+        );
+        foreach ($todayStudentRows as $tsr) {
+            $cid = (int)$tsr['class_id'];
+            $st = strtolower(trim((string)$tsr['status']));
+            if ($st === 'alfa') $st = 'alpa';
+            if (!isset($classStudentTodayStats[$cid])) {
+                $classStudentTodayStats[$cid] = ['hadir' => 0, 'sakit' => 0, 'izin' => 0, 'alpa' => 0];
+            }
+            if ($st === 'terlambat') {
+                $classStudentTodayStats[$cid]['hadir'] += (int)$tsr['total'];
+            } elseif (isset($classStudentTodayStats[$cid][$st])) {
+                $classStudentTodayStats[$cid][$st] += (int)$tsr['total'];
+            }
         }
     }
 
@@ -408,10 +454,16 @@ function get_live_monitoring_data(): array
         $studentStats = ['hadir' => 0, 'sakit' => 0, 'izin' => 0, 'alpa' => 0];
         $meetingNo = 1;
 
+        if ($sess) {
+            $meetingNo = (int)($sess['meeting_no'] ?? 1);
+            if (isset($studentCountsBySession[(int)$sess['id']])) {
+                $studentStats = array_merge($studentStats, $studentCountsBySession[(int)$sess['id']]);
+            }
+        }
+
         if ($sess && (!empty($sess['teacher_attended']) || !empty($sess['teacher_time_in']))) {
             $isCheckedIn = true;
             $checkinType = 'classroom';
-            $meetingNo = (int)($sess['meeting_no'] ?? 1);
             $checkinTime = (string)($sess['teacher_time_in'] ?: '');
             $checkinStatus = (string)($sess['teacher_status'] ?: 'hadir');
             $checkinNotes = (string)($sess['teacher_notes'] ?: '');
@@ -419,9 +471,6 @@ function get_live_monitoring_data(): array
                 $hasGps = true;
                 $lat = (float)$sess['teacher_lat'];
                 $lng = (float)$sess['teacher_lng'];
-            }
-            if (isset($studentCountsBySession[(int)$sess['id']])) {
-                $studentStats = array_merge($studentStats, $studentCountsBySession[(int)$sess['id']]);
             }
         } elseif ($tAtt && !empty($tAtt['status']) && $tAtt['status'] !== 'belum input') {
             $isCheckedIn = true;
@@ -468,15 +517,23 @@ function get_live_monitoring_data(): array
 
     ksort($periodsToday);
 
+    // Calculate total distinct student attendance for today across entire school
+    $totalHadirStudents = 0;
+    $totalSakitStudents = 0;
+    $totalIzinStudents = 0;
+    $totalAlpaStudents = 0;
+    foreach ($classStudentTodayStats as $sStat) {
+        $totalHadirStudents += (int)$sStat['hadir'];
+        $totalSakitStudents += (int)$sStat['sakit'];
+        $totalIzinStudents += (int)$sStat['izin'];
+        $totalAlpaStudents += (int)$sStat['alpa'];
+    }
+
     // Build class cards data
     $classCards = [];
     $totalOngoingClasses = 0;
     $totalPresentTeachers = 0;
     $totalAbsentAlerts = 0;
-    $totalHadirStudents = 0;
-    $totalSakitStudents = 0;
-    $totalIzinStudents = 0;
-    $totalAlpaStudents = 0;
 
     $availablePeriodKeys = array_keys($periodsToday);
     $latestPeriodToday = !empty($availablePeriodKeys) ? end($availablePeriodKeys) : 1;
@@ -490,7 +547,7 @@ function get_live_monitoring_data(): array
 
         $classSlots = $schedulesByClass[$cid] ?? [];
 
-        // Sum student attendance for this class today across all sessions
+        // Sum student attendance for this class today across all sessions (per slot)
         $classStudentSum = ['hadir' => 0, 'sakit' => 0, 'izin' => 0, 'alpa' => 0];
         foreach ($classSlots as $slot) {
             $classStudentSum['hadir'] += $slot['student_stats']['hadir'];
@@ -498,10 +555,11 @@ function get_live_monitoring_data(): array
             $classStudentSum['izin'] += $slot['student_stats']['izin'];
             $classStudentSum['alpa'] += $slot['student_stats']['alpa'];
         }
-        $totalHadirStudents += $classStudentSum['hadir'];
-        $totalSakitStudents += $classStudentSum['sakit'];
-        $totalIzinStudents += $classStudentSum['izin'];
-        $totalAlpaStudents += $classStudentSum['alpa'];
+        $todayClassStats = $classStudentTodayStats[$cid] ?? ['hadir' => 0, 'sakit' => 0, 'izin' => 0, 'alpa' => 0];
+        // If direct class stats has numbers, fallback or merge if slot sum is 0
+        if (($classStudentSum['hadir'] + $classStudentSum['sakit'] + $classStudentSum['izin'] + $classStudentSum['alpa']) === 0) {
+            $classStudentSum = $todayClassStats;
+        }
 
         // Find active slot right now
         $currentSlot = null;
@@ -536,6 +594,9 @@ function get_live_monitoring_data(): array
             }
         }
 
+        $firstSlot = !empty($classSlots) ? reset($classSlots) : null;
+        $defaultAttUrl = $firstSlot['attendance_url'] ?? route_url('student-attendance');
+
         $classCards[] = [
             'class_id' => $cid,
             'class_name' => $cName,
@@ -546,6 +607,8 @@ function get_live_monitoring_data(): array
             'next_slot' => $nextSlot,
             'latest_slot' => !empty($classSlots) ? end($classSlots) : null,
             'class_student_sum' => $classStudentSum,
+            'today_student_stats' => $todayClassStats,
+            'default_attendance_url' => $defaultAttUrl,
         ];
     }
 
@@ -1331,14 +1394,25 @@ function render_live_monitoring_widget(): void
             var subjectName = '-';
             var periodLabel = 'Tidak ada KBM';
             var studentStats = { hadir: 0, sakit: 0, izin: 0, alpa: 0 };
-            var attUrl = '#';
+            var attUrl = card.default_attendance_url || '#';
+            var hasSlotAttendance = false;
 
             if (slot) {
                 teacherName = slot.teacher_name || '-';
                 subjectName = slot.subject_name || '-';
                 periodLabel = 'Jam ' + slot.period_no + ' &bull; ' + slot.start_time;
-                studentStats = slot.student_stats || { hadir: 0, sakit: 0, izin: 0, alpa: 0 };
-                attUrl = slot.attendance_url || '#';
+                if (slot.attendance_url) attUrl = slot.attendance_url;
+
+                if (slot.student_stats) {
+                    var sh = Number(slot.student_stats.hadir || 0);
+                    var ss = Number(slot.student_stats.sakit || 0);
+                    var si = Number(slot.student_stats.izin || 0);
+                    var sa = Number(slot.student_stats.alpa || 0);
+                    if ((sh + ss + si + sa) > 0) {
+                        studentStats = { hadir: sh, sakit: ss, izin: si, alpa: sa };
+                        hasSlotAttendance = true;
+                    }
+                }
 
                 if (slot.is_checked_in) {
                     cardClass = 'status-present';
@@ -1374,6 +1448,22 @@ function render_live_monitoring_widget(): void
                     '</div>';
             }
 
+            // Fallback to today's recorded class attendance if this slot has no attendance
+            var isDayFallback = false;
+            if (!hasSlotAttendance) {
+                var dayStats = card.today_student_stats || card.class_student_sum;
+                if (dayStats) {
+                    var dh = Number(dayStats.hadir || 0);
+                    var ds = Number(dayStats.sakit || 0);
+                    var di = Number(dayStats.izin || 0);
+                    var da = Number(dayStats.alpa || 0);
+                    if ((dh + ds + di + da) > 0) {
+                        studentStats = { hadir: dh, sakit: ds, izin: di, alpa: da };
+                        isDayFallback = true;
+                    }
+                }
+            }
+
             var levelClass = (card.class_level.toUpperCase() === 'SMA') ? 'level-sma' : 'level-smp';
 
             var cHtml = '<div class="live-class-card ' + cardClass + '">';
@@ -1406,9 +1496,11 @@ function render_live_monitoring_widget(): void
 
             // Foot
             cHtml += '<div class="live-card-foot">';
-            var hasStudents = (studentStats.hadir + studentStats.sakit + studentStats.izin + studentStats.alpa) > 0;
-            if (hasStudents) {
+            var totalSt = (studentStats.hadir || 0) + (studentStats.sakit || 0) + (studentStats.izin || 0) + (studentStats.alpa || 0);
+            if (hasSlotAttendance) {
                 cHtml += '<span style="font-size: 0.7rem; color: #16a34a; font-weight: 700;">' + svgCheck + ' Siswa Diabsen</span>';
+            } else if (isDayFallback) {
+                cHtml += '<span style="font-size: 0.7rem; color: #16a34a; font-weight: 700;" title="Absensi siswa yang tercatat hari ini">' + svgCheck + ' Presensi Hari Ini</span>';
             } else if (slot && slot.is_checked_in) {
                 cHtml += '<span style="font-size: 0.7rem; color: #d97706; font-weight: 600;">⏳ Belum Absen Siswa</span>';
             } else {
@@ -1416,7 +1508,7 @@ function render_live_monitoring_widget(): void
             }
 
             if (attUrl && attUrl !== '#') {
-                cHtml += '<a href="' + attUrl + '" class="live-btn-detail" title="Buka Presensi"><span>' + (hasStudents ? 'Detail Siswa' : 'Input Absen') + '</span>' + svgExtLink + '</a>';
+                cHtml += '<a href="' + attUrl + '" class="live-btn-detail" title="Buka Presensi"><span>' + (totalSt > 0 ? 'Detail Siswa' : 'Input Absen') + '</span>' + svgExtLink + '</a>';
             } else {
                 cHtml += '<span style="font-size: 0.7rem; color: #cbd5e1;">Belum Ada Sesi</span>';
             }
