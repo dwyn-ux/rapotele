@@ -893,6 +893,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (sel.classList.contains('search-select-original')) return;
         if (sel.closest('.search-select')) return;
         if (sel.classList.contains('no-search-select') || sel.dataset.noSearch !== undefined || sel.classList.contains('matrix-activity-select') || sel.classList.contains('matrix-slot-select')) return;
+        if (sel.style.display === 'none' || sel.hidden || (sel.getAttribute('style') && sel.getAttribute('style').indexOf('display: none') !== -1)) return;
         if (sel.options.length < 8) return;
         if (sel.multiple) return;
 

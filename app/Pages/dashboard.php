@@ -1762,9 +1762,6 @@ function render_live_monitoring_widget(): void
                     </button>
                     <div id="live-period-dropdown-menu" class="live-period-dropdown-menu" style="display: none;">
                     </div>
-                    <select id="live-period-select" style="display: none;">
-                        <option value="current">⚡ Jam Saat Ini (Otomatis)</option>
-                    </select>
                 </div>
             </div>
         </div>
@@ -1807,7 +1804,6 @@ function render_live_monitoring_widget(): void
         var dateEl = document.getElementById('live-header-date');
         var timeEl = document.getElementById('live-header-time');
         var stateEl = document.getElementById('live-header-state');
-        var periodSelect = document.getElementById('live-period-select');
 
         var svgPlay = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
         var svgPause = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
@@ -1920,23 +1916,11 @@ function render_live_monitoring_widget(): void
                         e.stopPropagation();
                         var val = item.getAttribute('data-value') || 'current';
                         selectedPeriod = val;
-                        if (periodSelect) periodSelect.value = val;
                         menuEl.style.display = 'none';
                         updatePeriodDropdown();
                         renderCards();
                     });
                 });
-            }
-
-            if (periodSelect) {
-                var html = '<option value="current">' + escapeHtml(autoLabel) + '</option>';
-                cachedPeriods.forEach(function(p){
-                    var isSelected = (currentVal == p.period_no) ? ' selected' : '';
-                    var actBadge = p.is_activity ? ' - 🚩 ' + p.activity_name : '';
-                    html += '<option value="' + p.period_no + '"' + isSelected + '>Jam ke-' + p.period_no + ' (' + p.start_time + ' - ' + p.end_time + ')' + escapeHtml(actBadge) + '</option>';
-                });
-                periodSelect.innerHTML = html;
-                if (currentVal) periodSelect.value = currentVal;
             }
         }
 
@@ -2283,14 +2267,6 @@ function render_live_monitoring_widget(): void
                 renderCards();
             });
         });
-
-        if (periodSelect) {
-            periodSelect.addEventListener('change', function(){
-                selectedPeriod = periodSelect.value;
-                updatePeriodDropdown();
-                renderCards();
-            });
-        }
 
         var dropdownBtn = document.getElementById('live-period-dropdown-btn');
         var dropdownMenu = document.getElementById('live-period-dropdown-menu');
