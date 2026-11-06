@@ -730,7 +730,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
             children: [
               // Class & Subject Selector
               DropdownButtonFormField<TeachingAssignmentModel>(
-                value: _selectedAssignment,
+                initialValue: _selectedAssignment,
                 isExpanded: true,
                 decoration: InputDecoration(
                   labelText: 'Kelas & Mata Pelajaran',
@@ -877,7 +877,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
                       itemCount: _students.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (ctx, idx) {
                         final student = _students[idx];
                         return _buildStudentCard(student, idx + 1);

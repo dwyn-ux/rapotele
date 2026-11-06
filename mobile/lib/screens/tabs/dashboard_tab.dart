@@ -281,7 +281,7 @@ class _DashboardTabState extends State<DashboardTab> {
                 child: const Row(
                   children: [
                     Icon(Icons.info_outline, color: Color(0xFF64748B), size: 20),
-                    const SizedBox(width: 10),
+                    SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'Tidak ada pemberitahuan atau peringatan jadwal saat ini.',

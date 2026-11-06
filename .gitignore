@@ -39,4 +39,6 @@ app/storage/uploads/*
 /test-output/
 /mobile/build/
 /mobile/.dart_tool/
+*.apk
+public/downloads/*.apk
 nul

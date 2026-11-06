@@ -303,7 +303,7 @@ class _AdministrationTabState extends State<AdministrationTab> with SingleTicker
 
             // Class Dropdown
             DropdownButtonFormField<TeachingAssignmentModel>(
-              value: _journalAssignment,
+              initialValue: _journalAssignment,
               isExpanded: true,
               decoration: InputDecoration(
                 labelText: 'Kelas & Mata Pelajaran',
@@ -551,7 +551,7 @@ class _AdministrationTabState extends State<AdministrationTab> with SingleTicker
             children: [
               // Class & Subject Selector
               DropdownButtonFormField<TeachingAssignmentModel>(
-                value: _gradeAssignment,
+                initialValue: _gradeAssignment,
                 isExpanded: true,
                 decoration: InputDecoration(
                   labelText: 'Kelas & Mata Pelajaran',
@@ -595,7 +595,7 @@ class _AdministrationTabState extends State<AdministrationTab> with SingleTicker
               if (_objectives.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 DropdownButtonFormField<LearningObjectiveModel?>(
-                  value: _selectedObjective,
+                  initialValue: _selectedObjective,
                   isExpanded: true,
                   decoration: InputDecoration(
                     labelText: 'Tujuan Pembelajaran (TP)',
@@ -632,7 +632,7 @@ class _AdministrationTabState extends State<AdministrationTab> with SingleTicker
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 10, 16, 90),
                       itemCount: _gradeStudents.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (ctx, idx) {
                         final s = _gradeStudents[idx];
                         final ctrl = _scoreControllers[s.id];
