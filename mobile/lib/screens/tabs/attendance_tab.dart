@@ -47,7 +47,7 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
   DateTime _selectedDate = DateTime.now();
   int _meetingNo = 1;
   final TextEditingController _topicController = TextEditingController(text: 'Presensi KBM');
-  bool _queueWhatsapp = true;
+  final bool _queueWhatsapp = false;
   List<StudentAttendanceItem> _students = [];
 
   @override
@@ -1202,26 +1202,13 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
             ),
             const SizedBox(height: 6),
 
-            // WA Notification Checkbox
-            Row(
-              children: [
-                SizedBox(
-                  height: 22,
-                  width: 22,
-                  child: Checkbox(
-                    value: _queueWhatsapp,
-                    onChanged: (val) => setState(() => _queueWhatsapp = val ?? true),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Kirim WA otomatis ke wali santri tidak hadir',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
-                  ),
-                ),
-              ],
-            ),
+            // WA Notification Checkbox (Pending / dinonaktifkan sementara)
+            // Row(
+            //   children: [
+            //     Checkbox(value: _queueWhatsapp, onChanged: (val) => setState(() => _queueWhatsapp = val ?? false)),
+            //     const Text('Kirim WA otomatis ke wali santri tidak hadir'),
+            //   ],
+            // ),
             const SizedBox(height: 8),
 
             // Save Button

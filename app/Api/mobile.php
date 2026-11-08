@@ -453,78 +453,84 @@ function mobile_api_handle_notifications(): void
             $startEpoch = strtotime($todayDate . ' ' . $startTime);
             $endEpoch = strtotime($todayDate . ' ' . $endTime);
             $nowEpoch = $now->getTimestamp();
-            $diffMinutes = (int)round(($startEpoch - $nowEpoch) / 60);
+            $diffMinutesStart = (int)round(($startEpoch - $nowEpoch) / 60);
+            $diffMinutesEnd = (int)round(($endEpoch - $nowEpoch) / 60);
+            $periodNum = (string)($sch['period_no'] ?? $sch['period'] ?? '-');
+            $timeRange = substr($startTime, 0, 5) . ' - ' . substr($endTime, 0, 5);
 
             // Active right now
             if ($nowEpoch >= $startEpoch && $nowEpoch <= $endEpoch) {
-                $notifications[] = [
-                    'id' => 'kbm-active-' . $sch['id'],
-                    'type' => 'schedule',
-                    'level' => 'success',
-                    'title' => '🔔 KBM Sedang Berlangsung: ' . $sch['subject_name'],
-                    'body' => 'Kelas ' . $sch['class_name'] . ' • Jam ke-' . $sch['period'] . ' (' . substr($startTime, 0, 5) . ' - ' . substr($endTime, 0, 5) . ') Pengajar: ' . $sch['teacher_name'],
-                    'time' => substr($startTime, 0, 5),
-                    'minutes_remaining' => 0,
-                    'is_active' => true,
-                ];
+                // Notifikasi khusus: 5 menit sebelum KBM selesai / berakhir
+                if ($diffMinutesEnd <= 5 && $diffMinutesEnd >= 0) {
+                    $notifications[] = [
+                        'id' => 'kbm-end-5m-' . $sch['id'] . '-' . $todayDate,
+                        'type' => 'schedule',
+                        'level' => 'warning',
+                        'title' => '⏰ 5 Menit Berakhir: ' . $sch['subject_name'] . ' (' . $sch['class_name'] . ')',
+                        'body' => 'Jam ke-' . $periodNum . ' selesai pukul ' . substr($endTime, 0, 5) . ($diffMinutesEnd > 0 ? ' (sisa ' . $diffMinutesEnd . ' menit)' : ' (segera berakhir)') . '. Harap selesaikan materi, presensi siswa, dan jurnal kelas.',
+                        'time' => substr($endTime, 0, 5),
+                        'minutes_remaining' => $diffMinutesEnd,
+                        'is_active' => true,
+                        'is_ending_soon' => true,
+                    ];
+                } else {
+                    $notifications[] = [
+                        'id' => 'kbm-active-' . $sch['id'] . '-' . $todayDate,
+                        'type' => 'schedule',
+                        'level' => 'success',
+                        'title' => '🔔 KBM Sedang Berlangsung: ' . $sch['subject_name'],
+                        'body' => 'Kelas ' . $sch['class_name'] . ' • Jam ke-' . $periodNum . ' (' . $timeRange . '). Pengajar: ' . $sch['teacher_name'],
+                        'time' => substr($startTime, 0, 5),
+                        'minutes_remaining' => 0,
+                        'is_active' => true,
+                    ];
+                }
             }
-            // Upcoming in <= 60 minutes
-            elseif ($diffMinutes > 0 && $diffMinutes <= 60) {
+            // Notifikasi khusus: 5 menit sebelum mengajar (KBM dimulai)
+            elseif ($diffMinutesStart > 0 && $diffMinutesStart <= 5) {
                 $notifications[] = [
-                    'id' => 'kbm-upcoming-' . $sch['id'],
+                    'id' => 'kbm-start-5m-' . $sch['id'] . '-' . $todayDate,
                     'type' => 'schedule',
                     'level' => 'warning',
-                    'title' => '⏳ ' . $diffMinutes . ' Menit Lagi: KBM ' . $sch['subject_name'],
-                    'body' => 'Persiapan kelas ' . $sch['class_name'] . ' jam ke-' . $sch['period'] . ' mulai ' . substr($startTime, 0, 5) . '. Guru: ' . $sch['teacher_name'],
+                    'title' => '🔔 5 Menit Lagi KBM: ' . $sch['subject_name'] . ' (' . $sch['class_name'] . ')',
+                    'body' => 'KBM jam ke-' . $periodNum . ' (' . $timeRange . ') akan dimulai dalam ' . $diffMinutesStart . ' menit. Harap segera bersiap menuju ruang kelas.',
                     'time' => substr($startTime, 0, 5),
-                    'minutes_remaining' => $diffMinutes,
+                    'minutes_remaining' => $diffMinutesStart,
+                    'is_active' => false,
+                    'is_starting_soon' => true,
+                ];
+            }
+            // Upcoming in 6 - 60 minutes
+            elseif ($diffMinutesStart > 5 && $diffMinutesStart <= 60) {
+                $notifications[] = [
+                    'id' => 'kbm-upcoming-' . $sch['id'] . '-' . $todayDate,
+                    'type' => 'schedule',
+                    'level' => 'info',
+                    'title' => '⏳ ' . $diffMinutesStart . ' Menit Lagi: KBM ' . $sch['subject_name'],
+                    'body' => 'Persiapan kelas ' . $sch['class_name'] . ' jam ke-' . $periodNum . ' mulai ' . substr($startTime, 0, 5) . '. Guru: ' . $sch['teacher_name'],
+                    'time' => substr($startTime, 0, 5),
+                    'minutes_remaining' => $diffMinutesStart,
                     'is_active' => false,
                 ];
             }
             // Later today (if <= 4 total items)
-            elseif ($diffMinutes > 60 && count($notifications) < 5) {
+            elseif ($diffMinutesStart > 60 && count($notifications) < 5) {
                 $notifications[] = [
-                    'id' => 'kbm-later-' . $sch['id'],
+                    'id' => 'kbm-later-' . $sch['id'] . '-' . $todayDate,
                     'type' => 'schedule',
                     'level' => 'info',
                     'title' => '📅 Jadwal KBM: ' . $sch['subject_name'] . ' (' . $sch['class_name'] . ')',
-                    'body' => 'Jam ke-' . $sch['period'] . ' pukul ' . substr($startTime, 0, 5) . ' - ' . substr($endTime, 0, 5),
+                    'body' => 'Jam ke-' . $periodNum . ' pukul ' . $timeRange . ' • Kelas ' . $sch['class_name'],
                     'time' => substr($startTime, 0, 5),
-                    'minutes_remaining' => $diffMinutes,
+                    'minutes_remaining' => $diffMinutesStart,
                     'is_active' => false,
                 ];
             }
         }
     }
 
-    // 2. WHATSAPP FEED ALERTS
-    if (whatsapp_tables_ready()) {
-        $failedWa = fetch_one("SELECT COUNT(*) AS total FROM whatsapp_queue WHERE status = 'failed' AND created_at >= ?", [$todayDate . ' 00:00:00']);
-        if ((int)($failedWa['total'] ?? 0) > 0) {
-            $notifications[] = [
-                'id' => 'wa-failed-' . date('YmdH'),
-                'type' => 'whatsapp',
-                'level' => 'danger',
-                'title' => '⚠️ ' . $failedWa['total'] . ' Pesan WhatsApp Gagal Terkirim',
-                'body' => 'Terdapat kendala pengiriman pesan WhatsApp hari ini. Periksa status antrian di tab WhatsApp.',
-                'time' => date('H:i'),
-                'is_active' => false,
-            ];
-        }
-
-        $pendingWa = fetch_one("SELECT COUNT(*) AS total FROM whatsapp_queue WHERE status = 'pending'");
-        if ((int)($pendingWa['total'] ?? 0) > 0) {
-            $notifications[] = [
-                'id' => 'wa-pending-' . date('YmdH'),
-                'type' => 'whatsapp',
-                'level' => 'info',
-                'title' => '📬 ' . $pendingWa['total'] . ' Antrian WhatsApp Siap Dikirim',
-                'body' => 'Antrian pesan (presensi, mingguan, pelanggaran) menunggu diproses pengirimannya.',
-                'time' => date('H:i'),
-                'is_active' => false,
-            ];
-        }
-    }
+    // 2. WHATSAPP FEED ALERTS (Pending / dinonaktifkan sesuai permintaan pengguna)
+    // Fitur notifikasi WhatsApp Gateway dipending sehingga tidak dimunculkan di mobile.
 
     // 3. STUDENT ABSENCE ALERTS (Presensi Santri Hari Ini)
     if (table_exists('student_attendance_entries')) {
@@ -616,7 +622,7 @@ function mobile_api_handle_my_schedule(): void
     }
 
     $whereClause = $where ? ' WHERE ' . implode(' AND ', $where) : '';
-    $allRows = fetch_all($baseSql . $whereClause . ' ORDER BY ls.day_of_week, ls.period, ls.start_time', $params);
+    $allRows = fetch_all($baseSql . $whereClause . ' ORDER BY ls.day_of_week, ls.period_no, ls.start_time', $params);
 
     $daysMap = schedule_days();
     $todaySchedules = [];
@@ -639,7 +645,7 @@ function mobile_api_handle_my_schedule(): void
             'id' => (int)$row['id'],
             'day_of_week' => $rowDay,
             'day_name' => $daysMap[$rowDay] ?? 'Hari ' . $rowDay,
-            'period' => (int)$row['period'],
+            'period' => (int)($row['period_no'] ?? 1),
             'start_time' => substr($startTime, 0, 5),
             'end_time' => substr($endTime, 0, 5),
             'subject_name' => (string)$row['subject_name'],

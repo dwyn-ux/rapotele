@@ -5,7 +5,7 @@ import 'login_screen.dart';
 import 'tabs/dashboard_tab.dart';
 import 'tabs/attendance_tab.dart';
 import 'tabs/administration_tab.dart';
-import 'tabs/whatsapp_tab.dart';
+import 'tabs/notifications_tab.dart';
 import 'tabs/schedule_tab.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -178,6 +178,15 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               actions: [
                 IconButton(
+                  icon: const Icon(Icons.notifications_outlined, color: Color(0xFF334155), size: 24),
+                  tooltip: 'Pusat Notifikasi & Pengingat',
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const NotificationsTab()),
+                    );
+                  },
+                ),
+                IconButton(
                   icon: const Icon(Icons.account_circle_outlined, color: Color(0xFF334155), size: 26),
                   tooltip: 'Profil & Pengaturan',
                   onPressed: _showSettingsModal,
@@ -199,7 +208,6 @@ class _HomeScreenState extends State<HomeScreen> {
             initialSubTab: _adminSubTab,
           ),
           const ScheduleTab(),
-          const WhatsAppTab(),
         ],
       ),
       bottomNavigationBar: Container(
@@ -244,11 +252,6 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Icon(Icons.calendar_month_outlined),
               activeIcon: Icon(Icons.calendar_month_rounded),
               label: 'Jadwal',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.mark_chat_unread_rounded),
-              activeIcon: Icon(Icons.mark_chat_unread_rounded),
-              label: 'WhatsApp',
             ),
           ],
         ),

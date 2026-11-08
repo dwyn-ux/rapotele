@@ -13,7 +13,6 @@ class NotificationService {
   Timer? _periodicTimer;
 
   static const String channelScheduleId = 'erapot_schedule_channel';
-  static const String channelWaId = 'erapot_wa_channel';
 
   Future<void> init() async {
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -46,7 +45,7 @@ class NotificationService {
     final androidDetails = AndroidNotificationDetails(
       channelId ?? channelScheduleId,
       channelName ?? 'Pengingat Jadwal & KBM',
-      channelDescription: 'Notifikasi jadwal pelajaran dan pembaruan WhatsApp',
+      channelDescription: 'Notifikasi jadwal pelajaran dan agenda KBM',
       importance: Importance.max,
       priority: Priority.high,
       enableVibration: true,
@@ -63,7 +62,7 @@ class NotificationService {
     );
   }
 
-  void startPeriodicChecker([Duration interval = const Duration(seconds: 45)]) {
+  void startPeriodicChecker([Duration interval = const Duration(seconds: 30)]) {
     _periodicTimer?.cancel();
     _periodicTimer = Timer.periodic(interval, (_) async {
       await checkAndTriggerNotifications();
@@ -84,9 +83,14 @@ class NotificationService {
       final notifications = await ApiService().getNotifications();
 
       for (var item in notifications) {
-        // If it's a schedule trigger that is upcoming (<= 20 min) or newly active
-        final shouldAlert = (item.type == 'schedule' && (item.isActive || item.minutesRemaining <= 20)) ||
-            (item.type == 'whatsapp' && item.level == 'danger') ||
+        // Skip WhatsApp notifications (dipending)
+        if (item.type == 'whatsapp') {
+          continue;
+        }
+
+        // Trigger for schedule (5 min before start, active, 5 min before end, or upcoming <= 15 min)
+        final shouldAlert = (item.type == 'schedule' &&
+                (item.isStartingSoon || item.isEndingSoon || item.isActive || item.minutesRemaining <= 15)) ||
             (item.type == 'violation') ||
             (item.type == 'attendance');
 
@@ -98,14 +102,14 @@ class NotificationService {
             id: notificationId,
             title: item.title,
             body: item.body,
-            channelId: item.type == 'whatsapp' ? channelWaId : channelScheduleId,
-            channelName: item.type == 'whatsapp' ? 'Update WhatsApp' : 'Jadwal & KBM',
+            channelId: channelScheduleId,
+            channelName: 'Jadwal & KBM',
             payload: item.id,
           );
         }
       }
 
-      return notifications;
+      return notifications.where((item) => item.type != 'whatsapp').toList();
     } catch (_) {
       return [];
     }

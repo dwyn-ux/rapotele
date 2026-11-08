@@ -7,6 +7,8 @@ class NotificationItem {
   final String time;
   final int minutesRemaining;
   final bool isActive;
+  final bool isEndingSoon;
+  final bool isStartingSoon;
 
   NotificationItem({
     required this.id,
@@ -17,6 +19,8 @@ class NotificationItem {
     required this.time,
     this.minutesRemaining = 0,
     this.isActive = false,
+    this.isEndingSoon = false,
+    this.isStartingSoon = false,
   });
 
   factory NotificationItem.fromJson(Map<String, dynamic> json) {
@@ -29,6 +33,8 @@ class NotificationItem {
       time: json['time']?.toString() ?? '',
       minutesRemaining: int.tryParse(json['minutes_remaining']?.toString() ?? '0') ?? 0,
       isActive: json['is_active'] == true,
+      isEndingSoon: json['is_ending_soon'] == true,
+      isStartingSoon: json['is_starting_soon'] == true,
     );
   }
 }

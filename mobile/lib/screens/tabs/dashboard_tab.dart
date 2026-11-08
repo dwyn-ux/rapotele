@@ -3,8 +3,8 @@ import '../../services/api_service.dart';
 import '../../services/notification_service.dart';
 import '../../models/notification_item.dart';
 import '../../models/schedule_item.dart';
-import '../../models/whatsapp_item.dart';
 import '../../models/attendance_models.dart';
+import 'notifications_tab.dart';
 
 class DashboardTab extends StatefulWidget {
   final Function(int tabIndex, {int? subTab}) onTabChange;
@@ -18,7 +18,6 @@ class DashboardTab extends StatefulWidget {
 class _DashboardTabState extends State<DashboardTab> {
   bool _isLoading = true;
   ScheduleItem? _nextSchedule;
-  WhatsAppStats? _waStats;
   TeacherAttendanceModel? _teacherAttendance;
   List<NotificationItem> _recentNotifications = [];
 
@@ -34,12 +33,10 @@ class _DashboardTabState extends State<DashboardTab> {
     try {
       final notifsFuture = NotificationService().checkAndTriggerNotifications();
       final schedFuture = ApiService().getMySchedule();
-      final waFuture = ApiService().getWhatsAppFeed(limit: 5);
       final attFuture = ApiService().getTeacherAttendance();
 
       final notifs = await notifsFuture;
       final schedData = await schedFuture;
-      final waData = await waFuture;
       final attData = await attFuture;
 
       ScheduleItem? next;
@@ -63,11 +60,6 @@ class _DashboardTabState extends State<DashboardTab> {
         );
       }
 
-      WhatsAppStats? stats;
-      if (waData['success'] == true) {
-        stats = waData['stats'] as WhatsAppStats?;
-      }
-
       TeacherAttendanceModel? att;
       if (attData['success'] == true) {
         att = attData['attendance'] as TeacherAttendanceModel?;
@@ -77,7 +69,6 @@ class _DashboardTabState extends State<DashboardTab> {
         setState(() {
           _recentNotifications = notifs;
           _nextSchedule = next;
-          _waStats = stats;
           _teacherAttendance = att;
           _isLoading = false;
         });
@@ -262,7 +253,11 @@ class _DashboardTabState extends State<DashboardTab> {
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                 ),
                 TextButton(
-                  onPressed: () => widget.onTabChange(4),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const NotificationsTab()),
+                    );
+                  },
                   child: const Text('Lihat Semua', style: TextStyle(fontSize: 12)),
                 ),
               ],
@@ -294,10 +289,6 @@ class _DashboardTabState extends State<DashboardTab> {
             else
               ..._recentNotifications.take(3).map(_buildNotificationSnippet),
 
-            const SizedBox(height: 16),
-
-            // Secondary WhatsApp Status Card
-            _buildWhatsAppOverviewCard(),
             const SizedBox(height: 20),
           ],
         ),
@@ -532,52 +523,6 @@ class _DashboardTabState extends State<DashboardTab> {
               ],
             ),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWhatsAppOverviewCard() {
-    final stats = _waStats;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF16A34A).withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.mark_chat_unread_rounded, color: Color(0xFF16A34A), size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Integrasi Bot WhatsApp Sekolah',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF1E293B)),
-                ),
-                Text(
-                  stats != null
-                      ? 'Antrian: ${stats.pending} • Terkirim: ${stats.sentToday} • Gagal: ${stats.failedToday}'
-                      : 'Notifikasi presensi dan KBM otomatis terkirim ke wali',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right_rounded, color: Color(0xFF64748B)),
-            onPressed: () => widget.onTabChange(4),
-          ),
         ],
       ),
     );
