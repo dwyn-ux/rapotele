@@ -4,6 +4,10 @@ DirectoryIndex public/index.php index.php
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # Pass Authorization Header to FastCGI/PHP
+    RewriteCond %{HTTP:Authorization} .+
+    RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
     RewriteRule ^(app|config|database|storage|tools)(/|$) - [F,L]
     RewriteRule ^assets/(.*)$ public/assets/$1 [L]
     RewriteRule ^(index|install|media|telegram_webhook|schedule_reminders|whatsapp_weekly|api)\.php$ public/$1.php [L]

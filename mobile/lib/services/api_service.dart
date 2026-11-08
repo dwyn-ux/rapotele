@@ -108,7 +108,11 @@ class ApiService {
   }
 
   List<Uri> _candidateUris(String action, [Map<String, String>? queryParams]) {
-    final params = {'action': action, ...?queryParams};
+    final params = {
+      'action': action,
+      if (_token != null && _token!.isNotEmpty) 'token': _token!,
+      ...?queryParams,
+    };
 
     final candidates = <String>[];
     if (_workingEndpointPrefix != null) {
@@ -319,29 +323,66 @@ class ApiService {
   Future<Map<String, dynamic>> getMySchedule() async {
     try {
       final response = await _executeWithFallback('my_schedule');
-      if (response.statusCode == 200) {
-        final dynamic decoded = jsonDecode(response.body);
-        if (decoded is Map<String, dynamic> && decoded['ok'] == true) {
-          final todayRaw = (decoded['today'] as List<dynamic>?) ?? [];
-          final weekRaw = (decoded['week'] as List<dynamic>?) ?? [];
-          final nextRaw = decoded['next_upcoming_schedule'];
-          ScheduleItem? nextUpcoming;
-          if (nextRaw is Map<String, dynamic>) {
-            nextUpcoming = ScheduleItem.fromJson(nextRaw);
-          }
-
-          return {
-            'success': true,
-            'today_day_name': decoded['today_day_name'] ?? '',
-            'today_date': decoded['today_date'] ?? '',
-            'today': todayRaw.map((e) => ScheduleItem.fromJson(e as Map<String, dynamic>)).toList(),
-            'week': weekRaw.map((e) => DaySchedule.fromJson(e as Map<String, dynamic>)).toList(),
-            'next_upcoming_schedule': nextUpcoming,
-            'summary': decoded['summary'] is Map<String, dynamic> ? decoded['summary'] as Map<String, dynamic> : {},
-          };
-        }
+      dynamic decoded;
+      try {
+        decoded = jsonDecode(response.body);
+      } catch (_) {
+        decoded = null;
       }
-      return {'success': false, 'message': 'Gagal mengambil jadwal'};
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic> && decoded['ok'] == true) {
+        final todayRaw = (decoded['today'] as List<dynamic>?) ?? [];
+        final weekRaw = (decoded['week'] as List<dynamic>?) ?? [];
+        final nextRaw = decoded['next_upcoming_schedule'];
+        ScheduleItem? nextUpcoming;
+        if (nextRaw is Map<String, dynamic>) {
+          try {
+            nextUpcoming = ScheduleItem.fromJson(nextRaw);
+          } catch (_) {}
+        }
+
+        final todayItems = <ScheduleItem>[];
+        for (var e in todayRaw) {
+          if (e is Map<String, dynamic>) {
+            try {
+              todayItems.add(ScheduleItem.fromJson(e));
+            } catch (_) {}
+          }
+        }
+
+        final weekItems = <DaySchedule>[];
+        for (var e in weekRaw) {
+          if (e is Map<String, dynamic>) {
+            try {
+              weekItems.add(DaySchedule.fromJson(e));
+            } catch (_) {}
+          }
+        }
+
+        return {
+          'success': true,
+          'today_day_name': decoded['today_day_name'] ?? '',
+          'today_date': decoded['today_date'] ?? '',
+          'today': todayItems,
+          'week': weekItems,
+          'next_upcoming_schedule': nextUpcoming,
+          'summary': decoded['summary'] is Map<String, dynamic> ? decoded['summary'] as Map<String, dynamic> : {},
+        };
+      }
+
+      if (response.statusCode == 401) {
+        return {
+          'success': false,
+          'is_unauthorized': true,
+          'message': 'Sesi login telah berakhir. Silakan login kembali.',
+        };
+      }
+
+      final serverMsg = (decoded is Map && decoded['message'] != null)
+          ? decoded['message'].toString()
+          : 'Gagal mengambil jadwal (${response.statusCode})';
+
+      return {'success': false, 'message': serverMsg};
     } catch (e) {
       return {'success': false, 'message': 'Koneksi error: $e'};
     }
@@ -394,7 +435,18 @@ class ApiService {
           };
         }
       }
-      return {'success': false, 'message': 'Gagal mengambil data presensi guru.'};
+      dynamic decoded;
+      try {
+        decoded = jsonDecode(response.body);
+      } catch (_) {}
+
+      if (response.statusCode == 401) {
+        return {'success': false, 'is_unauthorized': true, 'message': 'Sesi login telah berakhir.'};
+      }
+      final msg = (decoded is Map && decoded['message'] != null)
+          ? decoded['message'].toString()
+          : 'Gagal mengambil data presensi guru (${response.statusCode}).';
+      return {'success': false, 'message': msg};
     } catch (e) {
       return {'success': false, 'message': 'Error presensi: $e'};
     }

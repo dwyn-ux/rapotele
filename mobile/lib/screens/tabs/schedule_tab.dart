@@ -56,9 +56,30 @@ class _ScheduleTabState extends State<ScheduleTab> {
       });
     } else {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(data['message'] ?? 'Gagal memuat jadwal')),
-      );
+      if (data['is_unauthorized'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(data['message'] ?? 'Sesi login telah berakhir'),
+            backgroundColor: Colors.red.shade700,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Login Ulang',
+              textColor: Colors.white,
+              onPressed: () {
+                ApiService().logout();
+                Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+              },
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(data['message'] ?? 'Gagal memuat jadwal'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
     }
   }
 

@@ -74,11 +74,24 @@ function mobile_api_verify_token(string $token): ?array
 function mobile_api_get_request_token(): string
 {
     $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+    if ($authHeader === '' && function_exists('apache_request_headers')) {
+        $headers = apache_request_headers();
+        $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+    }
+    if ($authHeader === '' && function_exists('getallheaders')) {
+        $headers = getallheaders();
+        $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+    }
+
     if (preg_match('/Bearer\s+(\S+)/i', $authHeader, $matches)) {
         return $matches[1];
     }
 
     $customHeader = $_SERVER['HTTP_X_AUTH_TOKEN'] ?? '';
+    if ($customHeader === '' && function_exists('apache_request_headers')) {
+        $headers = apache_request_headers();
+        $customHeader = $headers['X-Auth-Token'] ?? $headers['x-auth-token'] ?? '';
+    }
     if ($customHeader !== '') {
         return trim($customHeader);
     }
@@ -616,157 +629,178 @@ function mobile_api_handle_notifications(): void
 
 function mobile_api_handle_my_schedule(): void
 {
-    $user = mobile_api_require_auth();
-    $now = new DateTimeImmutable('now');
-    $day = (int)$now->format('N');
-    $todayDate = $now->format('Y-m-d');
+    try {
+        $user = mobile_api_require_auth();
+        $now = new DateTimeImmutable('now');
+        $day = (int)$now->format('N');
+        $todayDate = $now->format('Y-m-d');
 
-    if (!schedule_tables_ready()) {
-        mobile_api_response(true, ['today' => [], 'week' => []], 'Jadwal belum dikonfigurasi.');
-    }
-
-    $teacherId = !empty($user['teacher_id']) ? (int)$user['teacher_id'] : 0;
-
-    // Safety net: Auto-link guru jika teacher_id di tabel users masih kosong
-    if ($teacherId <= 0 && $user['role'] === 'guru') {
-        $cleanedName = trim(preg_replace('/^(ust\.|usth\.|bpk\.|ibu|drs\.|dra\.)\s*/i', '', (string)$user['name']));
-        $teacherByName = fetch_one(
-            "SELECT id FROM teachers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) OR LOWER(name) LIKE ? ORDER BY id ASC LIMIT 1",
-            [$user['name'], '%' . strtolower($cleanedName) . '%']
-        );
-        if ($teacherByName && !empty($teacherByName['id'])) {
-            $teacherId = (int)$teacherByName['id'];
-            try {
-                execute_sql('UPDATE users SET teacher_id = ? WHERE id = ?', [$teacherId, (int)$user['id']]);
-            } catch (Throwable $e) {}
+        if (!schedule_tables_ready()) {
+            mobile_api_response(true, ['today' => [], 'week' => []], 'Jadwal belum dikonfigurasi.');
+            return;
         }
-    }
 
-    $baseSql = "SELECT ls.*, t.name AS teacher_name, c.name AS class_name, s.name AS subject_name
-                FROM lesson_schedules ls
-                JOIN teachers t ON t.id = ls.teacher_id
-                JOIN classes c ON c.id = ls.class_id
-                JOIN subjects s ON s.id = ls.subject_id";
-    $where = [];
-    $params = [];
+        $teacherId = !empty($user['teacher_id']) ? (int)$user['teacher_id'] : 0;
 
-    if ($teacherId > 0 && $user['role'] !== 'admin') {
-        $where[] = "ls.teacher_id = ?";
-        $params[] = $teacherId;
-    } elseif ($user['role'] === 'siswa' && !empty($user['student_id'])) {
-        $student = fetch_one('SELECT class_id FROM students WHERE id = ?', [(int)$user['student_id']]);
-        if ($student && !empty($student['class_id'])) {
-            $where[] = "ls.class_id = ?";
-            $params[] = (int)$student['class_id'];
+        // Safety net: Auto-link guru jika teacher_id di tabel users masih kosong
+        if ($teacherId <= 0 && $user['role'] === 'guru') {
+            $cleanedName = trim(preg_replace('/^(ust\.|usth\.|bpk\.|ibu|drs\.|dra\.)\s*/i', '', (string)$user['name']));
+            $teacherByName = fetch_one(
+                "SELECT id FROM teachers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) OR LOWER(name) LIKE ? ORDER BY id ASC LIMIT 1",
+                [$user['name'], '%' . strtolower($cleanedName) . '%']
+            );
+            if ($teacherByName && !empty($teacherByName['id'])) {
+                $teacherId = (int)$teacherByName['id'];
+                try {
+                    execute_sql('UPDATE users SET teacher_id = ? WHERE id = ?', [$teacherId, (int)$user['id']]);
+                } catch (Throwable $e) {}
+            }
         }
-    }
 
-    $whereClause = $where ? ' WHERE ' . implode(' AND ', $where) : '';
-    $allRows = fetch_all($baseSql . $whereClause . ' ORDER BY ls.day_of_week, ls.period_no, ls.start_time', $params);
+        $baseSql = "SELECT ls.*, 
+                           COALESCE(t.name, 'Guru') AS teacher_name, 
+                           COALESCE(c.name, 'Kelas') AS class_name, 
+                           COALESCE(s.name, 'Mata Pelajaran') AS subject_name
+                    FROM lesson_schedules ls
+                    LEFT JOIN teachers t ON t.id = ls.teacher_id
+                    LEFT JOIN classes c ON c.id = ls.class_id
+                    LEFT JOIN subjects s ON s.id = ls.subject_id";
+        $where = [];
+        $params = [];
 
-    $daysMap = [
-        1 => 'Senin',
-        2 => 'Selasa',
-        3 => 'Rabu',
-        4 => 'Kamis',
-        5 => 'Jumat',
-        6 => 'Sabtu',
-        7 => 'Minggu',
-    ];
-    $todaySchedules = [];
-    $weekSchedules = [];
-    $dayCounts = [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0];
+        if ($teacherId > 0 && $user['role'] !== 'admin') {
+            $where[] = "(ls.teacher_id = ? OR ls.assignment_id IN (SELECT id FROM teaching_assignments WHERE teacher_id = ?))";
+            $params[] = $teacherId;
+            $params[] = $teacherId;
+        } elseif ($user['role'] === 'siswa' && !empty($user['student_id'])) {
+            $student = fetch_one('SELECT class_id FROM students WHERE id = ?', [(int)$user['student_id']]);
+            if ($student && !empty($student['class_id'])) {
+                $where[] = "ls.class_id = ?";
+                $params[] = (int)$student['class_id'];
+            }
+        }
 
-    for ($d = 1; $d <= 6; $d++) {
-        $weekSchedules[$d] = [
-            'day_number' => $d,
-            'day_name' => $daysMap[$d],
-            'items' => [],
+        $whereClause = $where ? ' WHERE ' . implode(' AND ', $where) : '';
+        $allRows = fetch_all($baseSql . $whereClause . ' ORDER BY ls.day_of_week, ls.period_no, ls.start_time', $params);
+
+        $daysMap = [
+            1 => 'Senin',
+            2 => 'Selasa',
+            3 => 'Rabu',
+            4 => 'Kamis',
+            5 => 'Jumat',
+            6 => 'Sabtu',
+            7 => 'Minggu',
         ];
-    }
+        $todaySchedules = [];
+        $weekSchedules = [];
+        $dayCounts = [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0];
 
-    $nextUpcomingToday = null;
-    $nextUpcomingOtherDay = null;
-    $minDaysAhead = 999;
-    $activeDaysWithLessons = [];
-
-    foreach ($allRows as $row) {
-        $rowDay = (int)$row['day_of_week'];
-        $startTime = (string)$row['start_time'];
-        $endTime = (string)($row['end_time'] ?: date('H:i:s', strtotime($startTime) + 40 * 60));
-
-        $item = [
-            'id' => (int)$row['id'],
-            'assignment_id' => (int)($row['assignment_id'] ?? 0),
-            'day_of_week' => $rowDay,
-            'day_name' => $daysMap[$rowDay] ?? 'Hari ' . $rowDay,
-            'period' => (int)($row['period_no'] ?? 1),
-            'start_time' => substr($startTime, 0, 5),
-            'end_time' => substr($endTime, 0, 5),
-            'subject_name' => (string)$row['subject_name'],
-            'class_name' => (string)$row['class_name'],
-            'teacher_name' => (string)$row['teacher_name'],
-            'room' => (string)($row['room'] ?? ''),
-        ];
-
-        if (isset($dayCounts[$rowDay])) {
-            $dayCounts[$rowDay]++;
-        }
-        if (!in_array($daysMap[$rowDay] ?? '', $activeDaysWithLessons, true) && isset($daysMap[$rowDay])) {
-            $activeDaysWithLessons[] = $daysMap[$rowDay];
+        for ($d = 1; $d <= 6; $d++) {
+            $weekSchedules[$d] = [
+                'day_number' => $d,
+                'day_name' => $daysMap[$d],
+                'items' => [],
+            ];
         }
 
-        if ($rowDay === $day) {
-            $startEpoch = strtotime($todayDate . ' ' . $startTime);
-            $endEpoch = strtotime($todayDate . ' ' . $endTime);
-            $nowEpoch = $now->getTimestamp();
+        $nextUpcomingToday = null;
+        $nextUpcomingOtherDay = null;
+        $minDaysAhead = 999;
+        $activeDaysWithLessons = [];
 
-            if ($nowEpoch > $endEpoch) {
-                $status = 'finished';
-            } elseif ($nowEpoch >= $startEpoch && $nowEpoch <= $endEpoch) {
-                $status = 'active';
+        foreach ($allRows as $row) {
+            $rowDay = (int)$row['day_of_week'];
+            $startTime = !empty($row['start_time']) ? trim((string)$row['start_time']) : '07:00:00';
+            $endTime = !empty($row['end_time']) ? trim((string)$row['end_time']) : '';
+            if ($endTime === '') {
+                $parsedStart = strtotime($startTime);
+                $endTime = ($parsedStart !== false) ? date('H:i:s', $parsedStart + 40 * 60) : '07:40:00';
+            }
+
+            $item = [
+                'id' => (int)$row['id'],
+                'assignment_id' => (int)($row['assignment_id'] ?? 0),
+                'day_of_week' => $rowDay,
+                'day_name' => $daysMap[$rowDay] ?? 'Hari ' . $rowDay,
+                'period' => (int)($row['period_no'] ?? 1),
+                'start_time' => substr($startTime, 0, 5),
+                'end_time' => substr($endTime, 0, 5),
+                'subject_name' => (string)($row['subject_name'] ?? 'Mata Pelajaran'),
+                'class_name' => (string)($row['class_name'] ?? 'Kelas'),
+                'teacher_name' => (string)($row['teacher_name'] ?? 'Guru'),
+                'room' => (string)($row['room'] ?? ''),
+            ];
+
+            if (isset($dayCounts[$rowDay])) {
+                $dayCounts[$rowDay]++;
+            }
+            if (isset($daysMap[$rowDay]) && !in_array($daysMap[$rowDay], $activeDaysWithLessons, true)) {
+                $activeDaysWithLessons[] = $daysMap[$rowDay];
+            }
+
+            if ($rowDay === $day) {
+                $startEpoch = strtotime($todayDate . ' ' . $startTime);
+                $endEpoch = strtotime($todayDate . ' ' . $endTime);
+                $nowEpoch = $now->getTimestamp();
+
+                if ($startEpoch === false) {
+                    $startEpoch = $nowEpoch;
+                }
+                if ($endEpoch === false) {
+                    $endEpoch = $startEpoch + 40 * 60;
+                }
+
+                if ($nowEpoch > $endEpoch) {
+                    $status = 'finished';
+                } elseif ($nowEpoch >= $startEpoch && $nowEpoch <= $endEpoch) {
+                    $status = 'active';
+                } else {
+                    $status = 'upcoming';
+                }
+
+                $item['status'] = $status;
+                $item['minutes_until_start'] = (int)round(($startEpoch - $nowEpoch) / 60);
+                $todaySchedules[] = $item;
+
+                if (($status === 'active' || $status === 'upcoming') && $nextUpcomingToday === null) {
+                    $nextUpcomingToday = $item;
+                }
             } else {
-                $status = 'upcoming';
+                // Cek hari berikutnya dalam siklus mingguan
+                $daysAhead = ($rowDay > $day) ? ($rowDay - $day) : (7 - $day + $rowDay);
+                if ($daysAhead < $minDaysAhead) {
+                    $minDaysAhead = $daysAhead;
+                    $nextUpcomingOtherDay = $item;
+                }
             }
 
-            $item['status'] = $status;
-            $item['minutes_until_start'] = (int)round(($startEpoch - $nowEpoch) / 60);
-            $todaySchedules[] = $item;
-
-            if (($status === 'active' || $status === 'upcoming') && $nextUpcomingToday === null) {
-                $nextUpcomingToday = $item;
-            }
-        } else {
-            // Cek hari berikutnya dalam siklus mingguan
-            $daysAhead = ($rowDay > $day) ? ($rowDay - $day) : (7 - $day + $rowDay);
-            if ($daysAhead < $minDaysAhead) {
-                $minDaysAhead = $daysAhead;
-                $nextUpcomingOtherDay = $item;
+            if (isset($weekSchedules[$rowDay])) {
+                $weekSchedules[$rowDay]['items'][] = $item;
             }
         }
 
-        if (isset($weekSchedules[$rowDay])) {
-            $weekSchedules[$rowDay]['items'][] = $item;
-        }
+        $nextUpcoming = $nextUpcomingToday ?: $nextUpcomingOtherDay;
+
+        mobile_api_response(true, [
+            'today_day' => $day,
+            'today_day_name' => $daysMap[$day] ?? 'Hari Ini',
+            'today_date' => $todayDate,
+            'today' => $todaySchedules,
+            'week' => array_values($weekSchedules),
+            'next_upcoming_schedule' => $nextUpcoming,
+            'summary' => [
+                'total_weekly_lessons' => count($allRows),
+                'days_with_lessons' => $activeDaysWithLessons,
+                'day_counts' => $dayCounts,
+                'teacher_id' => $teacherId,
+                'is_teacher_linked' => ($teacherId > 0),
+            ],
+        ]);
+    } catch (Throwable $e) {
+        log_exception($e);
+        mobile_api_response(false, [], 'Gagal memproses jadwal: ' . $e->getMessage(), 500);
     }
-
-    $nextUpcoming = $nextUpcomingToday ?: $nextUpcomingOtherDay;
-
-    mobile_api_response(true, [
-        'today_day' => $day,
-        'today_day_name' => $daysMap[$day] ?? 'Hari Ini',
-        'today_date' => $todayDate,
-        'today' => $todaySchedules,
-        'week' => array_values($weekSchedules),
-        'next_upcoming_schedule' => $nextUpcoming,
-        'summary' => [
-            'total_weekly_lessons' => count($allRows),
-            'days_with_lessons' => $activeDaysWithLessons,
-            'day_counts' => $dayCounts,
-            'teacher_id' => $teacherId,
-            'is_teacher_linked' => ($teacherId > 0),
-        ],
-    ]);
 }
 
 function mobile_api_handle_trigger_schedule(): void
