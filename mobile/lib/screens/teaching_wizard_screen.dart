@@ -92,8 +92,20 @@ class _TeachingWizardScreenState extends State<TeachingWizardScreen> {
     super.dispose();
   }
 
-  String _formatDateYmd(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
-  String _formatDateDisplay(DateTime d) => DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(d);
+  static const _days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+  static const _months = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+  ];
+
+  String _formatDateYmd(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  String _formatDateDisplay(DateTime d) {
+    final dayName = (d.weekday >= 1 && d.weekday <= 7) ? _days[d.weekday - 1] : '';
+    final monthName = (d.month >= 1 && d.month <= 12) ? _months[d.month - 1] : '';
+    return '$dayName, ${d.day} $monthName ${d.year}';
+  }
 
   Future<void> _initData() async {
     setState(() => _isLoading = true);
@@ -396,6 +408,60 @@ class _TeachingWizardScreenState extends State<TeachingWizardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          title: const Text('Alur Mengajar Kelas Terpandu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF0F172A),
+          elevation: 0.5,
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_assignments.isEmpty) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          title: const Text('Alur Mengajar Kelas Terpandu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF0F172A),
+          elevation: 0.5,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.assignment_late_rounded, size: 64, color: Color(0xFF94A3B8)),
+                const SizedBox(height: 16),
+                const Text('Tidak Ada Pembelajaran', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                const SizedBox(height: 8),
+                const Text(
+                  'Akun Anda belum terdaftar mengajar di kelas atau mata pelajaran semester ini.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('Kembali ke Beranda'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -410,27 +476,25 @@ class _TeachingWizardScreenState extends State<TeachingWizardScreen> {
         foregroundColor: const Color(0xFF0F172A),
         elevation: 0.5,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // 1. Class & Meeting Selector Header
-                _buildClassHeader(),
+      body: Column(
+        children: [
+          // 1. Class & Meeting Selector Header
+          _buildClassHeader(),
 
-                // 2. Stepper Nav (3 Steps)
-                _buildStepperNav(),
+          // 2. Stepper Nav (3 Steps)
+          _buildStepperNav(),
 
-                const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          const Divider(height: 1, color: Color(0xFFE2E8F0)),
 
-                // 3. Step Content
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: _buildCurrentStepContent(),
-                  ),
-                ),
-              ],
+          // 3. Step Content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: _buildCurrentStepContent(),
             ),
+          ),
+        ],
+      ),
     );
   }
 

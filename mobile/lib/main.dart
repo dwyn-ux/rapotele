@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
 import 'screens/login_screen.dart';
@@ -6,6 +7,9 @@ import 'screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Indonesian locale formatting
+  await initializeDateFormatting('id_ID', null);
 
   // Initialize persistent API & Notification services
   await ApiService().init();
