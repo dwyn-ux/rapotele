@@ -627,6 +627,21 @@ function mobile_api_handle_my_schedule(): void
 
     $teacherId = !empty($user['teacher_id']) ? (int)$user['teacher_id'] : 0;
 
+    // Safety net: Auto-link guru jika teacher_id di tabel users masih kosong
+    if ($teacherId <= 0 && $user['role'] === 'guru') {
+        $cleanedName = trim(preg_replace('/^(ust\.|usth\.|bpk\.|ibu|drs\.|dra\.)\s*/i', '', (string)$user['name']));
+        $teacherByName = fetch_one(
+            "SELECT id FROM teachers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) OR LOWER(name) LIKE ? ORDER BY id ASC LIMIT 1",
+            [$user['name'], '%' . strtolower($cleanedName) . '%']
+        );
+        if ($teacherByName && !empty($teacherByName['id'])) {
+            $teacherId = (int)$teacherByName['id'];
+            try {
+                execute_sql('UPDATE users SET teacher_id = ? WHERE id = ?', [$teacherId, (int)$user['id']]);
+            } catch (Throwable $e) {}
+        }
+    }
+
     $baseSql = "SELECT ls.*, t.name AS teacher_name, c.name AS class_name, s.name AS subject_name
                 FROM lesson_schedules ls
                 JOIN teachers t ON t.id = ls.teacher_id
@@ -649,17 +664,31 @@ function mobile_api_handle_my_schedule(): void
     $whereClause = $where ? ' WHERE ' . implode(' AND ', $where) : '';
     $allRows = fetch_all($baseSql . $whereClause . ' ORDER BY ls.day_of_week, ls.period_no, ls.start_time', $params);
 
-    $daysMap = schedule_days();
+    $daysMap = [
+        1 => 'Senin',
+        2 => 'Selasa',
+        3 => 'Rabu',
+        4 => 'Kamis',
+        5 => 'Jumat',
+        6 => 'Sabtu',
+        7 => 'Minggu',
+    ];
     $todaySchedules = [];
     $weekSchedules = [];
+    $dayCounts = [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0];
 
-    foreach ($daysMap as $dNum => $dName) {
-        $weekSchedules[$dNum] = [
-            'day_number' => $dNum,
-            'day_name' => $dName,
+    for ($d = 1; $d <= 6; $d++) {
+        $weekSchedules[$d] = [
+            'day_number' => $d,
+            'day_name' => $daysMap[$d],
             'items' => [],
         ];
     }
+
+    $nextUpcomingToday = null;
+    $nextUpcomingOtherDay = null;
+    $minDaysAhead = 999;
+    $activeDaysWithLessons = [];
 
     foreach ($allRows as $row) {
         $rowDay = (int)$row['day_of_week'];
@@ -680,6 +709,13 @@ function mobile_api_handle_my_schedule(): void
             'room' => (string)($row['room'] ?? ''),
         ];
 
+        if (isset($dayCounts[$rowDay])) {
+            $dayCounts[$rowDay]++;
+        }
+        if (!in_array($daysMap[$rowDay] ?? '', $activeDaysWithLessons, true) && isset($daysMap[$rowDay])) {
+            $activeDaysWithLessons[] = $daysMap[$rowDay];
+        }
+
         if ($rowDay === $day) {
             $startEpoch = strtotime($todayDate . ' ' . $startTime);
             $endEpoch = strtotime($todayDate . ' ' . $endTime);
@@ -696,6 +732,17 @@ function mobile_api_handle_my_schedule(): void
             $item['status'] = $status;
             $item['minutes_until_start'] = (int)round(($startEpoch - $nowEpoch) / 60);
             $todaySchedules[] = $item;
+
+            if (($status === 'active' || $status === 'upcoming') && $nextUpcomingToday === null) {
+                $nextUpcomingToday = $item;
+            }
+        } else {
+            // Cek hari berikutnya dalam siklus mingguan
+            $daysAhead = ($rowDay > $day) ? ($rowDay - $day) : (7 - $day + $rowDay);
+            if ($daysAhead < $minDaysAhead) {
+                $minDaysAhead = $daysAhead;
+                $nextUpcomingOtherDay = $item;
+            }
         }
 
         if (isset($weekSchedules[$rowDay])) {
@@ -703,11 +750,22 @@ function mobile_api_handle_my_schedule(): void
         }
     }
 
+    $nextUpcoming = $nextUpcomingToday ?: $nextUpcomingOtherDay;
+
     mobile_api_response(true, [
-        'today_day_name' => $daysMap[$day] ?? '',
+        'today_day' => $day,
+        'today_day_name' => $daysMap[$day] ?? 'Hari Ini',
         'today_date' => $todayDate,
         'today' => $todaySchedules,
         'week' => array_values($weekSchedules),
+        'next_upcoming_schedule' => $nextUpcoming,
+        'summary' => [
+            'total_weekly_lessons' => count($allRows),
+            'days_with_lessons' => $activeDaysWithLessons,
+            'day_counts' => $dayCounts,
+            'teacher_id' => $teacherId,
+            'is_teacher_linked' => ($teacherId > 0),
+        ],
     ]);
 }
 
@@ -801,6 +859,23 @@ function mobile_api_handle_teacher_checkin(): void
 function mobile_api_handle_teaching_assignments(): void
 {
     $user = mobile_api_require_auth();
+    $teacherId = !empty($user['teacher_id']) ? (int)$user['teacher_id'] : 0;
+
+    // Safety net: Auto-link guru jika teacher_id di tabel users masih kosong
+    if ($teacherId <= 0 && $user['role'] === 'guru') {
+        $cleanedName = trim(preg_replace('/^(ust\.|usth\.|bpk\.|ibu|drs\.|dra\.)\s*/i', '', (string)$user['name']));
+        $teacherByName = fetch_one(
+            "SELECT id FROM teachers WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) OR LOWER(name) LIKE ? ORDER BY id ASC LIMIT 1",
+            [$user['name'], '%' . strtolower($cleanedName) . '%']
+        );
+        if ($teacherByName && !empty($teacherByName['id'])) {
+            $teacherId = (int)$teacherByName['id'];
+            try {
+                execute_sql('UPDATE users SET teacher_id = ? WHERE id = ?', [$teacherId, (int)$user['id']]);
+            } catch (Throwable $e) {}
+        }
+    }
+
     $sql = "SELECT ta.id, ta.teacher_id, ta.class_id, ta.subject_id, ta.academic_year, ta.semester,
                    c.name AS class_name, c.grade, s.name AS subject_name, s.code AS subject_code
             FROM teaching_assignments ta
@@ -809,15 +884,20 @@ function mobile_api_handle_teaching_assignments(): void
             WHERE ta.active = 1";
     $params = [];
 
-    if ($user['role'] !== 'admin' && !empty($user['teacher_id'])) {
-        $sql .= " AND ta.teacher_id = ?";
-        $params[] = (int)$user['teacher_id'];
+    if ($user['role'] !== 'admin' && $teacherId > 0) {
+        $sql .= " AND (ta.teacher_id = ? OR ta.id IN (SELECT DISTINCT assignment_id FROM lesson_schedules WHERE teacher_id = ?))";
+        $params[] = $teacherId;
+        $params[] = $teacherId;
     }
 
     $sql .= " ORDER BY c.grade, c.name, s.name";
     $assignments = fetch_all($sql, $params);
 
-    mobile_api_response(true, ['assignments' => $assignments]);
+    mobile_api_response(true, [
+        'assignments' => $assignments,
+        'teacher_id' => $teacherId,
+        'is_teacher_linked' => ($teacherId > 0),
+    ]);
 }
 
 function mobile_api_handle_students_for_attendance(): void

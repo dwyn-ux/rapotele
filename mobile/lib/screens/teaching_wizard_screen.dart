@@ -45,6 +45,7 @@ class _TeachingWizardScreenState extends State<TeachingWizardScreen> {
   String? _scheduleInfo;
   bool _hasSchedule = true;
   String _scheduleDayName = '';
+  List<String> _otherSchedules = [];
 
   // Step 2: Student Attendance
   List<StudentAttendanceItem> _students = [];
@@ -157,6 +158,8 @@ class _TeachingWizardScreenState extends State<TeachingWizardScreen> {
         _hasSchedule = res['has_schedule'] == true;
         _scheduleInfo = res['schedule_info']?.toString();
         _scheduleDayName = res['day_name']?.toString() ?? '';
+        final otherRaw = res['other_schedules'] as List<dynamic>?;
+        _otherSchedules = otherRaw?.map((e) => e.toString()).toList() ?? [];
 
         // Check if any student attendance has been recorded
         _hasSavedAttendance = _students.any((s) => s.notes.isNotEmpty || s.status != 'hadir') || _isTeacherCheckedIn;
@@ -825,24 +828,58 @@ class _TeachingWizardScreenState extends State<TeachingWizardScreen> {
                 ],
               ),
               const Divider(height: 24),
-              if (!_hasSchedule && _scheduleDayName.isNotEmpty) ...[
+              if (_hasSchedule && _scheduleInfo != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFBBF7D0)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle_outline_rounded, size: 16, color: Color(0xFF16A34A)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Sesuai Jadwal: $_scheduleInfo',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF15803D)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else if (!_hasSchedule && _scheduleDayName.isNotEmpty) ...[
                 Container(
                   padding: const EdgeInsets.all(10),
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFEF2F2),
+                    color: const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFFECACA)),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFFDC2626)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Catatan: Tidak ada jadwal resmi KBM pada hari $_scheduleDayName untuk kelas ini.',
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF991B1B)),
-                        ),
+                      Row(
+                        children: [
+                          const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF2563EB)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _otherSchedules.isNotEmpty
+                                  ? 'Jadwal Reguler: ${_otherSchedules.join(' & ')}'
+                                  : 'Hari ini ($_scheduleDayName) di luar jam reguler.',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Anda tetap dapat melakukan presensi & pengisian jurnal jika mengajar jam tambahan atau jam pengganti (inval).',
+                        style: TextStyle(fontSize: 10.5, color: Colors.blue.shade900),
                       ),
                     ],
                   ),

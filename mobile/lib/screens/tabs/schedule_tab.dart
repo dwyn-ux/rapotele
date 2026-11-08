@@ -32,11 +32,26 @@ class _ScheduleTabState extends State<ScheduleTab> {
     if (!mounted) return;
 
     if (data['success'] == true) {
+      final todayList = (data['today'] as List<ScheduleItem>?) ?? [];
+      final weekList = (data['week'] as List<DaySchedule>?) ?? [];
+
+      // Cari hari pertama yang memiliki jadwal jika hari ini kosong
+      int initialDayIndex = 0;
+      if (todayList.isEmpty && weekList.isNotEmpty) {
+        final firstActive = weekList.indexWhere((d) => d.items.isNotEmpty);
+        if (firstActive != -1) {
+          initialDayIndex = firstActive;
+        }
+      }
+
       setState(() {
         _todayDayName = data['today_day_name'] ?? '';
         _todayDate = data['today_date'] ?? '';
-        _todayList = data['today'] as List<ScheduleItem>;
-        _weekList = data['week'] as List<DaySchedule>;
+        _todayList = todayList;
+        _weekList = weekList;
+        if (_selectedDayIndex == 0) {
+          _selectedDayIndex = initialDayIndex;
+        }
         _isLoading = false;
       });
     } else {
@@ -132,20 +147,153 @@ class _ScheduleTabState extends State<ScheduleTab> {
 
   Widget _buildTodayView() {
     if (_todayList.isEmpty) {
+      final activeDays = _weekList.where((d) => d.items.isNotEmpty).toList();
+
       return ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          const SizedBox(height: 80),
-          Center(
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
             child: Column(
               children: [
-                const Icon(Icons.event_available_rounded, size: 54, color: Color(0xFF94A3B8)),
-                const SizedBox(height: 12),
-                Text('Tidak Ada Jadwal KBM Hari Ini ($_todayDayName)', style: const TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                const Text('Silakan periksa tab "Semua Hari" untuk melihat jadwal hari lain.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.event_available_rounded, size: 40, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Hari Ini (${_todayDayName.isNotEmpty ? _todayDayName : "Libur"}) Tidak Ada KBM',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Tidak ada jam pelajaran yang dijadwalkan untuk hari ini.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                ),
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          if (activeDays.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.calendar_month_rounded, size: 18, color: Color(0xFF2563EB)),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Jadwal Mengajar Anda Minggu Ini',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...activeDays.map((d) {
+              final subjectsSummary = d.items.map((i) => '${i.subjectName} (${i.className})').toSet().join(', ');
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFDBEAFE)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(d.dayName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1D4ED8))),
+                          Text('${d.items.length} Jam', style: const TextStyle(fontSize: 10, color: Color(0xFF3B82F6))),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            subjectsSummary.isNotEmpty ? subjectsSummary : 'Jam Mengajar',
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF0F172A)),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Jam ke-${d.items.first.period} (${d.items.first.startTime}) s/d Jam ke-${d.items.last.period} (${d.items.last.endTime})',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _selectedDayIndex = _weekList.indexOf(d);
+                          _showWeekly = true;
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        visualDensity: VisualDensity.compact,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: const Text('Buka', style: TextStyle(fontSize: 12)),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 20),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Belum ada jadwal mengajar yang terhubung ke akun ini. Pastikan akun sudah terhubung ke data Guru di web.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF92400E)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       );
     }
@@ -167,12 +315,13 @@ class _ScheduleTabState extends State<ScheduleTab> {
     }
 
     final currentDay = _weekList[_selectedDayIndex.clamp(0, _weekList.length - 1)];
+    final activeDays = _weekList.where((d) => d.items.isNotEmpty).toList();
 
     return Column(
       children: [
         // Day selector tabs
         Container(
-          height: 46,
+          height: 48,
           color: Colors.white,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
@@ -181,13 +330,25 @@ class _ScheduleTabState extends State<ScheduleTab> {
             itemBuilder: (ctx, index) {
               final d = _weekList[index];
               final isSelected = index == _selectedDayIndex;
+              final hasItems = d.items.isNotEmpty;
               return Padding(
                 padding: const EdgeInsets.only(right: 6),
                 child: ChoiceChip(
-                  label: Text(d.dayName, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                  label: Text(
+                    '${d.dayName} (${d.items.length})',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: (isSelected || hasItems) ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
                   selected: isSelected,
                   selectedColor: const Color(0xFF2563EB),
-                  labelStyle: TextStyle(color: isSelected ? Colors.white : const Color(0xFF475569)),
+                  backgroundColor: hasItems ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+                  labelStyle: TextStyle(
+                    color: isSelected
+                        ? Colors.white
+                        : (hasItems ? const Color(0xFF1D4ED8) : const Color(0xFF64748B)),
+                  ),
                   onSelected: (_) => setState(() => _selectedDayIndex = index),
                 ),
               );
@@ -199,7 +360,42 @@ class _ScheduleTabState extends State<ScheduleTab> {
         Expanded(
           child: currentDay.items.isEmpty
               ? Center(
-                  child: Text('Tidak ada KBM pada hari ${currentDay.dayName}', style: const TextStyle(color: Color(0xFF64748B))),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.event_busy_rounded, size: 48, color: Color(0xFF94A3B8)),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Tidak ada KBM pada hari ${currentDay.dayName}',
+                          style: const TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                        if (activeDays.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Jadwal KBM Anda tersedia pada hari:',
+                            style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            alignment: WrapAlignment.center,
+                            children: activeDays.map((d) {
+                              return ActionChip(
+                                avatar: const Icon(Icons.calendar_today_rounded, size: 14, color: Color(0xFF2563EB)),
+                                label: Text('${d.dayName} (${d.items.length} jam)'),
+                                onPressed: () {
+                                  setState(() => _selectedDayIndex = _weekList.indexOf(d));
+                                },
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 )
               : ListView.separated(
                   padding: const EdgeInsets.all(16),

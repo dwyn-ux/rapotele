@@ -324,6 +324,11 @@ class ApiService {
         if (decoded is Map<String, dynamic> && decoded['ok'] == true) {
           final todayRaw = (decoded['today'] as List<dynamic>?) ?? [];
           final weekRaw = (decoded['week'] as List<dynamic>?) ?? [];
+          final nextRaw = decoded['next_upcoming_schedule'];
+          ScheduleItem? nextUpcoming;
+          if (nextRaw is Map<String, dynamic>) {
+            nextUpcoming = ScheduleItem.fromJson(nextRaw);
+          }
 
           return {
             'success': true,
@@ -331,6 +336,8 @@ class ApiService {
             'today_date': decoded['today_date'] ?? '',
             'today': todayRaw.map((e) => ScheduleItem.fromJson(e as Map<String, dynamic>)).toList(),
             'week': weekRaw.map((e) => DaySchedule.fromJson(e as Map<String, dynamic>)).toList(),
+            'next_upcoming_schedule': nextUpcoming,
+            'summary': decoded['summary'] is Map<String, dynamic> ? decoded['summary'] as Map<String, dynamic> : {},
           };
         }
       }

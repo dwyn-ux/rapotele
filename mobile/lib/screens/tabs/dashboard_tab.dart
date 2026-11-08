@@ -44,9 +44,17 @@ class _DashboardTabState extends State<DashboardTab> {
       if (schedData['success'] == true) {
         final todayList = (schedData['today'] as List<dynamic>?) ?? [];
         final items = todayList.whereType<ScheduleItem>().toList();
-        next = items.firstWhere(
-          (item) => item.status == 'active' || item.status == 'upcoming',
-          orElse: () => items.isNotEmpty ? items.first : ScheduleItem(
+        final nextUpcoming = schedData['next_upcoming_schedule'] as ScheduleItem?;
+
+        if (items.isNotEmpty) {
+          next = items.firstWhere(
+            (item) => item.status == 'active' || item.status == 'upcoming',
+            orElse: () => items.first,
+          );
+        } else if (nextUpcoming != null) {
+          next = nextUpcoming;
+        } else {
+          next = ScheduleItem(
             id: 0,
             dayOfWeek: 1,
             dayName: '',
@@ -57,8 +65,8 @@ class _DashboardTabState extends State<DashboardTab> {
             className: '-',
             teacherName: '-',
             status: 'finished',
-          ),
-        );
+          );
+        }
       }
 
       TeacherAttendanceModel? att;
@@ -437,6 +445,22 @@ class _DashboardTabState extends State<DashboardTab> {
   Widget _buildLiveScheduleCard() {
     final next = _nextSchedule;
     final isActive = next?.status == 'active';
+    final isUpcomingToday = next?.status == 'upcoming';
+    final isNextDay = next != null && next.id > 0 && !isActive && !isUpcomingToday;
+
+    String headerLabel = 'JADWAL KBM HARI INI';
+    IconData headerIcon = Icons.schedule_rounded;
+    Color headerColor = const Color(0xFF64748B);
+
+    if (isActive) {
+      headerLabel = 'KBM SEDANG BERLANGSUNG';
+      headerIcon = Icons.play_circle_fill_rounded;
+      headerColor = const Color(0xFF2563EB);
+    } else if (isNextDay && next.dayName.isNotEmpty) {
+      headerLabel = 'JADWAL BERIKUTNYA (${next.dayName.toUpperCase()})';
+      headerIcon = Icons.event_available_rounded;
+      headerColor = const Color(0xFF1D4ED8);
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -461,18 +485,18 @@ class _DashboardTabState extends State<DashboardTab> {
               Row(
                 children: [
                   Icon(
-                    isActive ? Icons.play_circle_fill_rounded : Icons.schedule_rounded,
-                    color: isActive ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                    headerIcon,
+                    color: headerColor,
                     size: 18,
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    isActive ? 'KBM SEDANG BERLANGSUNG' : 'JADWAL KBM HARI INI',
+                    headerLabel,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.6,
-                      color: isActive ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                      color: headerColor,
                     ),
                   ),
                 ],
@@ -506,7 +530,7 @@ class _DashboardTabState extends State<DashboardTab> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Kelas ${next.className} • Jam ke-${next.period} (${next.timeRange})',
+                        '${isNextDay && next.dayName.isNotEmpty ? "Hari ${next.dayName} • " : ""}Kelas ${next.className} • Jam ke-${next.period} (${next.timeRange})',
                         style: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
                       ),
                     ],
@@ -522,7 +546,7 @@ class _DashboardTabState extends State<DashboardTab> {
                     ),
                   ),
                   child: Text(
-                    next.remainingLabel,
+                    isNextDay && next.dayName.isNotEmpty ? 'Hari ${next.dayName}' : next.remainingLabel,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -540,8 +564,8 @@ class _DashboardTabState extends State<DashboardTab> {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => TeachingWizardScreen(
-                        assignmentId: next.assignmentId,
-                        scheduleId: next.id,
+                        assignmentId: next.assignmentId > 0 ? next.assignmentId : null,
+                        scheduleId: next.id > 0 ? next.id : null,
                       ),
                     ),
                   );
@@ -554,7 +578,11 @@ class _DashboardTabState extends State<DashboardTab> {
                 ),
                 icon: const Icon(Icons.play_circle_fill_rounded, size: 18),
                 label: Text(
-                  isActive ? 'Mulai KBM (Absen Masuk, Siswa & Jurnal) ➜' : 'Buka Alur Mengajar (3 Langkah) ➜',
+                  isActive
+                      ? 'Mulai KBM (Absen Masuk, Siswa & Jurnal) ➜'
+                      : (isNextDay && next.dayName.isNotEmpty
+                          ? 'Buka Alur KBM (Hari ${next.dayName}) ➜'
+                          : 'Buka Alur Mengajar (3 Langkah) ➜'),
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ),
