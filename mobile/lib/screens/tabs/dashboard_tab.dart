@@ -4,6 +4,7 @@ import '../../services/notification_service.dart';
 import '../../models/notification_item.dart';
 import '../../models/schedule_item.dart';
 import '../../models/attendance_models.dart';
+import '../teaching_wizard_screen.dart';
 import 'notifications_tab.dart';
 
 class DashboardTab extends StatefulWidget {
@@ -216,11 +217,20 @@ class _DashboardTabState extends State<DashboardTab> {
                   onTap: () => widget.onTabChange(1, subTab: 0),
                 ),
                 _buildAdminActionCard(
-                  title: 'Presensi Siswa',
-                  subtitle: 'Kehadiran H/S/I/A',
-                  icon: Icons.groups_rounded,
+                  title: 'Alur KBM Kelas',
+                  subtitle: 'Absen masuk, siswa & jurnal',
+                  icon: Icons.play_circle_fill_rounded,
                   color: const Color(0xFF2563EB),
-                  onTap: () => widget.onTabChange(1, subTab: 1),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => TeachingWizardScreen(
+                          assignmentId: _nextSchedule?.assignmentId,
+                          scheduleId: _nextSchedule?.id,
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 _buildAdminActionCard(
                   title: 'Jurnal Mengajar',
@@ -522,6 +532,33 @@ class _DashboardTabState extends State<DashboardTab> {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => TeachingWizardScreen(
+                        assignmentId: next.assignmentId,
+                        scheduleId: next.id,
+                      ),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isActive ? const Color(0xFF16A34A) : const Color(0xFF2563EB),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                icon: const Icon(Icons.play_circle_fill_rounded, size: 18),
+                label: Text(
+                  isActive ? 'Mulai KBM (Absen Masuk, Siswa & Jurnal) ➜' : 'Buka Alur Mengajar (3 Langkah) ➜',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+            ),
           ],
         ],
       ),
@@ -551,41 +588,66 @@ class _DashboardTabState extends State<DashboardTab> {
       iconColor = const Color(0xFF16A34A);
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: iconColor, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+    final isSchedule = item.type == 'schedule' && item.assignmentId > 0;
+
+    return InkWell(
+      onTap: isSchedule
+          ? () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => TeachingWizardScreen(
+                    assignmentId: item.assignmentId,
+                    scheduleId: item.scheduleId,
+                  ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  item.body,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
-                ),
-              ],
+              );
+            }
+          : null,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: border),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: iconColor, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        ),
+                      ),
+                      if (isSchedule)
+                        const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFF2563EB)),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    item.body,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            item.time,
-            style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
-          ),
-        ],
+            const SizedBox(width: 6),
+            Text(
+              item.time,
+              style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+            ),
+          ],
+        ),
       ),
     );
   }

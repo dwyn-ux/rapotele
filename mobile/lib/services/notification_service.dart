@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'api_service.dart';
 import '../models/notification_item.dart';
@@ -14,6 +15,10 @@ class NotificationService {
 
   static const String channelScheduleId = 'erapot_schedule_channel';
 
+  /// Stream to listen when user clicks/taps an Android notification
+  static final StreamController<Map<String, dynamic>> onNotificationClick =
+      StreamController<Map<String, dynamic>>.broadcast();
+
   Future<void> init() async {
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidInit);
@@ -21,7 +26,12 @@ class NotificationService {
     await _plugin.initialize(
       settings: initSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
-        // Notification tapped
+        if (response.payload != null && response.payload!.isNotEmpty) {
+          try {
+            final data = jsonDecode(response.payload!) as Map<String, dynamic>;
+            onNotificationClick.add(data);
+          } catch (_) {}
+        }
       },
     );
 
@@ -32,6 +42,19 @@ class NotificationService {
     }
 
     startPeriodicChecker();
+  }
+
+  Future<Map<String, dynamic>?> getInitialNotificationPayload() async {
+    final launchDetails = await _plugin.getNotificationAppLaunchDetails();
+    if (launchDetails?.didNotificationLaunchApp ?? false) {
+      final payload = launchDetails?.notificationResponse?.payload;
+      if (payload != null && payload.isNotEmpty) {
+        try {
+          return jsonDecode(payload) as Map<String, dynamic>;
+        } catch (_) {}
+      }
+    }
+    return null;
   }
 
   Future<void> showNotification({
@@ -98,13 +121,25 @@ class NotificationService {
           _notifiedIds.add(item.id);
 
           final notificationId = item.id.hashCode & 0x7FFFFFFF;
+          final payloadData = jsonEncode({
+            'type': item.type,
+            'id': item.id,
+            'assignment_id': item.assignmentId,
+            'schedule_id': item.scheduleId,
+            'class_name': item.className,
+            'subject_name': item.subjectName,
+            'period': item.period,
+            'is_active': item.isActive,
+            'is_starting_soon': item.isStartingSoon,
+          });
+
           await showNotification(
             id: notificationId,
             title: item.title,
             body: item.body,
             channelId: channelScheduleId,
             channelName: 'Jadwal & KBM',
-            payload: item.id,
+            payload: payloadData,
           );
         }
       }

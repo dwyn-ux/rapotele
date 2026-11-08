@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import 'login_screen.dart';
+import 'teaching_wizard_screen.dart';
 import 'tabs/dashboard_tab.dart';
 import 'tabs/attendance_tab.dart';
 import 'tabs/administration_tab.dart';
@@ -19,6 +21,51 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   int _attendanceSubTab = 0;
   int _adminSubTab = 0;
+  StreamSubscription? _notifSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _notifSub = NotificationService.onNotificationClick.stream.listen((data) {
+      if (!mounted) return;
+      final assignmentId = int.tryParse(data['assignment_id']?.toString() ?? '0') ?? 0;
+      final scheduleId = int.tryParse(data['schedule_id']?.toString() ?? '0') ?? 0;
+      if (assignmentId > 0) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => TeachingWizardScreen(
+              assignmentId: assignmentId,
+              scheduleId: scheduleId,
+            ),
+          ),
+        );
+      }
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final payload = await NotificationService().getInitialNotificationPayload();
+      if (payload != null && mounted) {
+        final assignmentId = int.tryParse(payload['assignment_id']?.toString() ?? '0') ?? 0;
+        final scheduleId = int.tryParse(payload['schedule_id']?.toString() ?? '0') ?? 0;
+        if (assignmentId > 0) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => TeachingWizardScreen(
+                assignmentId: assignmentId,
+                scheduleId: scheduleId,
+              ),
+            ),
+          );
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _notifSub?.cancel();
+    super.dispose();
+  }
 
   void _onTabTapped(int index, {int? subTab}) {
     setState(() {

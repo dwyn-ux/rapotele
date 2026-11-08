@@ -1,5 +1,6 @@
 class ScheduleItem {
   final int id;
+  final int assignmentId;
   final int dayOfWeek;
   final String dayName;
   final int period;
@@ -14,6 +15,7 @@ class ScheduleItem {
 
   ScheduleItem({
     required this.id,
+    this.assignmentId = 0,
     required this.dayOfWeek,
     required this.dayName,
     required this.period,
@@ -30,6 +32,7 @@ class ScheduleItem {
   factory ScheduleItem.fromJson(Map<String, dynamic> json) {
     return ScheduleItem(
       id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      assignmentId: int.tryParse(json['assignment_id']?.toString() ?? '0') ?? 0,
       dayOfWeek: int.tryParse(json['day_of_week']?.toString() ?? '1') ?? 1,
       dayName: json['day_name']?.toString() ?? '',
       period: int.tryParse(json['period']?.toString() ?? '1') ?? 1,

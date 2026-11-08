@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/teaching_assignment.dart';
 import '../../models/attendance_models.dart';
 import '../../services/api_service.dart';
+import '../teaching_wizard_screen.dart';
 
 class AttendanceTab extends StatefulWidget {
   final int initialSubTab;
@@ -291,13 +292,32 @@ class _AttendanceTabState extends State<AttendanceTab> with SingleTickerProvider
           ),
           content: Text(res['message']?.toString() ?? ''),
           actions: [
-            FilledButton(
+            TextButton(
               onPressed: () {
                 Navigator.pop(ctx);
                 _loadStudentsForSession();
               },
-              child: const Text('OK'),
+              child: const Text('Tutup'),
             ),
+            if (res['success'] == true && _selectedAssignment != null)
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => TeachingWizardScreen(
+                        assignmentId: _selectedAssignment!.id,
+                        date: _formatDateYmd(_selectedDate),
+                        meetingNo: _meetingNo,
+                        initialStep: 3,
+                      ),
+                    ),
+                  );
+                },
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF16A34A)),
+                icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                label: const Text('Lanjut Isi Jurnal ➜'),
+              ),
           ],
         ),
       );

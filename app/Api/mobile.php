@@ -472,6 +472,11 @@ function mobile_api_handle_notifications(): void
                         'minutes_remaining' => $diffMinutesEnd,
                         'is_active' => true,
                         'is_ending_soon' => true,
+                        'schedule_id' => (int)$sch['id'],
+                        'assignment_id' => (int)($sch['assignment_id'] ?? 0),
+                        'class_name' => (string)$sch['class_name'],
+                        'subject_name' => (string)$sch['subject_name'],
+                        'period' => (int)$periodNum,
                     ];
                 } else {
                     $notifications[] = [
@@ -483,6 +488,11 @@ function mobile_api_handle_notifications(): void
                         'time' => substr($startTime, 0, 5),
                         'minutes_remaining' => 0,
                         'is_active' => true,
+                        'schedule_id' => (int)$sch['id'],
+                        'assignment_id' => (int)($sch['assignment_id'] ?? 0),
+                        'class_name' => (string)$sch['class_name'],
+                        'subject_name' => (string)$sch['subject_name'],
+                        'period' => (int)$periodNum,
                     ];
                 }
             }
@@ -498,6 +508,11 @@ function mobile_api_handle_notifications(): void
                     'minutes_remaining' => $diffMinutesStart,
                     'is_active' => false,
                     'is_starting_soon' => true,
+                    'schedule_id' => (int)$sch['id'],
+                    'assignment_id' => (int)($sch['assignment_id'] ?? 0),
+                    'class_name' => (string)$sch['class_name'],
+                    'subject_name' => (string)$sch['subject_name'],
+                    'period' => (int)$periodNum,
                 ];
             }
             // Upcoming in 6 - 60 minutes
@@ -511,6 +526,11 @@ function mobile_api_handle_notifications(): void
                     'time' => substr($startTime, 0, 5),
                     'minutes_remaining' => $diffMinutesStart,
                     'is_active' => false,
+                    'schedule_id' => (int)$sch['id'],
+                    'assignment_id' => (int)($sch['assignment_id'] ?? 0),
+                    'class_name' => (string)$sch['class_name'],
+                    'subject_name' => (string)$sch['subject_name'],
+                    'period' => (int)$periodNum,
                 ];
             }
             // Later today (if <= 4 total items)
@@ -524,6 +544,11 @@ function mobile_api_handle_notifications(): void
                     'time' => substr($startTime, 0, 5),
                     'minutes_remaining' => $diffMinutesStart,
                     'is_active' => false,
+                    'schedule_id' => (int)$sch['id'],
+                    'assignment_id' => (int)($sch['assignment_id'] ?? 0),
+                    'class_name' => (string)$sch['class_name'],
+                    'subject_name' => (string)$sch['subject_name'],
+                    'period' => (int)$periodNum,
                 ];
             }
         }
@@ -643,6 +668,7 @@ function mobile_api_handle_my_schedule(): void
 
         $item = [
             'id' => (int)$row['id'],
+            'assignment_id' => (int)($row['assignment_id'] ?? 0),
             'day_of_week' => $rowDay,
             'day_name' => $daysMap[$rowDay] ?? 'Hari ' . $rowDay,
             'period' => (int)($row['period_no'] ?? 1),
@@ -1088,6 +1114,18 @@ function mobile_api_handle_journals(): void
         $params[] = $assignmentId;
     }
 
+    $date = trim((string)($_GET['date'] ?? ''));
+    if ($date !== '') {
+        $sql .= ($params ? " AND" : " WHERE") . " dj.date = ?";
+        $params[] = $date;
+    }
+
+    $meetingNo = (int)($_GET['meeting_no'] ?? 0);
+    if ($meetingNo > 0) {
+        $sql .= ($params ? " AND" : " WHERE") . " dj.meeting_no = ?";
+        $params[] = $meetingNo;
+    }
+
     $sql .= " ORDER BY dj.date DESC, dj.id DESC LIMIT 40";
     $journals = fetch_all($sql, $params);
 
@@ -1122,18 +1160,43 @@ function mobile_api_handle_save_journal(): void
     }
 
     $now = now_string();
+    $hasStatus = function_exists('table_column_exists') && table_column_exists('daily_journals', 'status');
+
+    if ($id <= 0) {
+        $existing = fetch_one(
+            'SELECT id FROM daily_journals WHERE assignment_id = ? AND date = ? AND meeting_no = ?',
+            [(int)$assignment['id'], $date, $meetingNo]
+        );
+        if ($existing) {
+            $id = (int)$existing['id'];
+        }
+    }
 
     if ($id > 0) {
-        execute_sql(
-            'UPDATE daily_journals SET assignment_id = ?, teacher_id = ?, class_id = ?, subject_id = ?, date = ?, meeting_no = ?, topic = ?, activities = ?, materials = ?, obstacles = ?, follow_up = ?, updated_at = ? WHERE id = ?',
-            [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $date, $meetingNo, $topic, $activities, $materials, $obstacles, $followUp, $now, $id]
-        );
+        if ($hasStatus) {
+            execute_sql(
+                'UPDATE daily_journals SET assignment_id = ?, teacher_id = ?, class_id = ?, subject_id = ?, date = ?, meeting_no = ?, topic = ?, activities = ?, materials = ?, obstacles = ?, follow_up = ?, updated_at = ?, status = ? WHERE id = ?',
+                [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $date, $meetingNo, $topic, $activities, $materials, $obstacles, $followUp, $now, 'completed', $id]
+            );
+        } else {
+            execute_sql(
+                'UPDATE daily_journals SET assignment_id = ?, teacher_id = ?, class_id = ?, subject_id = ?, date = ?, meeting_no = ?, topic = ?, activities = ?, materials = ?, obstacles = ?, follow_up = ?, updated_at = ? WHERE id = ?',
+                [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $date, $meetingNo, $topic, $activities, $materials, $obstacles, $followUp, $now, $id]
+            );
+        }
         mobile_api_response(true, ['id' => $id], 'Jurnal pembelajaran berhasil diperbarui.');
     } else {
-        execute_sql(
-            'INSERT INTO daily_journals (assignment_id, teacher_id, class_id, subject_id, date, meeting_no, topic, activities, materials, obstacles, follow_up, created_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $date, $meetingNo, $topic, $activities, $materials, $obstacles, $followUp, (int)$user['id'], $now]
-        );
+        if ($hasStatus) {
+            execute_sql(
+                'INSERT INTO daily_journals (assignment_id, teacher_id, class_id, subject_id, date, meeting_no, topic, activities, materials, obstacles, follow_up, created_by, updated_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $date, $meetingNo, $topic, $activities, $materials, $obstacles, $followUp, (int)$user['id'], $now, 'completed']
+            );
+        } else {
+            execute_sql(
+                'INSERT INTO daily_journals (assignment_id, teacher_id, class_id, subject_id, date, meeting_no, topic, activities, materials, obstacles, follow_up, created_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [(int)$assignment['id'], (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $date, $meetingNo, $topic, $activities, $materials, $obstacles, $followUp, (int)$user['id'], $now]
+            );
+        }
         mobile_api_response(true, ['id' => (int)db()->lastInsertId()], 'Jurnal pembelajaran berhasil disimpan.');
     }
 }

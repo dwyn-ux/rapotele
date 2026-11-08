@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../models/schedule_item.dart';
+import '../teaching_wizard_screen.dart';
 
 class ScheduleTab extends StatefulWidget {
   const ScheduleTab({super.key});
@@ -322,6 +323,42 @@ class _ScheduleTabState extends State<ScheduleTab> {
               ),
             ],
           ),
+          if (showStatus) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => TeachingWizardScreen(
+                        assignmentId: item.assignmentId,
+                        scheduleId: item.id,
+                      ),
+                    ),
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  side: BorderSide(color: isActive ? const Color(0xFF16A34A) : const Color(0xFF2563EB)),
+                ),
+                icon: Icon(
+                  isActive ? Icons.play_circle_fill_rounded : Icons.assignment_turned_in_rounded,
+                  size: 16,
+                  color: isActive ? const Color(0xFF16A34A) : const Color(0xFF2563EB),
+                ),
+                label: Text(
+                  isActive ? 'Masuk Kelas & Isi Jurnal (KBM Aktif)' : 'Buka Alur Mengajar (3 Langkah)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isActive ? const Color(0xFF16A34A) : const Color(0xFF2563EB),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
