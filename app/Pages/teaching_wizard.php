@@ -500,7 +500,7 @@ function render_wizard_step2(array $assignment, string $date, int $meetingNo, in
                                 <tr>
                                     <td style="text-align:center;"><?= $no++ ?></td>
                                     <td style="font-weight:600;">
-                                        <input type="hidden" name="entries[<?= $sid ?>][student_id]" value="<?= $sid ?>">
+                                        <input type="hidden" name="student_ids[]" value="<?= $sid ?>">
                                         <?= e($st['name']) ?>
                                     </td>
                                     <td style="color:var(--text-muted);font-size:.85rem;"><?= e($st['nis'] ?: '-') ?></td>
@@ -508,14 +508,14 @@ function render_wizard_step2(array $assignment, string $date, int $meetingNo, in
                                         <div style="display:flex;gap:6px;flex-wrap:wrap;">
                                             <?php foreach (['hadir' => 'Hadir', 'sakit' => 'Sakit', 'izin' => 'Izin', 'alpa' => 'Alpa', 'terlambat' => 'Telat'] as $val => $lbl): ?>
                                                 <label style="margin:0;cursor:pointer;display:inline-flex;align-items:center;gap:3px;font-size:.82rem;padding:3px 8px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;" class="att-radio-label">
-                                                    <input type="radio" name="entries[<?= $sid ?>][status]" value="<?= $val ?>" <?= $curStatus === $val ? 'checked' : '' ?> class="att-radio" data-status="<?= $val ?>">
+                                                    <input type="radio" name="status[<?= $sid ?>]" value="<?= $val ?>" <?= $curStatus === $val ? 'checked' : '' ?> class="att-radio" data-status="<?= $val ?>">
                                                     <span><?= $lbl ?></span>
                                                 </label>
                                             <?php endforeach; ?>
                                         </div>
                                     </td>
                                     <td>
-                                        <input type="text" name="entries[<?= $sid ?>][notes]" value="<?= e($st['notes'] ?? '') ?>" placeholder="Keterangan..." style="font-size:.82rem;padding:4px 8px;">
+                                        <input type="text" name="notes[<?= $sid ?>]" value="<?= e($st['notes'] ?? '') ?>" placeholder="Keterangan..." style="font-size:.82rem;padding:4px 8px;">
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

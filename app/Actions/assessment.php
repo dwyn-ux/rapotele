@@ -136,6 +136,14 @@ function action_save_student_attendance(): void
 
     $statusInput = $_POST['status'] ?? [];
     $notesInput = $_POST['notes'] ?? [];
+    if (empty($statusInput) && !empty($_POST['entries']) && is_array($_POST['entries'])) {
+        foreach ($_POST['entries'] as $studentKey => $entry) {
+            if (is_array($entry)) {
+                $statusInput[$studentKey] = $entry['status'] ?? 'hadir';
+                $notesInput[$studentKey] = $entry['notes'] ?? '';
+            }
+        }
+    }
     if (!is_array($statusInput) || !is_array($notesInput)) {
         throw new InvalidArgumentException('Data absensi tidak valid.');
     }
@@ -152,6 +160,9 @@ function action_save_student_attendance(): void
             'status' => allowed_status_value($status, allowed_statuses(), 'Status absensi tidak valid.'),
             'notes' => trim((string)($noteValue ?? '')),
         ];
+    }
+    if (empty($rows)) {
+        throw new RuntimeException('Tidak ada data absensi siswa yang dikirim.');
     }
 
     $queueWhatsapp = !empty($_POST['queue_whatsapp_absence']) && function_exists('whatsapp_enqueue_attendance_notice');
