@@ -19,6 +19,9 @@ class DashboardTab extends StatefulWidget {
 class _DashboardTabState extends State<DashboardTab> {
   bool _isLoading = true;
   ScheduleItem? _nextSchedule;
+  List<ScheduleItem> _todayList = [];
+  List<DaySchedule> _weekList = [];
+  String _todayDayName = '';
   TeacherAttendanceModel? _teacherAttendance;
   List<NotificationItem> _recentNotifications = [];
 
@@ -41,31 +44,25 @@ class _DashboardTabState extends State<DashboardTab> {
       final attData = await attFuture;
 
       ScheduleItem? next;
+      List<ScheduleItem> todayItems = [];
+      List<DaySchedule> weekItems = [];
+      String dayName = '';
+
       if (schedData['success'] == true) {
-        final todayList = (schedData['today'] as List<dynamic>?) ?? [];
-        final items = todayList.whereType<ScheduleItem>().toList();
+        dayName = schedData['today_day_name']?.toString() ?? '';
+        final rawToday = (schedData['today'] as List<dynamic>?) ?? [];
+        todayItems = rawToday.whereType<ScheduleItem>().toList();
+        final rawWeek = (schedData['week'] as List<dynamic>?) ?? [];
+        weekItems = rawWeek.whereType<DaySchedule>().toList();
         final nextUpcoming = schedData['next_upcoming_schedule'] as ScheduleItem?;
 
-        if (items.isNotEmpty) {
-          next = items.firstWhere(
+        if (todayItems.isNotEmpty) {
+          next = todayItems.firstWhere(
             (item) => item.status == 'active' || item.status == 'upcoming',
-            orElse: () => items.first,
+            orElse: () => todayItems.first,
           );
         } else if (nextUpcoming != null) {
           next = nextUpcoming;
-        } else {
-          next = ScheduleItem(
-            id: 0,
-            dayOfWeek: 1,
-            dayName: '',
-            period: 0,
-            startTime: '-',
-            endTime: '-',
-            subjectName: 'Tidak ada KBM hari ini',
-            className: '-',
-            teacherName: '-',
-            status: 'finished',
-          );
         }
       }
 
@@ -78,6 +75,9 @@ class _DashboardTabState extends State<DashboardTab> {
         setState(() {
           _recentNotifications = notifs;
           _nextSchedule = next;
+          _todayList = todayItems;
+          _weekList = weekItems;
+          _todayDayName = dayName;
           _teacherAttendance = att;
           _isLoading = false;
         });
@@ -443,20 +443,29 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   Widget _buildLiveScheduleCard() {
+    final hasTodayClasses = _todayList.isNotEmpty;
     final next = _nextSchedule;
-    final isActive = next?.status == 'active';
-    final isUpcomingToday = next?.status == 'upcoming';
-    final isNextDay = next != null && next.id > 0 && !isActive && !isUpcomingToday;
+    final activeClass = _todayList.where((s) => s.status == 'active').firstOrNull;
+    final upcomingClass = _todayList.where((s) => s.status == 'upcoming').firstOrNull;
+    final featuredClass = activeClass ?? upcomingClass ?? _todayList.firstOrNull ?? next;
+
+    final isActive = featuredClass?.status == 'active';
+    final isUpcomingToday = featuredClass?.status == 'upcoming';
+    final isFinishedToday = hasTodayClasses && activeClass == null && upcomingClass == null;
 
     String headerLabel = 'JADWAL KBM HARI INI';
-    IconData headerIcon = Icons.schedule_rounded;
+    IconData headerIcon = Icons.calendar_today_rounded;
     Color headerColor = const Color(0xFF64748B);
 
     if (isActive) {
       headerLabel = 'KBM SEDANG BERLANGSUNG';
       headerIcon = Icons.play_circle_fill_rounded;
+      headerColor = const Color(0xFF16A34A);
+    } else if (hasTodayClasses) {
+      headerLabel = 'JADWAL HARI INI (${_todayDayName.toUpperCase()} • ${_todayList.length} JAM)';
+      headerIcon = Icons.schedule_rounded;
       headerColor = const Color(0xFF2563EB);
-    } else if (isNextDay && next.dayName.isNotEmpty) {
+    } else if (next != null && next.id > 0 && next.dayName.isNotEmpty) {
       headerLabel = 'JADWAL BERIKUTNYA (${next.dayName.toUpperCase()})';
       headerIcon = Icons.event_available_rounded;
       headerColor = const Color(0xFF1D4ED8);
@@ -467,7 +476,12 @@ class _DashboardTabState extends State<DashboardTab> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isActive ? const Color(0xFF60A5FA) : const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: isActive
+              ? const Color(0xFF86EFAC)
+              : (hasTodayClasses ? const Color(0xFFBFDBFE) : const Color(0xFFE2E8F0)),
+          width: isActive ? 1.5 : 1,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -479,45 +493,209 @@ class _DashboardTabState extends State<DashboardTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    headerIcon,
-                    color: headerColor,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    headerLabel,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.6,
-                      color: headerColor,
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(headerIcon, color: headerColor, size: 18),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        headerLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                          color: headerColor,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               TextButton(
                 onPressed: () => widget.onTabChange(3),
-                style: TextButton.styleFrom(visualDensity: VisualDensity.compact, padding: EdgeInsets.zero),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                ),
                 child: const Text('Semua Jadwal', style: TextStyle(fontSize: 12)),
               ),
             ],
           ),
           const Divider(height: 16),
-          if (next == null || next.subjectName == 'Tidak ada KBM hari ini')
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'Tidak ada jadwal KBM tersisa hari ini.',
-                style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+
+          // Body Content
+          if (hasTodayClasses) ...[
+            // Status KBM hari ini
+            if (featuredClass != null) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          featuredClass.subjectName,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Kelas ${featuredClass.className} • Jam ke-${featuredClass.period} (${featuredClass.timeRange})',
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? const Color(0xFFDCFCE7)
+                          : (isUpcomingToday ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9)),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isActive
+                            ? const Color(0xFF86EFAC)
+                            : (isUpcomingToday ? const Color(0xFFBFDBFE) : const Color(0xFFE2E8F0)),
+                      ),
+                    ),
+                    child: Text(
+                      isActive
+                          ? 'Berlangsung'
+                          : (isUpcomingToday ? featuredClass.remainingLabel : 'Selesai'),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isActive
+                            ? const Color(0xFF166534)
+                            : (isUpcomingToday ? const Color(0xFF1D4ED8) : const Color(0xFF64748B)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            )
-          else ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => TeachingWizardScreen(
+                          assignmentId: featuredClass.assignmentId > 0 ? featuredClass.assignmentId : null,
+                          scheduleId: featuredClass.id > 0 ? featuredClass.id : null,
+                        ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isActive ? const Color(0xFF16A34A) : const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  icon: const Icon(Icons.play_circle_fill_rounded, size: 18),
+                  label: Text(
+                    isActive
+                        ? 'Masuk Kelas Sekarang ➜'
+                        : (isFinishedToday
+                            ? 'Buka Jurnal & Absensi Kelas ➜'
+                            : 'Buka Alur Mengajar (Jam ke-${featuredClass.period}) ➜'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                ),
+              ),
+            ],
+
+            // Jika ada lebih dari 1 kelas hari ini, tampilkan daftar sesi lainnya
+            if (_todayList.length > 1) ...[
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+              const Text(
+                'Semua Sesi Mengajar Hari Ini:',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+              ),
+              const SizedBox(height: 6),
+              ..._todayList.map((item) {
+                final isItemActive = item.status == 'active';
+                return InkWell(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => TeachingWizardScreen(
+                          assignmentId: item.assignmentId > 0 ? item.assignmentId : null,
+                          scheduleId: item.id > 0 ? item.id : null,
+                        ),
+                      ),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 12,
+                          backgroundColor: isItemActive ? const Color(0xFF16A34A) : const Color(0xFFE2E8F0),
+                          child: Text(
+                            '${item.period}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isItemActive ? Colors.white : const Color(0xFF475569),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${item.className} • ${item.subjectName}',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                '${item.startTime} - ${item.endTime}',
+                                style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isItemActive ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            isItemActive ? 'Aktif' : (item.status == 'upcoming' ? 'Nanti' : 'Selesai'),
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              color: isItemActive ? const Color(0xFF166534) : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF94A3B8)),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ] else if (next != null && next.id > 0) ...[
+            // Tampilan jadwal berikutnya di hari lain
             Row(
               children: [
                 Expanded(
@@ -528,63 +706,113 @@ class _DashboardTabState extends State<DashboardTab> {
                         next.subjectName,
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3),
                       Text(
-                        '${isNextDay && next.dayName.isNotEmpty ? "Hari ${next.dayName} • " : ""}Kelas ${next.className} • Jam ke-${next.period} (${next.timeRange})',
+                        'Hari ${next.dayName} • Kelas ${next.className} • Jam ke-${next.period} (${next.timeRange})',
                         style: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isActive ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isActive ? const Color(0xFFBFDBFE) : const Color(0xFFE2E8F0),
-                    ),
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
                   ),
                   child: Text(
-                    isNextDay && next.dayName.isNotEmpty ? 'Hari ${next.dayName}' : next.remainingLabel,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: isActive ? const Color(0xFF1D4ED8) : const Color(0xFF475569),
-                    ),
+                    'Hari ${next.dayName}',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8)),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const TeachingWizardScreen(),
+                        ),
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.add_task_rounded, size: 16),
+                    label: const Text('KBM Inval / Pengganti', style: TextStyle(fontSize: 12)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => TeachingWizardScreen(
+                            assignmentId: next.assignmentId > 0 ? next.assignmentId : null,
+                            scheduleId: next.id > 0 ? next.id : null,
+                          ),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                    ),
+                    icon: const Icon(Icons.play_circle_fill_rounded, size: 16),
+                    label: Text('Alur KBM (${next.dayName})', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+            if (_weekList.any((d) => d.items.isNotEmpty)) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: _weekList.where((d) => d.items.isNotEmpty).map((d) {
+                  return Chip(
+                    label: Text('${d.dayName} (${d.items.length} Jam)', style: const TextStyle(fontSize: 10.5, color: Color(0xFF334155))),
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    side: const BorderSide(color: Color(0xFFE2E8F0)),
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                  );
+                }).toList(),
+              ),
+            ],
+          ] else ...[
+            // Tidak ada jadwal sama sekali
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Text(
+                'Tidak ada jadwal KBM tersisa hari ini.',
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+              ),
+            ),
+            const SizedBox(height: 6),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
+              child: OutlinedButton.icon(
                 onPressed: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => TeachingWizardScreen(
-                        assignmentId: next.assignmentId > 0 ? next.assignmentId : null,
-                        scheduleId: next.id > 0 ? next.id : null,
-                      ),
-                    ),
+                    MaterialPageRoute(builder: (_) => const TeachingWizardScreen()),
                   );
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isActive ? const Color(0xFF16A34A) : const Color(0xFF2563EB),
-                  foregroundColor: Colors.white,
+                style: OutlinedButton.styleFrom(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 9),
                 ),
-                icon: const Icon(Icons.play_circle_fill_rounded, size: 18),
-                label: Text(
-                  isActive
-                      ? 'Mulai KBM (Absen Masuk, Siswa & Jurnal) ➜'
-                      : (isNextDay && next.dayName.isNotEmpty
-                          ? 'Buka Alur KBM (Hari ${next.dayName}) ➜'
-                          : 'Buka Alur Mengajar (3 Langkah) ➜'),
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
+                icon: const Icon(Icons.add_task_rounded, size: 16),
+                label: const Text('Mulai KBM Pengganti / Inval ➜', style: TextStyle(fontSize: 12)),
               ),
             ),
           ],

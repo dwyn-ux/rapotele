@@ -378,9 +378,14 @@ class ApiService {
         };
       }
 
-      final serverMsg = (decoded is Map && decoded['message'] != null)
-          ? decoded['message'].toString()
-          : 'Gagal mengambil jadwal (${response.statusCode})';
+      String serverMsg = 'Gagal mengambil jadwal (${response.statusCode})';
+      if (decoded is Map) {
+        if (decoded['error'] != null && decoded['error'].toString().isNotEmpty) {
+          serverMsg = '${decoded['message'] ?? 'Error'}: ${decoded['error']}';
+        } else if (decoded['message'] != null) {
+          serverMsg = decoded['message'].toString();
+        }
+      }
 
       return {'success': false, 'message': serverMsg};
     } catch (e) {

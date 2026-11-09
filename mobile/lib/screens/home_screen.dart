@@ -21,6 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   int _attendanceSubTab = 0;
   int _adminSubTab = 0;
+  int _dashboardRefreshKey = 0;
   StreamSubscription? _notifSub;
 
   @override
@@ -69,6 +70,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onTabTapped(int index, {int? subTab}) {
     setState(() {
+      if (index == 0 && _currentIndex != 0) {
+        _dashboardRefreshKey++;
+      }
       _currentIndex = index;
       if (index == 1 && subTab != null) {
         _attendanceSubTab = subTab;
@@ -244,7 +248,10 @@ class _HomeScreenState extends State<HomeScreen> {
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          DashboardTab(onTabChange: _onTabTapped),
+          DashboardTab(
+            key: ValueKey('dash_$_dashboardRefreshKey'),
+            onTabChange: _onTabTapped,
+          ),
           AttendanceTab(
             key: ValueKey('att_$_attendanceSubTab'),
             initialSubTab: _attendanceSubTab,

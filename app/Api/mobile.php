@@ -1053,11 +1053,13 @@ function mobile_api_handle_teacher_class_checkin(): void
         mobile_api_response(false, [], 'Pembelajaran kelas tidak ditemukan.', 404);
     }
 
-    // Rule: Harus ada jadwal KBM pada hari tersebut
+    // Rule Fleksibel (Opsi A): Cek apakah sesuai jadwal mingguan atau kelas pengganti/inval
     $dayOfWeek = (int)(new DateTimeImmutable($date))->format('N');
     $daysMap = [1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu', 4 => 'Kamis', 5 => 'Jumat', 6 => 'Sabtu', 7 => 'Minggu'];
     $dayName = $daysMap[$dayOfWeek] ?? 'hari ini';
 
+    $hasValidSchedule = false;
+    $scheduleId = 0;
     if (table_exists('lesson_schedules')) {
         $validSchedule = fetch_one(
             "SELECT id, period_no, start_time, end_time FROM lesson_schedules 
@@ -1067,13 +1069,9 @@ function mobile_api_handle_teacher_class_checkin(): void
             [$assignmentId, (int)$assignment['teacher_id'], (int)$assignment['class_id'], (int)$assignment['subject_id'], $dayOfWeek]
         );
 
-        if (!$validSchedule) {
-            mobile_api_response(
-                false,
-                ['no_schedule' => true, 'day_name' => $dayName],
-                "Tidak dapat absen masuk kelas: Tidak ada jadwal KBM pada hari $dayName untuk kelas dan mata pelajaran ini.",
-                422
-            );
+        if ($validSchedule) {
+            $hasValidSchedule = true;
+            $scheduleId = (int)$validSchedule['id'];
         }
     }
 
@@ -1097,12 +1095,36 @@ function mobile_api_handle_teacher_class_checkin(): void
         $sessionId = (int)db()->lastInsertId();
     }
 
+    // Sinkronkan ke tabel teacher_teaching_attendance jika jadwal terdaftar
+    if ($scheduleId > 0 && table_exists('teacher_teaching_attendance')) {
+        try {
+            $existingAtt = fetch_one(
+                'SELECT id FROM teacher_teaching_attendance WHERE schedule_id = ? AND date = ?',
+                [$scheduleId, $date]
+            );
+            if ($existingAtt) {
+                execute_sql(
+                    'UPDATE teacher_teaching_attendance SET status = ?, time_in = ?, updated_at = ? WHERE id = ?',
+                    [$status, $timeIn, $now, (int)$existingAtt['id']]
+                );
+            } else {
+                execute_sql(
+                    'INSERT INTO teacher_teaching_attendance (schedule_id, teacher_id, date, status, time_in, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    [$scheduleId, (int)$assignment['teacher_id'], $date, $status, $timeIn, 'Presensi via Mobile App', $now, $now]
+                );
+            }
+        } catch (Throwable $e) {}
+    }
+
+    $infoNote = $hasValidSchedule ? '' : ' (Kelas Pengganti / Inval)';
     mobile_api_response(true, [
         'session_id' => $sessionId,
         'teacher_checked_in' => true,
         'teacher_time_in' => $timeIn,
         'teacher_status' => $status,
-    ], 'Absen masuk kelas berhasil dicatat pukul ' . substr($timeIn, 0, 5));
+        'has_schedule' => $hasValidSchedule,
+        'schedule_id' => $scheduleId,
+    ], 'Absen masuk kelas berhasil dicatat pukul ' . substr($timeIn, 0, 5) . $infoNote);
 }
 
 function mobile_api_handle_save_student_attendance(): void
