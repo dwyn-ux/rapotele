@@ -12,6 +12,11 @@ function page_dashboard(): void
         return;
     }
 
+    if (user_role() === 'guru') {
+        page_teacher_dashboard();
+        return;
+    }
+
     $user = current_user();
     $cards = [
         ['Guru', (int)db()->query('SELECT COUNT(*) FROM teachers WHERE active = 1')->fetchColumn(), 'blue', 'users'],
@@ -283,6 +288,420 @@ function page_pengawas_dashboard(): void
 
     <?php
     render_live_monitoring_widget();
+    render_footer();
+}
+
+function page_teacher_dashboard(): void
+{
+    require_role(['guru']);
+    $user = current_user();
+    $teacherId = (int)($user['teacher_id'] ?? 0);
+    $date = date('Y-m-d');
+    $dow = (int)(new DateTimeImmutable($date))->format('N');
+    $dayNames = [1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu', 4 => 'Kamis', 5 => 'Jumat', 6 => 'Sabtu', 7 => 'Minggu'];
+    $dayName = $dayNames[$dow] ?? '-';
+    $monthNames = [
+        '01' => 'Januari', '02' => 'Februari', '03' => 'Maret', '04' => 'April',
+        '05' => 'Mei', '06' => 'Juni', '07' => 'Juli', '08' => 'Agustus',
+        '09' => 'September', '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
+    ];
+    $dateFormatted = $dayName . ', ' . date('d') . ' ' . ($monthNames[date('m')] ?? date('F')) . ' ' . date('Y');
+
+    // Check if default password is still in use
+    $hasDefaultPassword = ($user['password'] ?? '') !== '' && (
+        password_verify('admin123', (string)($user['password'] ?? '')) ||
+        password_verify('guru123', (string)($user['password'] ?? '')) ||
+        password_verify('siswa123', (string)($user['password'] ?? ''))
+    );
+
+    $classesCount = 0;
+    $subjectsCount = 0;
+    $todayJp = 0;
+    $journalsCount = 0;
+    $attendanceToday = null;
+    $recentJournals = [];
+
+    if ($teacherId > 0) {
+        if (table_exists('teaching_assignments')) {
+            $classesCount = (int)db()->query("SELECT COUNT(DISTINCT class_id) FROM teaching_assignments WHERE teacher_id = $teacherId AND active = 1")->fetchColumn();
+            $subjectsCount = (int)db()->query("SELECT COUNT(DISTINCT subject_id) FROM teaching_assignments WHERE teacher_id = $teacherId AND active = 1")->fetchColumn();
+        }
+        if (table_exists('lesson_schedules')) {
+            $todayJp = (int)db()->query("SELECT COUNT(*) FROM lesson_schedules WHERE teacher_id = $teacherId AND day_of_week = $dow")->fetchColumn();
+        }
+        if (table_exists('daily_journals')) {
+            $journalsCount = (int)db()->query("SELECT COUNT(*) FROM daily_journals WHERE teacher_id = $teacherId")->fetchColumn();
+            $recentJournals = fetch_all(
+                "SELECT j.*, c.name AS class_name, s.name AS subject_name
+                 FROM daily_journals j
+                 LEFT JOIN classes c ON c.id = j.class_id
+                 LEFT JOIN subjects s ON s.id = j.subject_id
+                 WHERE j.teacher_id = ?
+                 ORDER BY j.date DESC, j.id DESC
+                 LIMIT 5",
+                [$teacherId]
+            );
+        }
+        if (table_exists('teacher_attendance')) {
+            $attendanceToday = fetch_one('SELECT * FROM teacher_attendance WHERE teacher_id = ? AND date = ?', [$teacherId, $date]);
+        }
+    }
+
+    $school = get_school_profile();
+    $hasSchoolLocation = !empty($school['location_lat']) && !empty($school['location_lng']);
+
+    render_header('Dashboard Guru');
+    ?>
+
+    <!-- Welcome Section -->
+    <section class="hero" style="margin-bottom:1.25rem;">
+        <div>
+            <div class="eyebrow" style="color:var(--primary,#2563eb);">
+                <i data-lucide="graduation-cap" style="width:16px;height:16px;display:inline-block;vertical-align:-2px;"></i>
+                Portal Guru &bull; Tahun Ajaran <?= e(current_academic_year()) ?> (Semester <?= e(current_semester()) ?>)
+            </div>
+            <h2>Selamat datang kembali, <?= e($user['name']) ?> 👋</h2>
+            <p>Kelola presensi kedatangan, alur mengajar kelas, pengisian jurnal, dan penilaian siswa dengan praktis.</p>
+        </div>
+    </section>
+
+    <?php if ($hasDefaultPassword): ?>
+    <div class="alert password-warning" style="margin-bottom:1.25rem;">
+        <div class="alert-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div class="alert-body">
+            <div class="alert-title">Keamanan akun perlu diperhatikan</div>
+            <div class="alert-desc">Anda masih menggunakan password bawaan. Segera ganti password Anda di menu profil.</div>
+        </div>
+        <a href="<?= e(route_url('profile')) ?>" class="button warning" style="white-space:nowrap;">
+            Ganti Password
+        </a>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($teacherId <= 0): ?>
+    <div class="alert warning" style="margin-bottom:1.25rem;">
+        Akun Anda belum terhubung dengan data guru. Hubungi Administrator untuk menghubungkan akun pengguna dengan profil guru.
+    </div>
+    <?php endif; ?>
+
+    <!-- Presensi Kedatangan Hari Ini (Absen Masuk / Pulang Sekolah) -->
+    <section class="panel" style="margin-bottom:1.25rem;border-left:4px solid var(--primary,#2563eb);background:#fff;box-shadow:0 4px 12px rgba(0,0,0,0.03);">
+        <div class="panel-heading" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;border-bottom:1px solid #f1f5f9;padding-bottom:0.75rem;margin-bottom:1rem;">
+            <div class="panel-title" style="display:flex;align-items:center;gap:10px;">
+                <div style="background:var(--primary-lighter,#dbeafe);color:var(--primary,#2563eb);width:36px;height:36px;border-radius:10px;display:grid;place-items:center;">
+                    <i data-lucide="clock" style="width:18px;height:18px;"></i>
+                </div>
+                <div>
+                    <h3 style="margin:0;font-size:1.1rem;font-weight:700;color:var(--text,#1e293b);">Presensi Kedatangan Sekolah Hari Ini</h3>
+                    <div style="font-size:0.82rem;color:var(--text-muted,#64748b);margin-top:2px;"><?= e($dateFormatted) ?></div>
+                </div>
+            </div>
+            <div>
+                <a href="<?= e(route_url('teacher-attendance-self')) ?>" class="button small" style="display:inline-flex;align-items:center;gap:4px;">
+                    <i data-lucide="calendar" style="width:14px;height:14px;"></i> Halaman Absensi Guru
+                </a>
+            </div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+            <div style="flex:1;min-width:280px;">
+                <?php if ($attendanceToday): ?>
+                    <?php if ($attendanceToday['status'] === 'hadir'): ?>
+                        <?php if (!empty($attendanceToday['time_in']) && empty($attendanceToday['time_out'])): ?>
+                            <div style="display:inline-flex;align-items:center;gap:8px;background:#ecfdf5;color:#065f46;padding:8px 14px;border-radius:8px;font-weight:600;font-size:0.92rem;margin-bottom:6px;">
+                                <i data-lucide="check-circle-2" style="width:18px;height:18px;color:#10b981;"></i>
+                                Sudah Absen Masuk: <?= e(substr((string)$attendanceToday['time_in'], 0, 5)) ?> WIB
+                            </div>
+                            <div style="font-size:0.82rem;color:var(--text-muted,#64748b);">
+                                Belum absen pulang. Tekan tombol di samping saat jam pulang kerja telah selesai.
+                            </div>
+                        <?php elseif (!empty($attendanceToday['time_in']) && !empty($attendanceToday['time_out'])): ?>
+                            <div style="display:inline-flex;align-items:center;gap:8px;background:#eff6ff;color:#1e40af;padding:8px 14px;border-radius:8px;font-weight:600;font-size:0.92rem;margin-bottom:6px;">
+                                <i data-lucide="check-check" style="width:18px;height:18px;color:#3b82f6;"></i>
+                                Presensi Selesai: Masuk <?= e(substr((string)$attendanceToday['time_in'], 0, 5)) ?> &bull; Pulang <?= e(substr((string)$attendanceToday['time_out'], 0, 5)) ?> WIB
+                            </div>
+                            <div style="font-size:0.82rem;color:var(--text-muted,#64748b);">
+                                Kehadiran sekolah Anda hari ini telah tercatat lengkap.
+                            </div>
+                        <?php else: ?>
+                            <div style="display:inline-flex;align-items:center;gap:8px;background:#ecfdf5;color:#065f46;padding:8px 14px;border-radius:8px;font-weight:600;font-size:0.92rem;">
+                                <i data-lucide="check-circle" style="width:18px;height:18px;color:#10b981;"></i> Hadir
+                            </div>
+                        <?php endif; ?>
+                    <?php else: ?>
+                        <div style="display:inline-flex;align-items:center;gap:8px;background:#fffbeb;color:#92400e;padding:8px 14px;border-radius:8px;font-weight:600;font-size:0.92rem;">
+                            <i data-lucide="info" style="width:18px;height:18px;color:#f59e0b;"></i>
+                            Status: <?= e(ucfirst((string)$attendanceToday['status'])) ?> (<?= e((string)($attendanceToday['notes'] ?? '-')) ?>)
+                        </div>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <div style="display:inline-flex;align-items:center;gap:8px;background:#fff7ed;color:#9a3412;padding:8px 14px;border-radius:8px;font-weight:600;font-size:0.92rem;margin-bottom:6px;">
+                        <i data-lucide="alert-circle" style="width:18px;height:18px;color:#f97316;"></i>
+                        Belum Melakukan Presensi Masuk Hari Ini
+                    </div>
+                    <div style="font-size:0.82rem;color:var(--text-muted,#64748b);">
+                        Silakan klik tombol <strong>Check-in Masuk</strong> di samping untuk mencatat kehadiran Anda di sekolah.
+                    </div>
+                <?php endif; ?>
+                <div id="dash-geo-status" style="margin-top:8px;font-size:0.8rem;color:#64748b;"></div>
+            </div>
+
+            <!-- Tombol Aksi Check-in / Checkout -->
+            <div>
+                <?php if ($teacherId > 0): ?>
+                    <?php if (!$attendanceToday): ?>
+                        <form method="post" id="dash-attendance-form" style="display:inline-block;">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="action" value="save_teacher_attendance_self">
+                            <input type="hidden" name="redirect" value="dashboard">
+                            <input type="hidden" name="type" value="checkin">
+                            <input type="hidden" name="status" value="hadir">
+                            <input type="hidden" name="lat" id="dash-lat">
+                            <input type="hidden" name="lng" id="dash-lng">
+                            <button type="submit" class="button primary" id="dash-checkin-btn" style="padding:10px 18px;font-weight:700;display:inline-flex;align-items:center;gap:8px;font-size:0.95rem;">
+                                <i data-lucide="map-pin" style="width:18px;height:18px;"></i>
+                                Check-in / Absen Masuk
+                            </button>
+                        </form>
+                    <?php elseif ($attendanceToday && empty($attendanceToday['time_out']) && $attendanceToday['status'] === 'hadir'): ?>
+                        <form method="post" id="dash-attendance-form" style="display:inline-block;">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="action" value="save_teacher_attendance_self">
+                            <input type="hidden" name="redirect" value="dashboard">
+                            <input type="hidden" name="type" value="checkout">
+                            <input type="hidden" name="lat" id="dash-lat">
+                            <input type="hidden" name="lng" id="dash-lng">
+                            <button type="submit" class="button" id="dash-checkout-btn" style="padding:10px 18px;font-weight:700;background:#f8fafc;border:1px solid #cbd5e1;color:#1e293b;display:inline-flex;align-items:center;gap:8px;font-size:0.95rem;">
+                                <i data-lucide="log-out" style="width:18px;height:18px;color:#dc2626;"></i>
+                                Checkout / Absen Pulang
+                            </button>
+                        </form>
+                    <?php endif; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+    </section>
+
+    <!-- Metrik Pribadi Guru -->
+    <div class="metric-grid" style="margin-bottom:1.5rem;">
+        <div class="metric">
+            <div class="metric-icon blue">
+                <i data-lucide="clock"></i>
+            </div>
+            <div class="metric-body">
+                <div class="metric-label">Jadwal Hari Ini</div>
+                <div class="metric-value"><?= e($todayJp) ?> <span style="font-size:1rem;font-weight:500;color:var(--text-muted);">JP</span></div>
+            </div>
+        </div>
+        <div class="metric">
+            <div class="metric-icon violet">
+                <i data-lucide="school"></i>
+            </div>
+            <div class="metric-body">
+                <div class="metric-label">Kelas Diampu</div>
+                <div class="metric-value"><?= e($classesCount) ?> <span style="font-size:1rem;font-weight:500;color:var(--text-muted);">Kelas</span></div>
+            </div>
+        </div>
+        <div class="metric">
+            <div class="metric-icon green">
+                <i data-lucide="book-open"></i>
+            </div>
+            <div class="metric-body">
+                <div class="metric-label">Mata Pelajaran</div>
+                <div class="metric-value"><?= e($subjectsCount) ?> <span style="font-size:1rem;font-weight:500;color:var(--text-muted);">Mapel</span></div>
+            </div>
+        </div>
+        <div class="metric">
+            <div class="metric-icon amber">
+                <i data-lucide="file-check-2"></i>
+            </div>
+            <div class="metric-body">
+                <div class="metric-label">Jurnal Dibuat</div>
+                <div class="metric-value"><?= e($journalsCount) ?> <span style="font-size:1rem;font-weight:500;color:var(--text-muted);">Entri</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alur Mengajar Hari Ini untuk Guru -->
+    <?php render_teacher_teaching_flow_widget(); ?>
+
+    <!-- Two Column Layout: Riwayat Jurnal & Shortcut Guru -->
+    <div class="grid two" style="margin-top:1.5rem;">
+        <!-- Riwayat Jurnal Mengajar Terbaru -->
+        <section class="panel">
+            <div class="panel-heading" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <div class="panel-title" style="display:flex;align-items:center;gap:8px;">
+                    <div style="color:var(--primary,#2563eb);display:grid;place-items:center;">
+                        <i data-lucide="book-marked" style="width:20px;height:20px;"></i>
+                    </div>
+                    <span>Riwayat Jurnal Terakhir</span>
+                </div>
+                <a href="<?= e(route_url('journals', ['add' => 1])) ?>" class="button small primary" style="display:inline-flex;align-items:center;gap:4px;">
+                    <i data-lucide="plus" style="width:14px;height:14px;"></i> Tulis Jurnal
+                </a>
+            </div>
+
+            <?php if (empty($recentJournals)): ?>
+                <div class="empty" style="padding:2rem 1rem;text-align:center;">
+                    <div style="background:#f1f5f9;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;margin:0 auto 10px;color:#94a3b8;">
+                        <i data-lucide="file-text" style="width:20px;height:20px;"></i>
+                    </div>
+                    <p style="margin:0 0 10px;color:var(--text-muted,#64748b);font-size:0.9rem;">Belum ada riwayat jurnal pembelajaran.</p>
+                    <a href="<?= e(route_url('journals', ['add' => 1])) ?>" class="button small">Mulai Tulis Jurnal</a>
+                </div>
+            <?php else: ?>
+                <div class="list" style="display:flex;flex-direction:column;gap:8px;">
+                    <?php foreach ($recentJournals as $j): ?>
+                        <div class="list-row" style="display:flex;align-items:flex-start;gap:12px;padding:10px 12px;background:#f8fafc;border-radius:8px;border:1px solid #f1f5f9;">
+                            <div style="width:36px;height:36px;min-width:36px;border-radius:8px;background:var(--primary-lighter,#dbeafe);display:grid;place-items:center;color:var(--primary,#2563eb);margin-top:2px;">
+                                <i data-lucide="book-open" style="width:18px;height:18px;"></i>
+                            </div>
+                            <div style="flex:1;min-width:0;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;">
+                                    <strong style="font-size:0.92rem;color:var(--text,#1e293b);"><?= e($j['subject_name'] ?? 'Mata Pelajaran') ?></strong>
+                                    <span style="font-size:0.75rem;background:#e2e8f0;color:#475569;padding:2px 8px;border-radius:12px;font-weight:600;"><?= e($j['class_name'] ?? 'Kelas') ?></span>
+                                </div>
+                                <div style="font-size:0.84rem;color:var(--text,#334155);margin-top:3px;font-weight:500;">
+                                    <?= e(mb_strimwidth((string)($j['topic'] ?? ''), 0, 75, '...')) ?>
+                                </div>
+                                <div style="font-size:0.75rem;color:var(--text-muted,#64748b);margin-top:4px;display:flex;gap:12px;">
+                                    <span>📅 <?= e(date('d M Y', strtotime((string)$j['date']))) ?></span>
+                                    <span>Pertemuan ke-<?= e((string)($j['meeting_no'] ?? 1)) ?></span>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <div style="text-align:right;margin-top:12px;padding-top:8px;border-top:1px solid #f1f5f9;">
+                    <a href="<?= e(route_url('journals')) ?>" style="font-size:0.85rem;font-weight:600;color:var(--primary,#2563eb);display:inline-flex;align-items:center;gap:4px;">
+                        Lihat Seluruh Riwayat Jurnal <i data-lucide="arrow-right" style="width:14px;height:14px;"></i>
+                    </a>
+                </div>
+            <?php endif; ?>
+        </section>
+
+        <!-- Quick Actions / Shortcut Guru -->
+        <section class="panel">
+            <div class="panel-heading">
+                <div class="panel-title" style="display:flex;align-items:center;gap:8px;">
+                    <div style="color:var(--primary,#2563eb);display:grid;place-items:center;">
+                        <i data-lucide="sparkles" style="width:20px;height:20px;"></i>
+                    </div>
+                    <span>Akses Cepat Guru</span>
+                </div>
+            </div>
+            <div class="quick-links" style="grid-template-columns: 1fr;">
+                <a href="<?= e(route_url('teaching-wizard')) ?>">
+                    <i data-lucide="sparkles" style="width:20px;height:20px;color:var(--primary);"></i>
+                    <div style="flex:1;">
+                        <div style="font-weight:600;font-size:14px;">Alur Mengajar Kelas</div>
+                        <div style="font-size:12px;color:var(--text-muted);">Panduan berurutan: Absen &rarr; Siswa &rarr; Jurnal</div>
+                    </div>
+                    <i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text-muted);"></i>
+                </a>
+                <a href="<?= e(route_url('journals')) ?>">
+                    <i data-lucide="book" style="width:20px;height:20px;color:var(--primary);"></i>
+                    <div style="flex:1;">
+                        <div style="font-weight:600;font-size:14px;">Jurnal Harian</div>
+                        <div style="font-size:12px;color:var(--text-muted);">Dokumentasi materi dan kegiatan pembelajaran</div>
+                    </div>
+                    <i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text-muted);"></i>
+                </a>
+                <a href="<?= e(route_url('grades')) ?>">
+                    <i data-lucide="pencil" style="width:20px;height:20px;color:var(--primary);"></i>
+                    <div style="flex:1;">
+                        <div style="font-weight:600;font-size:14px;">Input Nilai Siswa</div>
+                        <div style="font-size:12px;color:var(--text-muted);">Masukkan nilai TP, formatif, dan sumatif murid</div>
+                    </div>
+                    <i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text-muted);"></i>
+                </a>
+                <a href="<?= e(route_url('status-penilaian')) ?>">
+                    <i data-lucide="bar-chart" style="width:20px;height:20px;color:var(--primary);"></i>
+                    <div style="flex:1;">
+                        <div style="font-weight:600;font-size:14px;">Status Penilaian</div>
+                        <div style="font-size:12px;color:var(--text-muted);">Pantau kelengkapan nilai per kelas dan tujuan belajar</div>
+                    </div>
+                    <i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text-muted);"></i>
+                </a>
+                <a href="<?= e(route_url('lesson-schedule')) ?>">
+                    <i data-lucide="calendar-days" style="width:20px;height:20px;color:var(--primary);"></i>
+                    <div style="flex:1;">
+                        <div style="font-weight:600;font-size:14px;">Jadwal Mengajar</div>
+                        <div style="font-size:12px;color:var(--text-muted);">Lihat jadwal pelajaran mingguan di semua kelas</div>
+                    </div>
+                    <i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text-muted);"></i>
+                </a>
+                <a href="<?= e(route_url('rekap-kehadiran', ['tab' => 'guru-jadwal', 'teacher_id' => $teacherId])) ?>">
+                    <i data-lucide="bar-chart-2" style="width:20px;height:20px;color:var(--primary);"></i>
+                    <div style="flex:1;">
+                        <div style="font-weight:600;font-size:14px;">Rekap Presensi Mengajar</div>
+                        <div style="font-size:12px;color:var(--text-muted);">Cek rekap kehadiran mengajar dan total jam tatap muka</div>
+                    </div>
+                    <i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--text-muted);"></i>
+                </a>
+            </div>
+        </section>
+    </div>
+
+    <!-- Geolocation Script for Dashboard Check-in / Checkout -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var geoStatus = document.getElementById('dash-geo-status');
+        var latInput = document.getElementById('dash-lat');
+        var lngInput = document.getElementById('dash-lng');
+        var form = document.getElementById('dash-attendance-form');
+        if (!form || !latInput || !lngInput) return;
+
+        if (!navigator.geolocation) {
+            if (geoStatus) geoStatus.innerHTML = '<span style="color:#dc2626;">Browser Anda tidak mendukung geolokasi GPS.</span>';
+            return;
+        }
+
+        // Otomatis minta izin dan tangkap koordinat
+        navigator.geolocation.getCurrentPosition(
+            function(pos) {
+                latInput.value = pos.coords.latitude;
+                lngInput.value = pos.coords.longitude;
+                if (geoStatus) {
+                    geoStatus.innerHTML = '<span style="color:#16a34a;">📍 Lokasi GPS terdeteksi (' + pos.coords.latitude.toFixed(5) + ', ' + pos.coords.longitude.toFixed(5) + ')</span>';
+                }
+            },
+            function(err) {
+                if (geoStatus) {
+                    var msg = 'Lokasi belum diizinkan. Mohon aktifkan izin GPS browser agar bisa absen.';
+                    if (err.code === 1) msg = 'Izin lokasi ditolak. Buka pengaturan browser untuk mengizinkan lokasi.';
+                    geoStatus.innerHTML = '<span style="color:#d97706;">⚠️ ' + msg + '</span>';
+                }
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+        );
+
+        // Validasi saat submit jika koordinat belum terisi
+        form.addEventListener('submit', function(e) {
+            if (!latInput.value || !lngInput.value) {
+                e.preventDefault();
+                if (geoStatus) {
+                    geoStatus.innerHTML = '<span style="color:#dc2626;font-weight:600;">Sedang mengambil koordinat GPS, silakan coba beberapa detik lagi...</span>';
+                }
+                navigator.geolocation.getCurrentPosition(
+                    function(pos) {
+                        latInput.value = pos.coords.latitude;
+                        lngInput.value = pos.coords.longitude;
+                        form.submit();
+                    },
+                    function(err) {
+                        alert('Gagal mengambil lokasi GPS. Pastikan izin lokasi aktif pada browser HP Anda.');
+                    },
+                    { enableHighAccuracy: true, timeout: 5000 }
+                );
+            }
+        });
+    });
+    </script>
+
+    <?php
     render_footer();
 }
 

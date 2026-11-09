@@ -509,25 +509,26 @@ function action_save_teacher_attendance_self(): void
     $schoolLat = coordinate_value($school['location_lat'] ?? null, -90, 90, 'Latitude sekolah tidak valid.');
     $schoolLng = coordinate_value($school['location_lng'] ?? null, -180, 180, 'Longitude sekolah tidak valid.');
     $radius = (int)($school['attendance_radius_meters'] ?? 500);
+    $redirectTo = !empty($_POST['redirect']) ? (string)$_POST['redirect'] : 'teacher-attendance-self';
 
     if ($schoolLat === null || $schoolLng === null || $schoolLat === 0.0 || $schoolLng === 0.0) {
         flash('danger', 'Lokasi sekolah belum diatur oleh admin.');
-        redirect_to('teacher-attendance-self');
+        redirect_to($redirectTo);
     }
     if ($lat === null || $lng === null) {
         flash('danger', 'Lokasi tidak terdeteksi. Izinkan akses lokasi di browser.');
-        redirect_to('teacher-attendance-self');
+        redirect_to($redirectTo);
     }
     if (!is_within_radius($lat, $lng, $schoolLat, $schoolLng, $radius)) {
         $distance = haversine_distance($lat, $lng, $schoolLat, $schoolLng);
         flash('danger', 'Anda berada di luar radius absensi (' . $radius . ' m). Jarak Anda: ' . round($distance) . ' m dari sekolah.');
-        redirect_to('teacher-attendance-self');
+        redirect_to($redirectTo);
     }
     $existing = fetch_one('SELECT id, time_in, time_out FROM teacher_attendance WHERE teacher_id = ? AND date = ?', [$teacherId, $date]);
     if ($existing) {
         if ($type === 'checkin' && $existing['time_in']) {
             flash('info', 'Anda sudah checkin hari ini.');
-            redirect_to('teacher-attendance-self');
+            redirect_to($redirectTo);
         }
         if ($type === 'checkout') {
             execute_sql(
@@ -535,7 +536,7 @@ function action_save_teacher_attendance_self(): void
                 [$time, $lat, $lng, now_string(), (int)$existing['id']]
             );
             flash('success', 'Checkout berhasil pada ' . $time . '.');
-            redirect_to('teacher-attendance-self');
+            redirect_to($redirectTo);
         }
         execute_sql(
             'UPDATE teacher_attendance SET time_in = ?, location_lat = ?, location_lng = ?, updated_at = ? WHERE id = ?',
@@ -548,7 +549,7 @@ function action_save_teacher_attendance_self(): void
         );
     }
     flash('success', 'Checkin berhasil pada ' . $time . '.');
-    redirect_to('teacher-attendance-self');
+    redirect_to($redirectTo);
 }
 
 function action_save_journal(): void
