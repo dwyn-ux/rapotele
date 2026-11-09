@@ -11,7 +11,7 @@ import '../models/journal_model.dart';
 import '../models/grade_models.dart';
 
 class ApiService {
-  static const String _defaultBaseUrl = 'https://raport.smpmuashidiq.sch.id';
+  static const String _defaultBaseUrl = 'http://10.49.62.121:8000';
   static const String _keyBaseUrl = 'server_base_url';
   static const String _keyToken = 'auth_token';
   static const String _keyUser = 'cached_user';

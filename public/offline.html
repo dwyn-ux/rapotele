@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tidak Ada Koneksi — E-Raport</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: #f8fafc;
+            color: #1e293b;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 2.5rem 2rem;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 4px 24px rgba(0,0,0,.08);
+        }
+        .icon {
+            font-size: 4rem;
+            margin-bottom: 1.25rem;
+            display: block;
+        }
+        h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: .5rem; }
+        p  { color: #64748b; font-size: .95rem; line-height: 1.6; margin-bottom: 1.5rem; }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: .75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: background .15s;
+        }
+        button:hover { background: #1d4ed8; }
+        .hint { font-size: .8rem; color: #94a3b8; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <span class="icon">📡</span>
+        <h1>Tidak Ada Koneksi</h1>
+        <p>
+            Sepertinya perangkat Anda sedang offline.<br>
+            Periksa koneksi internet lalu coba lagi.
+        </p>
+        <button onclick="window.location.reload()">🔄 Coba Lagi</button>
+        <p class="hint">E-Raport KumerBot memerlukan koneksi internet untuk bekerja.</p>
+    </div>
+</body>
+</html>

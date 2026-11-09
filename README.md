@@ -167,3 +167,49 @@ Untuk Fonnte:
 4. Pilih mode `Fonnte Gateway`.
 5. Isi `Token Fonnte` dan `Country Code Fonnte` dengan `62`.
 6. Jalankan pengiriman dari antrian atau cron weekly seperti biasa.
+
+
+## PWA & Web Push Notification
+
+Aplikasi ini mendukung **Progressive Web App (PWA)** dan **Web Push Notification** berbasis VAPID — tanpa Firebase, tanpa Play Store wajib.
+
+### Fitur PWA
+
+- Bisa di-install ke home screen Android/iOS via "Tambahkan ke layar utama" di Chrome.
+- Ikon sekolah dipakai sebagai app icon (dari logo yang di-upload di menu Data Logo).
+- Halaman offline fallback saat koneksi terputus.
+- Shortcut langsung ke: Absensi Guru, Alur Mengajar, dan Jurnal Harian.
+
+### Setup Web Push (Admin)
+
+1. Pastikan ekstensi PHP `openssl` dan `curl` aktif di server.
+2. Buka menu **Bot Telegram** → klik **Generate VAPID Keys**.
+3. Keys otomatis tersimpan di database — tidak perlu isi `.env`.
+4. Pastikan cron `schedule_reminders.php` berjalan tiap 1–5 menit (sama seperti reminder Telegram).
+
+### Alur Guru Aktifkan Notifikasi
+
+1. Buka web di **Chrome** (Android/desktop).
+2. Jika di Android: ketuk ⋮ → "Tambahkan ke layar utama" untuk install PWA.
+3. Buka halaman **Profil Pengguna**.
+4. Klik **Aktifkan Notifikasi** → izinkan saat browser bertanya.
+5. Klik **Kirim Test Notifikasi** untuk verifikasi.
+
+### Jenis Notifikasi Otomatis
+
+| Waktu | Jenis | Isi |
+|-------|-------|-----|
+| 06:43–06:47 | Absensi Guru | Pengingat isi absensi kehadiran pagi |
+| X menit sebelum jadwal | Jadwal KBM | "X menit lagi: [Mapel] di [Kelas]" |
+| 14:00–14:04 | Jurnal Harian | Pengingat isi jurnal bagi guru yang belum mengisi |
+
+### Upload ke Play Store (TWA)
+
+Untuk distribusi via Play Store tanpa Flutter:
+
+1. Install [Bubblewrap CLI](https://github.com/GoogleChromeLabs/bubblewrap): `npm i -g @bubblewrap/cli`
+2. Jalankan: `bubblewrap init --manifest https://domain-anda/manifest.json`
+3. Build APK: `bubblewrap build`
+4. Upload APK ke Google Play Console.
+
+Notifikasi tetap berjalan via Web Push tanpa perubahan apapun — tidak perlu Firebase.

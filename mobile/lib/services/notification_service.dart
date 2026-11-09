@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'api_service.dart';
 import '../models/notification_item.dart';
@@ -14,6 +15,7 @@ class NotificationService {
   Timer? _periodicTimer;
 
   static const String channelScheduleId = 'erapot_schedule_channel';
+  static const String channelDailyId = 'erapot_daily_channel';
 
   /// Stream to listen when user clicks/taps an Android notification
   static final StreamController<Map<String, dynamic>> onNotificationClick =
@@ -67,8 +69,8 @@ class NotificationService {
   }) async {
     final androidDetails = AndroidNotificationDetails(
       channelId ?? channelScheduleId,
-      channelName ?? 'Pengingat Jadwal & KBM',
-      channelDescription: 'Notifikasi jadwal pelajaran dan agenda KBM',
+      channelName ?? 'Pengingat E-Raport',
+      channelDescription: 'Notifikasi jadwal pelajaran, presensi dan jurnal',
       importance: Importance.max,
       priority: Priority.high,
       enableVibration: true,
@@ -90,6 +92,8 @@ class NotificationService {
     _periodicTimer = Timer.periodic(interval, (_) async {
       await checkAndTriggerNotifications();
     });
+    // Run immediately once
+    checkAndTriggerNotifications();
   }
 
   void stopPeriodicChecker() {
@@ -98,6 +102,43 @@ class NotificationService {
   }
 
   Future<List<NotificationItem>> checkAndTriggerNotifications() async {
+    final now = DateTime.now();
+    final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final dayOfWeek = now.weekday; // 1 = Monday, 7 = Sunday
+
+    // ── 1. Daily Morning Attendance Reminder (Senin - Sabtu, 06:40 - 07:15) ──
+    if (dayOfWeek <= 6 && now.hour == 6 && now.minute >= 40 && now.minute <= 55) {
+      final morningKey = 'morning-absensi-$todayStr';
+      if (!_notifiedIds.contains(morningKey)) {
+        _notifiedIds.add(morningKey);
+        await showNotification(
+          id: 1001,
+          title: '📋 Presensi Kehadiran Guru',
+          body: 'Selamat pagi! Jangan lupa lakukan absensi kehadiran hari ini.',
+          channelId: channelDailyId,
+          channelName: 'Pengingat Harian',
+          payload: jsonEncode({'url': '/?page=teacher-attendance-self'}),
+        );
+      }
+    }
+
+    // ── 2. Daily Afternoon Journal Reminder (Senin - Sabtu, 13:30 - 14:15) ──
+    if (dayOfWeek <= 6 && now.hour == 13 && now.minute >= 30 && now.minute <= 50) {
+      final journalKey = 'afternoon-journal-$todayStr';
+      if (!_notifiedIds.contains(journalKey)) {
+        _notifiedIds.add(journalKey);
+        await showNotification(
+          id: 1002,
+          title: '📝 Jurnal Mengajar Hari Ini',
+          body: 'KBM hampir usai. Pastikan presensi siswa dan jurnal kelas sudah terisi.',
+          channelId: channelDailyId,
+          channelName: 'Pengingat Harian',
+          payload: jsonEncode({'url': '/?page=journals'}),
+        );
+      }
+    }
+
+    // ── 3. API-based notifications (if authenticated) ──
     if (!ApiService().isAuthenticated) {
       return [];
     }
@@ -106,12 +147,10 @@ class NotificationService {
       final notifications = await ApiService().getNotifications();
 
       for (var item in notifications) {
-        // Skip WhatsApp notifications (dipending)
         if (item.type == 'whatsapp') {
           continue;
         }
 
-        // Trigger for schedule (5 min before start, active, 5 min before end, or upcoming <= 15 min)
         final shouldAlert = (item.type == 'schedule' &&
                 (item.isStartingSoon || item.isEndingSoon || item.isActive || item.minutesRemaining <= 15)) ||
             (item.type == 'violation') ||
@@ -121,9 +160,14 @@ class NotificationService {
           _notifiedIds.add(item.id);
 
           final notificationId = item.id.hashCode & 0x7FFFFFFF;
+          final targetUrl = item.type == 'schedule'
+              ? (item.isEndingSoon ? '/?page=journals' : '/?page=teaching-wizard')
+              : (item.type == 'attendance' ? '/?page=student-attendance' : '/?page=violations');
+
           final payloadData = jsonEncode({
             'type': item.type,
             'id': item.id,
+            'url': targetUrl,
             'assignment_id': item.assignmentId,
             'schedule_id': item.scheduleId,
             'class_name': item.className,
@@ -145,7 +189,8 @@ class NotificationService {
       }
 
       return notifications.where((item) => item.type != 'whatsapp').toList();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Notification fetch error: $e');
       return [];
     }
   }
@@ -154,4 +199,3 @@ class NotificationService {
     _notifiedIds.clear();
   }
 }
-

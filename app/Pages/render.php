@@ -200,11 +200,19 @@ function render_header(string $title): void
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="color-scheme" content="light only">
+        <meta name="theme-color" content="#2563eb">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="default">
+        <meta name="apple-mobile-web-app-title" content="<?= e(config('app_name')) ?>">
         <title><?= e($title) ?> — <?= e(config('app_name')) ?></title>
+        <link rel="manifest" href="<?= e(app_url('manifest.json')) ?>">
         <?php if ($appLogoUrl !== ''): ?>
             <link rel="icon" href="<?= e($appLogoUrl) ?>">
-            <link rel="apple-touch-icon" href="<?= e($appLogoUrl) ?>">
+            <link rel="apple-touch-icon" href="<?= e(app_url('pwa-icon.php?size=192')) ?>">
             <link rel="preload" as="image" href="<?= e($appLogoUrl) ?>">
+        <?php else: ?>
+            <link rel="apple-touch-icon" href="<?= e(app_url('pwa-icon.php?size=192')) ?>">
         <?php endif; ?>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -217,6 +225,13 @@ function render_header(string $title): void
                         document.documentElement.classList.add('sidebar-collapsed');
                     }
                 } catch(e) {}
+                // Register Service Worker (PWA)
+                if ('serviceWorker' in navigator) {
+                    window.addEventListener('load', function() {
+                        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                            .catch(function(e) { console.warn('SW reg failed:', e); });
+                    });
+                }
             })();
         </script>
     </head>
@@ -368,6 +383,87 @@ function render_footer(): void
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <script src="<?= e(asset_version_url('assets/app.js')) ?>"></script>
     <script>try{lucide.createIcons();}catch(e){console.warn('Lucide icons skipped:',e.message);}</script>
+    <script>
+    // ── PWA Web Push Auto-Subscribe ──────────────────────────────────────────
+    (function() {
+        'use strict';
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+        const VAPID_KEY_URL  = '/api?action=vapid_public_key';
+        const SUB_SAVE_URL   = '/api?action=save_push_subscription';
+        const TOKEN_KEY      = 'eraport_push_subscribed';
+
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const raw     = window.atob(base64);
+            return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+        }
+
+        async function trySubscribe() {
+            // Sudah pernah subscribe di sesi ini — skip
+            if (sessionStorage.getItem(TOKEN_KEY)) return;
+
+            const perm = Notification.permission;
+            if (perm === 'denied') return;
+
+            try {
+                const reg = await navigator.serviceWorker.ready;
+
+                // Ambil VAPID public key dari server
+                const keyResp = await fetch(VAPID_KEY_URL);
+                const keyData = await keyResp.json();
+                const vapidKey = keyData.vapid_public_key;
+                if (!vapidKey) return; // VAPID belum di-generate admin
+
+                // Cek apakah sudah punya subscription
+                let sub = await reg.pushManager.getSubscription();
+                if (!sub) {
+                    if (perm !== 'granted') return; // Jangan auto-prompt, biar user pilih
+                    sub = await reg.pushManager.subscribe({
+                        userVisibleOnly:      true,
+                        applicationServerKey: urlBase64ToUint8Array(vapidKey),
+                    });
+                }
+
+                // Kirim ke server
+                const subJson = sub.toJSON();
+                const body    = new FormData();
+                body.append('endpoint', subJson.endpoint);
+                body.append('p256dh',   subJson.keys.p256dh);
+                body.append('auth',     subJson.keys.auth);
+
+                // Ambil auth token dari meta (diinject oleh PHP)
+                const tokenMeta = document.querySelector('meta[name="api-token"]');
+                const headers   = tokenMeta ? { 'X-Auth-Token': tokenMeta.content } : {};
+                await fetch(SUB_SAVE_URL, { method: 'POST', headers, body });
+                sessionStorage.setItem(TOKEN_KEY, '1');
+            } catch (e) {
+                // Gagal subscribe — silent, tidak ganggu UI
+            }
+        }
+
+        // Jalankan setelah SW ready
+        if (navigator.serviceWorker.controller) {
+            trySubscribe();
+        } else {
+            navigator.serviceWorker.addEventListener('controllerchange', trySubscribe);
+        }
+
+        // Expose fungsi global untuk tombol "Aktifkan Notifikasi" di halaman Profil
+        window.eraportRequestPush = async function() {
+            const perm = await Notification.requestPermission();
+            if (perm !== 'granted') {
+                return { ok: false, message: 'Izin notifikasi ditolak.' };
+            }
+            await trySubscribe();
+            return { ok: true, message: 'Notifikasi diaktifkan!' };
+        };
+        window.eraportPushEnabled = function() {
+            return Notification.permission === 'granted' && sessionStorage.getItem(TOKEN_KEY) === '1';
+        };
+    })();
+    </script>
     </body>
     </html>
     <?php

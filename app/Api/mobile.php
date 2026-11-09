@@ -239,17 +239,37 @@ function mobile_api_dispatch(): void
                 mobile_api_handle_save_grades();
                 break;
 
+            case 'save_push_subscription':
+                mobile_api_handle_save_push_subscription();
+                break;
+
+            case 'delete_push_subscription':
+                mobile_api_handle_delete_push_subscription();
+                break;
+
+            case 'send_push_test':
+                mobile_api_handle_send_push_test();
+                break;
+
+            case 'vapid_public_key':
+                mobile_api_handle_vapid_public_key();
+                break;
+
             default:
                 mobile_api_response(true, [
                     'version' => '1.0.0',
                     'app' => config('app_name', 'E-Rapor Kurikulum Merdeka'),
                     'endpoints' => [
-                        'POST ?action=login' => 'Login user (username, password)',
-                        'GET ?action=me' => 'Current authenticated user profile',
-                        'GET ?action=whatsapp_feed' => 'Live WhatsApp queue, sent logs, and statistics',
-                        'POST ?action=send_whatsapp_queue' => 'Trigger sending pending WhatsApp messages',
-                        'GET ?action=notifications' => 'Real-time schedule reminders & system triggers',
-                        'GET ?action=my_schedule' => 'Today & weekly teaching/class schedule',
+                        'POST ?action=login'                  => 'Login user (username, password)',
+                        'GET ?action=me'                      => 'Current authenticated user profile',
+                        'GET ?action=vapid_public_key'        => 'Ambil VAPID public key untuk Web Push',
+                        'POST ?action=save_push_subscription' => 'Simpan push subscription browser',
+                        'POST ?action=delete_push_subscription' => 'Hapus push subscription',
+                        'POST ?action=send_push_test'         => 'Kirim notif push test',
+                        'GET ?action=whatsapp_feed'           => 'Live WhatsApp queue, sent logs, and statistics',
+                        'POST ?action=send_whatsapp_queue'    => 'Trigger sending pending WhatsApp messages',
+                        'GET ?action=notifications'           => 'Real-time schedule reminders & system triggers',
+                        'GET ?action=my_schedule'             => 'Today & weekly teaching/class schedule',
                         'POST ?action=trigger_schedule_reminders' => 'Trigger schedule reminder dispatcher',
                     ],
                 ], 'E-Rapor Mobile API Ready');
@@ -1553,5 +1573,104 @@ function mobile_api_handle_save_grades(): void
             $pdo->rollBack();
         }
         mobile_api_response(false, [], 'Gagal menyimpan nilai: ' . $e->getMessage(), 500);
+    }
+}
+
+
+// ─── Web Push / PWA Subscription Handlers ─────────────────────────────────────
+
+function mobile_api_handle_vapid_public_key(): void
+{
+    // Endpoint publik (tidak butuh auth) agar SW bisa ambil key sebelum login
+    if (!function_exists('get_app_setting')) {
+        require_once dirname(__DIR__) . '/bootstrap.php';
+    }
+    $publicKey = (string)get_app_setting('vapid_public_key', '');
+    mobile_api_response(true, ['vapid_public_key' => $publicKey], '');
+}
+
+function mobile_api_handle_save_push_subscription(): void
+{
+    $user = mobile_api_require_auth();
+
+    $endpoint = trim((string)($_POST['endpoint'] ?? ''));
+    $p256dh   = trim((string)($_POST['p256dh']   ?? ''));
+    $auth     = trim((string)($_POST['auth']      ?? ''));
+
+    if ($endpoint === '' || $p256dh === '' || $auth === '') {
+        mobile_api_response(false, [], 'endpoint, p256dh, dan auth wajib diisi.', 422);
+    }
+
+    if (!table_exists('push_subscriptions')) {
+        mobile_api_response(false, [], 'Tabel push_subscriptions belum ada. Jalankan install.php.', 503);
+    }
+
+    $userAgent = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 500);
+    $userId    = (int)$user['id'];
+
+    // Upsert: kalau endpoint sudah ada untuk user ini, update saja
+    $existing = fetch_one(
+        'SELECT id FROM push_subscriptions WHERE user_id = ? AND endpoint = ?',
+        [$userId, $endpoint]
+    );
+
+    if ($existing) {
+        execute_sql(
+            'UPDATE push_subscriptions SET p256dh = ?, auth_token = ?, user_agent = ?, last_used_at = ? WHERE id = ?',
+            [$p256dh, $auth, $userAgent, date('Y-m-d H:i:s'), (int)$existing['id']]
+        );
+        mobile_api_response(true, ['action' => 'updated'], 'Subscription diperbarui.');
+    } else {
+        execute_sql(
+            'INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth_token, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [$userId, $endpoint, $p256dh, $auth, $userAgent, date('Y-m-d H:i:s')]
+        );
+        mobile_api_response(true, ['action' => 'created'], 'Subscription disimpan.');
+    }
+}
+
+function mobile_api_handle_delete_push_subscription(): void
+{
+    $user     = mobile_api_require_auth();
+    $endpoint = trim((string)($_POST['endpoint'] ?? ''));
+
+    if ($endpoint === '') {
+        // Hapus semua subscription milik user ini
+        execute_sql('DELETE FROM push_subscriptions WHERE user_id = ?', [(int)$user['id']]);
+        mobile_api_response(true, [], 'Semua subscription dihapus.');
+    } else {
+        execute_sql(
+            'DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?',
+            [(int)$user['id'], $endpoint]
+        );
+        mobile_api_response(true, [], 'Subscription dihapus.');
+    }
+}
+
+function mobile_api_handle_send_push_test(): void
+{
+    $user = mobile_api_require_auth();
+
+    require_once dirname(__DIR__) . '/Services/webpush.php';
+
+    if (!webpush_is_configured()) {
+        mobile_api_response(false, [], 'VAPID keys belum di-generate. Buka halaman Pengaturan Push Notifikasi.', 400);
+    }
+
+    $result = webpush_send_to_user(
+        (int)$user['id'],
+        '🔔 Test Notifikasi',
+        'Notifikasi Web Push berhasil! E-Raport siap kirim pengingat absensi dan jurnal ke perangkat Anda.',
+        '/?page=dashboard',
+        'info',
+        'test'
+    );
+
+    if ($result['sent'] > 0) {
+        mobile_api_response(true, $result, 'Notifikasi test berhasil dikirim ke ' . $result['sent'] . ' perangkat.');
+    } elseif ($result['failed'] > 0) {
+        mobile_api_response(false, $result, 'Gagal mengirim notifikasi. Pastikan browser sudah mengizinkan notifikasi.', 500);
+    } else {
+        mobile_api_response(false, $result, 'Tidak ada subscription aktif. Aktifkan notifikasi di halaman Profil terlebih dahulu.', 404);
     }
 }

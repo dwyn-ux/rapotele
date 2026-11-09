@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
-import 'screens/login_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/web_app_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +23,7 @@ class ERaporMobileApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'E-Rapor Ashidiq Mobile',
+      title: 'E-Raport KumerBot',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -36,12 +35,12 @@ class ERaporMobileApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Color(0xFF0F172A),
+          backgroundColor: Color(0xFF2563EB),
+          foregroundColor: Colors.white,
           elevation: 0,
         ),
       ),
-      home: ApiService().isAuthenticated ? const HomeScreen() : const LoginScreen(),
+      home: const WebAppScreen(),
     );
   }
 }

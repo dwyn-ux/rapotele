@@ -802,7 +802,9 @@ function page_student_attendance(): void
                         </label>
                         <label style="margin: 0;">
                             <span style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px; color: #92400e;">Jam Masuk Kelas</span>
-                            <input type="time" name="teacher_time_in" value="<?= date('H:i') ?>" required>
+                            <select name="teacher_time_in" required>
+                                <?= time_options(date('H:i')) ?>
+                            </select>
                         </label>
                         <label style="margin: 0;">
                             <span style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px; color: #92400e;">Catatan (Opsional)</span>
@@ -935,8 +937,8 @@ function page_teacher_attendance(): void
                                 <td><?= e($row['class_name']) ?></td>
                                 <td><?= e($row['subject_name']) ?></td>
                                 <td><select name="status[<?= e($scheduleId) ?>]"><?= options(teacher_attendance_statuses(), $row['status'] ?? 'hadir') ?></select></td>
-                                <td><input type="time" name="time_in[<?= e($scheduleId) ?>]" value="<?= e(substr($start, 0, 5)) ?>"></td>
-                                <td><input type="time" name="time_out[<?= e($scheduleId) ?>]" value="<?= e(substr($end, 0, 5)) ?>"></td>
+                                <td><select name="time_in[<?= e($scheduleId) ?>]"><?= time_options(substr($start, 0, 5)) ?></select></td>
+                                <td><select name="time_out[<?= e($scheduleId) ?>]"><?= time_options(substr($end, 0, 5)) ?></select></td>
                                 <td><input type="text" name="notes[<?= e($scheduleId) ?>]" value="<?= e($row['notes']) ?>" placeholder="Materi/kelas pengganti/catatan"></td>
                             </tr>
                         <?php endforeach; ?>

@@ -370,7 +370,9 @@ function render_wizard_step1(array $assignment, string $date, int $meetingNo, in
 
                 <label>
                     <span style="font-weight:600;">Waktu Masuk Kelas</span>
-                    <input type="time" name="teacher_time_in" value="<?= date('H:i') ?>" required>
+                    <select name="teacher_time_in" required style="font-size:1rem;padding:8px 12px;">
+                        <?= time_options(date('H:i')) ?>
+                    </select>
                 </label>
 
                 <label class="wide">

@@ -1019,6 +1019,17 @@ function run_migrations_locked(): void
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )$engine",
 
+        "CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id $pk,
+            user_id INT NOT NULL,
+            endpoint TEXT NOT NULL,
+            p256dh TEXT NOT NULL,
+            auth_token VARCHAR(64) NOT NULL,
+            user_agent TEXT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_used_at DATETIME NULL
+        )$engine",
+
         "CREATE TABLE IF NOT EXISTS dapodik_sync_logs (
             id $pk,
             mode VARCHAR(40) NOT NULL,

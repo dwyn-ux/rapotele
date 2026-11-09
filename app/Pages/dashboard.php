@@ -861,7 +861,7 @@ function render_teacher_teaching_flow_widget(): void
                     // Cek Absensi Siswa
                     $studentEntriesCount = 0;
                     if ($session) {
-                        $studentEntriesCount = (int)(fetch_one('SELECT COUNT(*) as cnt FROM student_attendance_entries WHERE session_id = ?', [(int)$session['id']]['cnt'] ?? 0));
+                        $studentEntriesCount = (int)(fetch_one('SELECT COUNT(*) as cnt FROM student_attendance_entries WHERE session_id = ?', [(int)$session['id']])['cnt'] ?? 0);
                     }
 
                     // Cek Jurnal Harian

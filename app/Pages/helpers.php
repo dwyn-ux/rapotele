@@ -61,6 +61,32 @@ function options(array $options, mixed $selected): string
     return $html;
 }
 
+function time_options(?string $selected = null, int $startHour = 6, int $endHour = 17, int $stepMinutes = 5): string
+{
+    $selected = $selected ? substr(trim($selected), 0, 5) : date('H:i');
+    $times = [];
+    $hasSelected = false;
+    for ($h = $startHour; $h <= $endHour; $h++) {
+        for ($m = 0; $m < 60; $m += $stepMinutes) {
+            $t = sprintf('%02d:%02d', $h, $m);
+            if ($t === $selected) {
+                $hasSelected = true;
+            }
+            $times[] = $t;
+        }
+    }
+    if (!$hasSelected && $selected !== '') {
+        $times[] = $selected;
+        sort($times);
+    }
+    $html = '';
+    foreach ($times as $t) {
+        $isSel = ($t === $selected) ? ' selected' : '';
+        $html .= '<option value="' . e($t) . '"' . $isSel . '>' . e($t) . ' WIB</option>';
+    }
+    return $html;
+}
+
 function subject_has_level(?string $subjectLevel, string $classLevel): bool
 {
     $sl = trim((string)$subjectLevel);

@@ -190,7 +190,9 @@ function page_school(): void
                     </div>
                     <div class="school-form-group">
                         <label class="school-label">Jam Mulai Pelajaran</label>
-                        <input type="time" class="school-input" name="start_time" value="<?= e($school['start_time'] ?? '07:00') ?>">
+                        <select class="school-input school-select" name="start_time">
+                            <?= time_options($school['start_time'] ?? '07:00') ?>
+                        </select>
                     </div>
                 </div>
 
@@ -1613,6 +1615,174 @@ function page_profile(): void
             <div class="wide actions"><button class="button primary">Simpan Profil</button></div>
         </form>
     </section>
+
+    <!-- ── Web Push / PWA Notification Settings ─────────────────────────── -->
+    <section class="panel" style="margin-top:1.25rem">
+        <div class="panel-heading">
+            <div class="panel-title">
+                <i data-lucide="bell"></i>
+                <span>Notifikasi Browser (Web Push)</span>
+            </div>
+        </div>
+        <div style="padding:1.25rem">
+            <p style="color:#64748b;margin-bottom:1rem;font-size:.9rem">
+                Aktifkan agar browser / HP mengirim notifikasi otomatis untuk pengingat
+                <strong>absensi guru</strong>, <strong>jadwal mengajar</strong>, dan <strong>jurnal harian</strong>
+                meskipun aplikasi tidak sedang dibuka.
+            </p>
+
+            <div id="pwa-push-status" style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+                <span id="pwa-push-badge" style="
+                    display:inline-flex;align-items:center;gap:.35rem;
+                    padding:.3rem .75rem;border-radius:999px;font-size:.82rem;font-weight:600;
+                    background:#f1f5f9;color:#64748b;
+                ">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    Memeriksa status...
+                </span>
+            </div>
+
+            <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+                <button type="button" id="pwa-btn-enable" class="button primary" style="display:none">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                    Aktifkan Notifikasi
+                </button>
+                <button type="button" id="pwa-btn-test" class="button" style="display:none">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Kirim Test Notifikasi
+                </button>
+                <button type="button" id="pwa-btn-disable" class="button" style="display:none;color:#ef4444;border-color:#ef4444">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M17 17H3s3-2 3-9a4 4 0 0 1 .88-2.5M9.03 4.5a4 4 0 0 1 7.97 1.5c0 2.5-.89 4.17-1.69 5.22"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                    Nonaktifkan
+                </button>
+            </div>
+
+            <div id="pwa-push-info" style="
+                margin-top:1rem;padding:.75rem 1rem;border-radius:8px;
+                background:#eff6ff;color:#1d4ed8;font-size:.85rem;display:none
+            "></div>
+
+            <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid #e2e8f0">
+                <strong style="font-size:.85rem;color:#475569">Panduan Install ke Home Screen Android:</strong>
+                <ol style="margin:.5rem 0 0 1.25rem;font-size:.85rem;color:#64748b;line-height:1.8">
+                    <li>Buka aplikasi ini di <strong>Chrome</strong> atau browser berbasis Chromium</li>
+                    <li>Ketuk ikon <strong>⋮</strong> (tiga titik) di pojok kanan atas</li>
+                    <li>Pilih <strong>"Tambahkan ke layar utama"</strong> atau <strong>"Install App"</strong></li>
+                    <li>Ketuk <strong>Tambahkan</strong> — ikon E-Raport muncul di home screen</li>
+                    <li>Buka dari home screen, lalu aktifkan notifikasi di halaman ini</li>
+                </ol>
+            </div>
+        </div>
+    </section>
+
+    <script>
+    (function() {
+        const badge   = document.getElementById('pwa-push-badge');
+        const btnEn   = document.getElementById('pwa-btn-enable');
+        const btnTest = document.getElementById('pwa-btn-test');
+        const btnDis  = document.getElementById('pwa-btn-disable');
+        const info    = document.getElementById('pwa-push-info');
+
+        function showInfo(msg, isError) {
+            info.style.display = 'block';
+            info.style.background = isError ? '#fef2f2' : '#eff6ff';
+            info.style.color      = isError ? '#dc2626' : '#1d4ed8';
+            info.textContent = msg;
+        }
+
+        function setBadge(state) {
+            const styles = {
+                checking:  { bg:'#f1f5f9', color:'#64748b', icon:'ℹ️', text:'Memeriksa...' },
+                unsupport: { bg:'#fef3c7', color:'#92400e', icon:'⚠️', text:'Browser tidak mendukung' },
+                denied:    { bg:'#fee2e2', color:'#991b1b', icon:'🚫', text:'Izin ditolak' },
+                inactive:  { bg:'#f1f5f9', color:'#475569', icon:'🔕', text:'Belum aktif' },
+                active:    { bg:'#dcfce7', color:'#166534', icon:'🔔', text:'Aktif' },
+            };
+            const s = styles[state] || styles.checking;
+            badge.style.background = s.bg;
+            badge.style.color      = s.color;
+            badge.innerHTML = s.icon + ' ' + s.text;
+        }
+
+        async function checkStatus() {
+            if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+                setBadge('unsupport');
+                showInfo('Browser ini tidak mendukung Web Push. Gunakan Chrome / Edge terbaru.', true);
+                return;
+            }
+
+            const perm = Notification.permission;
+            if (perm === 'denied') {
+                setBadge('denied');
+                showInfo('Izin notifikasi ditolak di pengaturan browser. Reset izin notifikasi untuk domain ini di pengaturan browser Anda.', true);
+                btnDis.style.display = 'inline-flex';
+                return;
+            }
+
+            if (perm !== 'granted') {
+                setBadge('inactive');
+                btnEn.style.display = 'inline-flex';
+                return;
+            }
+
+            // Cek apakah sudah ada subscription aktif
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            if (sub) {
+                setBadge('active');
+                btnTest.style.display   = 'inline-flex';
+                btnDis.style.display    = 'inline-flex';
+            } else {
+                setBadge('inactive');
+                btnEn.style.display = 'inline-flex';
+            }
+        }
+
+        btnEn.addEventListener('click', async () => {
+            btnEn.disabled = true;
+            btnEn.textContent = 'Meminta izin...';
+            const result = await (window.eraportRequestPush ? window.eraportRequestPush() : Promise.resolve({ ok: false, message: 'Belum siap' }));
+            if (result.ok) {
+                showInfo('✅ Notifikasi berhasil diaktifkan!', false);
+            } else {
+                showInfo('❌ ' + result.message, true);
+            }
+            await checkStatus();
+        });
+
+        btnTest.addEventListener('click', async () => {
+            btnTest.disabled    = true;
+            btnTest.textContent = 'Mengirim...';
+            try {
+                const resp = await fetch('/api?action=send_push_test', { method: 'POST' });
+                const data = await resp.json();
+                showInfo(data.ok ? '✅ ' + data.message : '❌ ' + data.message, !data.ok);
+            } catch (e) {
+                showInfo('❌ Gagal menghubungi server.', true);
+            } finally {
+                btnTest.disabled    = false;
+                btnTest.textContent = 'Kirim Test Notifikasi';
+            }
+        });
+
+        btnDis.addEventListener('click', async () => {
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            if (sub) {
+                const ep = sub.endpoint;
+                await sub.unsubscribe();
+                // Beritahu server
+                const body = new FormData();
+                body.append('endpoint', ep);
+                await fetch('/api?action=delete_push_subscription', { method: 'POST', body });
+            }
+            showInfo('🔕 Notifikasi dinonaktifkan.', false);
+            checkStatus();
+        });
+
+        checkStatus();
+    })();
+    </script>
     <?php
     render_footer();
 }

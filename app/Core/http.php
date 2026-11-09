@@ -25,11 +25,14 @@ function app_url(string $path = ''): string
 {
     $base = rtrim((string)config('base_url', ''), '/');
     if ($base === '') {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? '127.0.0.1:8000';
         $script = $_SERVER['SCRIPT_NAME'] ?? '/index.php';
-        $base = rtrim(str_replace('\\', '/', dirname($script)), '/');
-        if ($base === '/') {
-            $base = '';
+        $dir = rtrim(str_replace('\\', '/', dirname($script)), '/');
+        if ($dir === '/') {
+            $dir = '';
         }
+        $base = $scheme . '://' . $host . $dir;
     }
 
     return $base . '/' . ltrim($path, '/');
