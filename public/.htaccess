@@ -16,3 +16,13 @@ DirectoryIndex index.php
 <FilesMatch "(^\.|\.sqlite$|\.db$|\.log$|\.json$|\.sql$|\.env$|\.exe$)">
     Require all denied
 </FilesMatch>
+
+<Files "manifest.json">
+    Require all granted
+</Files>
+
+<IfModule mod_headers.c>
+    <Files "sw.js">
+        Header set Service-Worker-Allowed "/"
+    </Files>
+</IfModule>

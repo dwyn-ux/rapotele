@@ -206,7 +206,7 @@ function render_header(string $title): void
         <meta name="apple-mobile-web-app-status-bar-style" content="default">
         <meta name="apple-mobile-web-app-title" content="<?= e(config('app_name')) ?>">
         <title><?= e($title) ?> — <?= e(config('app_name')) ?></title>
-        <link rel="manifest" href="<?= e(app_url('manifest.json')) ?>">
+        <link rel="manifest" href="<?= e(app_url('manifest.php')) ?>">
         <?php if ($appLogoUrl !== ''): ?>
             <link rel="icon" href="<?= e($appLogoUrl) ?>">
             <link rel="apple-touch-icon" href="<?= e(app_url('pwa-icon.php?size=192')) ?>">
@@ -228,7 +228,7 @@ function render_header(string $title): void
                 // Register Service Worker (PWA)
                 if ('serviceWorker' in navigator) {
                     window.addEventListener('load', function() {
-                        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                        navigator.serviceWorker.register('<?= e(app_url('sw.js')) ?>', { scope: '<?= e(app_url('')) ?>' })
                             .catch(function(e) { console.warn('SW reg failed:', e); });
                     });
                 }
@@ -565,16 +565,32 @@ function render_public_header(string $title): void
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="color-scheme" content="light only">
+        <meta name="theme-color" content="#2563eb">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="default">
+        <meta name="apple-mobile-web-app-title" content="<?= e(config('app_name')) ?>">
         <title><?= e($title) ?> — <?= e(config('app_name')) ?></title>
+        <link rel="manifest" href="<?= e(app_url('manifest.php')) ?>">
         <?php if ($appLogoUrl !== ''): ?>
             <link rel="icon" href="<?= e($appLogoUrl) ?>">
-            <link rel="apple-touch-icon" href="<?= e($appLogoUrl) ?>">
+            <link rel="apple-touch-icon" href="<?= e(app_url('pwa-icon.php?size=192')) ?>">
             <link rel="preload" as="image" href="<?= e($appLogoUrl) ?>">
+        <?php else: ?>
+            <link rel="apple-touch-icon" href="<?= e(app_url('pwa-icon.php?size=192')) ?>">
         <?php endif; ?>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
         <link rel="stylesheet" href="<?= e(asset_version_url('assets/app.css')) ?>">
+        <script>
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                    navigator.serviceWorker.register('<?= e(app_url('sw.js')) ?>', { scope: '<?= e(app_url('')) ?>' })
+                        .catch(function(e) { console.warn('SW reg failed:', e); });
+                });
+            }
+        </script>
     </head>
     <body class="public-page">
     <main class="public-card">

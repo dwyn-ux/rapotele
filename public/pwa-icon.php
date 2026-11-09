@@ -16,66 +16,86 @@ if (!in_array($size, $validSizes, true)) {
     $size = 192;
 }
 
-// Coba ambil logo sekolah dari storage
-$logoPath = '';
-if (function_exists('fetch_one')) {
-    $logo = fetch_one(
-        "SELECT file_path FROM media_files WHERE media_type = 'logo' ORDER BY id DESC LIMIT 1"
-    );
-    if ($logo && !empty($logo['file_path'])) {
-        $candidate = APP_ROOT . '/storage/' . ltrim((string)$logo['file_path'], '/');
-        if (is_file($candidate)) {
-            $logoPath = $candidate;
-        }
-    }
-}
-
 header('Content-Type: image/png');
 header('Cache-Control: public, max-age=86400');
 
-if ($logoPath !== '' && extension_loaded('gd')) {
-    // Resize logo ke ukuran yang diminta
-    $info = @getimagesize($logoPath);
-    if ($info) {
-        $src = match ($info['mime']) {
-            'image/jpeg' => @imagecreatefromjpeg($logoPath),
-            'image/png'  => @imagecreatefrompng($logoPath),
-            'image/webp' => @imagecreatefromwebp($logoPath),
-            'image/gif'  => @imagecreatefromgif($logoPath),
-            default      => false,
-        };
-        if ($src !== false) {
-            $dst = imagecreatetruecolor($size, $size);
-            // Latar putih
-            $white = imagecolorallocate($dst, 255, 255, 255);
-            imagefill($dst, 0, 0, $white);
-            imagecopyresampled($dst, $src, 0, 0, 0, 0, $size, $size, (int)$info[0], (int)$info[1]);
-            imagepng($dst);
-            imagedestroy($src);
-            imagedestroy($dst);
-            exit;
+$logoPath = '';
+try {
+    if (function_exists('signature_asset')) {
+        $asset = signature_asset('logo');
+        if ($asset && !empty($asset['file_path'])) {
+            $candidate = app_file_path((string)$asset['file_path'], ['storage/uploads/signatures', 'storage']);
+            if (is_file($candidate)) {
+                $logoPath = $candidate;
+            }
         }
+    }
+} catch (Throwable) {
+    $logoPath = '';
+}
+
+// 1. Jika ada logo sekolah dan GD aktif, resize logo
+if ($logoPath !== '' && extension_loaded('gd')) {
+    try {
+        $info = @getimagesize($logoPath);
+        if ($info && !empty($info['mime'])) {
+            $src = match ($info['mime']) {
+                'image/jpeg' => @imagecreatefromjpeg($logoPath),
+                'image/png'  => @imagecreatefrompng($logoPath),
+                'image/webp' => @imagecreatefromwebp($logoPath),
+                'image/gif'  => @imagecreatefromgif($logoPath),
+                default      => false,
+            };
+            if ($src !== false) {
+                $dst = imagecreatetruecolor($size, $size);
+                // Background putih bersih
+                $white = imagecolorallocate($dst, 255, 255, 255);
+                imagefill($dst, 0, 0, $white);
+                imagecopyresampled($dst, $src, 0, 0, 0, 0, $size, $size, (int)$info[0], (int)$info[1]);
+                imagepng($dst);
+                imagedestroy($src);
+                imagedestroy($dst);
+                exit;
+            }
+        }
+    } catch (Throwable) {
+        // Fallback ke generator di bawah
     }
 }
 
-// Fallback: buat ikon teks sederhana pakai GD
+// 2. Fallback: buat ikon profesional pakai GD
 if (extension_loaded('gd')) {
-    $img  = imagecreatetruecolor($size, $size);
-    $bg   = imagecolorallocate($img, 37, 99, 235);   // blue-600
-    $fg   = imagecolorallocate($img, 255, 255, 255);
-    imagefill($img, 0, 0, $bg);
-    $label = 'ER';
-    $font  = 5; // built-in GD font
-    $tw    = imagefontwidth($font) * strlen($label);
-    $th    = imagefontheight($font);
-    $scale = min((int)($size * 0.4 / $tw), (int)($size * 0.4 / $th));
-    $scale = max(1, $scale);
-    // GD tidak support scale font natively, cukup tulis di tengah
-    imagestring($img, $font, (int)(($size - $tw) / 2), (int)(($size - $th) / 2), $label, $fg);
-    imagepng($img);
-    imagedestroy($img);
-    exit;
+    try {
+        $img = imagecreatetruecolor($size, $size);
+        $bg  = imagecolorallocate($img, 37, 99, 235);   // Primary Blue (#2563eb)
+        $fg  = imagecolorallocate($img, 255, 255, 255); // White
+        imagefill($img, 0, 0, $bg);
+
+        // Ambil inisial nama sekolah jika ada
+        $label = 'ER';
+        try {
+            if (function_exists('get_school_profile')) {
+                $sc = get_school_profile();
+                if (!empty($sc['name'])) {
+                    $words = preg_split('/\s+/', trim((string)$sc['name']));
+                    if (count($words) >= 2) {
+                        $label = strtoupper(substr($words[0], 0, 1) . substr($words[1], 0, 1));
+                    }
+                }
+            }
+        } catch (Throwable) {}
+
+        $font = 5; // Built-in GD font
+        $tw   = imagefontwidth($font) * strlen($label);
+        $th   = imagefontheight($font);
+        imagestring($img, $font, (int)(($size - $tw) / 2), (int)(($size - $th) / 2), $label, $fg);
+        imagepng($img);
+        imagedestroy($img);
+        exit;
+    } catch (Throwable) {
+        // Fallback ke PNG transparan
+    }
 }
 
-// Fallback terakhir: PNG 1x1 transparan
+// 3. Fallback terakhir: PNG 1x1 transparan
 echo base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');

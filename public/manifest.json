@@ -2,8 +2,8 @@
   "name": "E-Raport KumerBot",
   "short_name": "E-Raport",
   "description": "Sistem Administrasi Akademik Sekolah — Absensi, Jurnal, Rapor",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "index.php",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#ffffff",
@@ -13,37 +13,48 @@
   "categories": ["education", "productivity"],
   "icons": [
     {
-      "src": "/pwa-icon.php?size=192",
+      "src": "pwa-icon.php?size=192",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/pwa-icon.php?size=512",
+      "src": "pwa-icon.php?size=512",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "pwa-icon.php?size=192",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "pwa-icon.php?size=512",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
-  "screenshots": [],
   "shortcuts": [
     {
       "name": "Absensi Guru",
       "short_name": "Absensi",
-      "url": "/?page=teacher-attendance-self",
-      "icons": [{ "src": "/pwa-icon.php?size=96", "sizes": "96x96" }]
+      "url": "index.php?page=teacher-attendance-self",
+      "icons": [{ "src": "pwa-icon.php?size=96", "sizes": "96x96" }]
     },
     {
       "name": "Alur Mengajar",
       "short_name": "Mengajar",
-      "url": "/?page=teaching-wizard",
-      "icons": [{ "src": "/pwa-icon.php?size=96", "sizes": "96x96" }]
+      "url": "index.php?page=teaching-wizard",
+      "icons": [{ "src": "pwa-icon.php?size=96", "sizes": "96x96" }]
     },
     {
       "name": "Jurnal Harian",
       "short_name": "Jurnal",
-      "url": "/?page=journals",
-      "icons": [{ "src": "/pwa-icon.php?size=96", "sizes": "96x96" }]
+      "url": "index.php?page=journals",
+      "icons": [{ "src": "pwa-icon.php?size=96", "sizes": "96x96" }]
     }
   ]
 }

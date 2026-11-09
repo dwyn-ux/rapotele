@@ -1,7 +1,7 @@
 // E-Raport KumerBot — Service Worker
 // Versi cache: update string ini setiap deploy besar agar browser refresh cache
-const CACHE_VERSION = 'eraport-v1';
-const OFFLINE_PAGE  = '/offline.html';
+const CACHE_VERSION = 'eraport-v2';
+const OFFLINE_PAGE  = new URL('offline.html', self.location.href).href;
 
 // Aset yang dicache saat SW di-install
 const PRECACHE_ASSETS = [
@@ -11,7 +11,13 @@ const PRECACHE_ASSETS = [
 // ─── Install ──────────────────────────────────────────────────────────────────
 self.addEventListener('install', (event) => {
     event.waitUntil(
-        caches.open(CACHE_VERSION).then((cache) => cache.addAll(PRECACHE_ASSETS))
+        caches.open(CACHE_VERSION).then(async (cache) => {
+            try {
+                await cache.addAll(PRECACHE_ASSETS);
+            } catch (err) {
+                console.warn('Precache non-critical notice:', err);
+            }
+        })
     );
     self.skipWaiting();
 });
@@ -37,9 +43,9 @@ self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
     if (url.origin !== self.location.origin) return;
 
-    // Jangan cache API, media, atau file dinamis
-    const skipPaths = ['/api', '/media.php', '/pwa-icon.php', '/telegram_webhook.php'];
-    if (skipPaths.some((p) => url.pathname.startsWith(p))) return;
+    // Jangan cache API, media, icon dinamis, atau webhook
+    const skipPaths = ['/api', '/media.php', '/pwa-icon.php', '/telegram_webhook.php', '/manifest.php'];
+    if (skipPaths.some((p) => url.pathname.includes(p))) return;
 
     event.respondWith(
         fetch(event.request)
@@ -56,33 +62,33 @@ self.addEventListener('fetch', (event) => {
                 const cached = await caches.match(event.request);
                 if (cached) return cached;
                 if (event.request.headers.get('accept')?.includes('text/html')) {
-                    return caches.match(OFFLINE_PAGE);
+                    const offline = await caches.match(OFFLINE_PAGE);
+                    if (offline) return offline;
                 }
-                return new Response('', { status: 503 });
+                return new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
             })
     );
 });
 
 // ─── Push Notification ─────────────────────────────────────────────────────────
 self.addEventListener('push', (event) => {
-    let data = { title: 'E-Raport', body: 'Ada notifikasi baru.', url: '/', type: 'info' };
+    const defaultUrl = new URL('index.php', self.location.href).href;
+    const icon192    = new URL('pwa-icon.php?size=192', self.location.href).href;
+    const icon96     = new URL('pwa-icon.php?size=96', self.location.href).href;
+
+    let data = { title: 'E-Raport', body: 'Ada notifikasi baru.', url: defaultUrl, type: 'info' };
     try {
         if (event.data) data = { ...data, ...event.data.json() };
     } catch (e) {}
 
-    const iconMap = {
-        absensi: '/pwa-icon.php?size=192',
-        jadwal:  '/pwa-icon.php?size=192',
-        jurnal:  '/pwa-icon.php?size=192',
-        info:    '/pwa-icon.php?size=192',
-    };
+    const targetUrl = data.url ? new URL(data.url, self.location.href).href : defaultUrl;
 
     const options = {
         body:    data.body,
-        icon:    iconMap[data.type] ?? '/pwa-icon.php?size=192',
-        badge:   '/pwa-icon.php?size=96',
+        icon:    icon192,
+        badge:   icon96,
         tag:     data.tag ?? data.type ?? 'eraport',
-        data:    { url: data.url ?? '/' },
+        data:    { url: targetUrl },
         vibrate: [200, 100, 200],
         requireInteraction: data.type === 'absensi', // absensi butuh interaksi user
         actions: buildActions(data.type),
@@ -118,10 +124,12 @@ self.addEventListener('notificationclick', (event) => {
     event.notification.close();
     if (event.action === 'dismiss') return;
 
-    const targetUrl = event.notification.data?.url ?? '/';
+    const defaultUrl = new URL('index.php', self.location.href).href;
+    const targetUrl  = event.notification.data?.url ? new URL(event.notification.data.url, self.location.href).href : defaultUrl;
+
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-            // Fokus tab yang sudah ada
+            // Fokus tab yang sudah ada jika ada
             for (const client of windowClients) {
                 if (client.url.includes(self.location.origin)) {
                     client.focus();

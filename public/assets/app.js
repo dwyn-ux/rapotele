@@ -1226,3 +1226,60 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+// PWA Install Prompt Handler
+(function() {
+    let deferredPrompt = null;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (isStandalone) return;
+
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+
+        if (localStorage.getItem('pwa_dismissed_until')) {
+            const until = parseInt(localStorage.getItem('pwa_dismissed_until'), 10);
+            if (Date.now() < until) return;
+        }
+
+        if (document.getElementById('pwa-install-banner')) return;
+
+        const banner = document.createElement('div');
+        banner.id = 'pwa-install-banner';
+        banner.style.cssText = 'position:fixed;bottom:16px;left:16px;right:16px;max-width:440px;margin:0 auto;background:#1e293b;color:#fff;padding:12px 16px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.25);display:flex;align-items:center;gap:12px;z-index:99999;font-family:inherit;font-size:14px;';
+        banner.innerHTML = `
+            <div style="width:36px;height:36px;background:#2563eb;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0;">📲</div>
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:600;line-height:1.2;">Pasang Aplikasi</div>
+                <div style="font-size:12px;color:#94a3b8;margin-top:2px;">Akses cepat & notifikasi absen di HP</div>
+            </div>
+            <button type="button" id="pwa-install-action" style="background:#2563eb;color:#fff;border:none;padding:8px 14px;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;flex-shrink:0;">Instal</button>
+            <button type="button" id="pwa-install-close" aria-label="Tutup" style="background:transparent;border:none;color:#94a3b8;font-size:18px;cursor:pointer;padding:0 4px;line-height:1;">&times;</button>
+        `;
+        document.body.appendChild(banner);
+
+        document.getElementById('pwa-install-action').addEventListener('click', function() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(function(choice) {
+                    if (choice.outcome === 'accepted') {
+                        banner.remove();
+                    }
+                    deferredPrompt = null;
+                });
+            }
+        });
+
+        document.getElementById('pwa-install-close').addEventListener('click', function() {
+            banner.remove();
+            localStorage.setItem('pwa_dismissed_until', (Date.now() + 7 * 86400 * 1000).toString());
+        });
+    });
+
+    window.addEventListener('appinstalled', function() {
+        const b = document.getElementById('pwa-install-banner');
+        if (b) b.remove();
+        deferredPrompt = null;
+    });
+})();
+
