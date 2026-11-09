@@ -73,8 +73,8 @@ self.addEventListener('fetch', (event) => {
 // ─── Push Notification ─────────────────────────────────────────────────────────
 self.addEventListener('push', (event) => {
     const defaultUrl = new URL('index.php', self.location.href).href;
-    const icon192    = new URL('pwa-icon.php?size=192', self.location.href).href;
-    const icon96     = new URL('pwa-icon.php?size=96', self.location.href).href;
+    const icon192    = new URL('icon-192.png', self.location.href).href;
+    const icon96     = new URL('icon-96.png', self.location.href).href;
 
     let data = { title: 'E-Raport', body: 'Ada notifikasi baru.', url: defaultUrl, type: 'info' };
     try {

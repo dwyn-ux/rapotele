@@ -377,6 +377,12 @@ function signature_media_url(string $type = 'logo', ?int $id = null): string
 {
     $asset = signature_asset($type, $id);
     if (!$asset || empty($asset['file_path'])) {
+        if ($type === 'logo') {
+            $defaultLogo = APP_ROOT . '/public/assets/logo.png';
+            if (is_file($defaultLogo)) {
+                return app_url('assets/logo.png');
+            }
+        }
         return '';
     }
 

@@ -43,25 +43,25 @@ $manifest = [
     'categories'       => ['education', 'productivity'],
     'icons'            => [
         [
-            'src'     => app_url('pwa-icon.php?size=192'),
+            'src'     => app_url('icon-192.png'),
             'sizes'   => '192x192',
             'type'    => 'image/png',
             'purpose' => 'any',
         ],
         [
-            'src'     => app_url('pwa-icon.php?size=512'),
+            'src'     => app_url('icon-512.png'),
             'sizes'   => '512x512',
             'type'    => 'image/png',
             'purpose' => 'any',
         ],
         [
-            'src'     => app_url('pwa-icon.php?size=192'),
+            'src'     => app_url('icon-maskable-192.png'),
             'sizes'   => '192x192',
             'type'    => 'image/png',
             'purpose' => 'maskable',
         ],
         [
-            'src'     => app_url('pwa-icon.php?size=512'),
+            'src'     => app_url('icon-maskable-512.png'),
             'sizes'   => '512x512',
             'type'    => 'image/png',
             'purpose' => 'maskable',
@@ -73,7 +73,7 @@ $manifest = [
             'short_name' => 'Absensi',
             'url'        => route_url('teacher-attendance-self'),
             'icons'      => [
-                ['src' => app_url('pwa-icon.php?size=96'), 'sizes' => '96x96'],
+                ['src' => app_url('icon-96.png'), 'sizes' => '96x96'],
             ],
         ],
         [
@@ -81,7 +81,7 @@ $manifest = [
             'short_name' => 'Mengajar',
             'url'        => route_url('teaching-wizard'),
             'icons'      => [
-                ['src' => app_url('pwa-icon.php?size=96'), 'sizes' => '96x96'],
+                ['src' => app_url('icon-96.png'), 'sizes' => '96x96'],
             ],
         ],
         [
@@ -89,7 +89,7 @@ $manifest = [
             'short_name' => 'Jurnal',
             'url'        => route_url('journals'),
             'icons'      => [
-                ['src' => app_url('pwa-icon.php?size=96'), 'sizes' => '96x96'],
+                ['src' => app_url('icon-96.png'), 'sizes' => '96x96'],
             ],
         ],
     ],

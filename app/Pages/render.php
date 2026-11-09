@@ -207,12 +207,12 @@ function render_header(string $title): void
         <meta name="apple-mobile-web-app-title" content="<?= e(config('app_name')) ?>">
         <title><?= e($title) ?> — <?= e(config('app_name')) ?></title>
         <link rel="manifest" href="<?= e(app_url('manifest.php')) ?>">
+        <link rel="icon" type="image/png" sizes="192x192" href="<?= e(app_url('icon-192.png')) ?>">
+        <link rel="icon" type="image/png" sizes="96x96" href="<?= e(app_url('icon-96.png')) ?>">
+        <link rel="apple-touch-icon" href="<?= e(app_url('apple-touch-icon.png')) ?>">
+        <link rel="apple-touch-icon-precomposed" href="<?= e(app_url('apple-touch-icon-precomposed.png')) ?>">
         <?php if ($appLogoUrl !== ''): ?>
-            <link rel="icon" href="<?= e($appLogoUrl) ?>">
-            <link rel="apple-touch-icon" href="<?= e(app_url('pwa-icon.php?size=192')) ?>">
             <link rel="preload" as="image" href="<?= e($appLogoUrl) ?>">
-        <?php else: ?>
-            <link rel="apple-touch-icon" href="<?= e(app_url('pwa-icon.php?size=192')) ?>">
         <?php endif; ?>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -572,12 +572,12 @@ function render_public_header(string $title): void
         <meta name="apple-mobile-web-app-title" content="<?= e(config('app_name')) ?>">
         <title><?= e($title) ?> — <?= e(config('app_name')) ?></title>
         <link rel="manifest" href="<?= e(app_url('manifest.php')) ?>">
+        <link rel="icon" type="image/png" sizes="192x192" href="<?= e(app_url('icon-192.png')) ?>">
+        <link rel="icon" type="image/png" sizes="96x96" href="<?= e(app_url('icon-96.png')) ?>">
+        <link rel="apple-touch-icon" href="<?= e(app_url('apple-touch-icon.png')) ?>">
+        <link rel="apple-touch-icon-precomposed" href="<?= e(app_url('apple-touch-icon-precomposed.png')) ?>">
         <?php if ($appLogoUrl !== ''): ?>
-            <link rel="icon" href="<?= e($appLogoUrl) ?>">
-            <link rel="apple-touch-icon" href="<?= e(app_url('pwa-icon.php?size=192')) ?>">
             <link rel="preload" as="image" href="<?= e($appLogoUrl) ?>">
-        <?php else: ?>
-            <link rel="apple-touch-icon" href="<?= e(app_url('pwa-icon.php?size=192')) ?>">
         <?php endif; ?>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

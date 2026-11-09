@@ -20,6 +20,7 @@ header('Content-Type: image/png');
 header('Cache-Control: public, max-age=86400');
 
 $logoPath = '';
+$isCustom = false;
 try {
     if (function_exists('signature_asset')) {
         $asset = signature_asset('logo');
@@ -27,6 +28,7 @@ try {
             $candidate = app_file_path((string)$asset['file_path'], ['storage/uploads/signatures', 'storage']);
             if (is_file($candidate)) {
                 $logoPath = $candidate;
+                $isCustom = true;
             }
         }
     }
@@ -34,7 +36,30 @@ try {
     $logoPath = '';
 }
 
-// 1. Jika ada logo sekolah dan GD aktif, resize logo
+// Fallback ke logo sekolah bawaan jika belum ada upload kustom
+if ($logoPath === '') {
+    $staticCandidates = [
+        APP_ROOT . '/public/assets/logo.png',
+        APP_ROOT . '/mobile/assets/logo.png',
+    ];
+    foreach ($staticCandidates as $sc) {
+        if (is_file($sc)) {
+            $logoPath = $sc;
+            break;
+        }
+    }
+}
+
+// Jika bukan kustom dan file statis ukuran yang cocok sudah ada, stream langsung
+if (!$isCustom) {
+    $staticIcon = APP_ROOT . '/public/icon-maskable-' . $size . '.png';
+    if (is_file($staticIcon)) {
+        readfile($staticIcon);
+        exit;
+    }
+}
+
+// 1. Jika ada logo sekolah dan GD aktif, resize logo dengan safe padding untuk launcher Android
 if ($logoPath !== '' && extension_loaded('gd')) {
     try {
         $info = @getimagesize($logoPath);
@@ -48,10 +73,16 @@ if ($logoPath !== '' && extension_loaded('gd')) {
             };
             if ($src !== false) {
                 $dst = imagecreatetruecolor($size, $size);
-                // Background putih bersih
+                // Background putih bersih untuk Android launcher
                 $white = imagecolorallocate($dst, 255, 255, 255);
                 imagefill($dst, 0, 0, $white);
-                imagecopyresampled($dst, $src, 0, 0, 0, 0, $size, $size, (int)$info[0], (int)$info[1]);
+
+                // Safe zone 80% (10% padding tiap sisi agar tidak terpotong launcher circle/squircle)
+                $pad = (int)round($size * 0.10);
+                $innerSize = $size - ($pad * 2);
+
+                imagealphablending($dst, true);
+                imagecopyresampled($dst, $src, $pad, $pad, 0, 0, $innerSize, $innerSize, (int)$info[0], (int)$info[1]);
                 imagepng($dst);
                 imagedestroy($src);
                 imagedestroy($dst);

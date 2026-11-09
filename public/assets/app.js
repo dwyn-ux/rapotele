@@ -1248,7 +1248,7 @@ document.addEventListener('DOMContentLoaded', function() {
         banner.id = 'pwa-install-banner';
         banner.style.cssText = 'position:fixed;bottom:16px;left:16px;right:16px;max-width:440px;margin:0 auto;background:#1e293b;color:#fff;padding:12px 16px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.25);display:flex;align-items:center;gap:12px;z-index:99999;font-family:inherit;font-size:14px;';
         banner.innerHTML = `
-            <div style="width:36px;height:36px;background:#2563eb;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0;">📲</div>
+            <img src="icon-96.png" alt="Logo" style="width:38px;height:38px;border-radius:8px;object-fit:contain;background:#fff;padding:2px;flex-shrink:0;">
             <div style="flex:1;min-width:0;">
                 <div style="font-weight:600;line-height:1.2;">Pasang Aplikasi</div>
                 <div style="font-size:12px;color:#94a3b8;margin-top:2px;">Akses cepat & notifikasi absen di HP</div>
