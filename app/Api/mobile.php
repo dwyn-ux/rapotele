@@ -910,12 +910,44 @@ function mobile_api_handle_teaching_assignments(): void
         }
     }
 
+    // Auto-sync / auto-link dari lesson_schedules jika ada jadwal KBM guru
+    if ($teacherId > 0 && table_exists('lesson_schedules')) {
+        try {
+            $schedPairs = fetch_all(
+                "SELECT DISTINCT class_id, subject_id FROM lesson_schedules WHERE teacher_id = ? AND class_id > 0 AND subject_id > 0",
+                [$teacherId]
+            );
+            foreach ($schedPairs as $pair) {
+                $cid = (int)$pair['class_id'];
+                $sid = (int)$pair['subject_id'];
+                $existTa = fetch_one(
+                    "SELECT id, teacher_id FROM teaching_assignments WHERE class_id = ? AND subject_id = ? LIMIT 1",
+                    [$cid, $sid]
+                );
+                if ($existTa) {
+                    if ((int)$existTa['teacher_id'] !== $teacherId) {
+                        execute_sql("UPDATE teaching_assignments SET teacher_id = ?, active = 1 WHERE id = ?", [$teacherId, $existTa['id']]);
+                    }
+                    execute_sql("UPDATE lesson_schedules SET assignment_id = ? WHERE teacher_id = ? AND class_id = ? AND subject_id = ? AND (assignment_id <= 0 OR assignment_id IS NULL)", [$existTa['id'], $teacherId, $cid, $sid]);
+                } else {
+                    execute_sql(
+                        "INSERT INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, updated_at) VALUES (?, ?, ?, '2026/2027', 'Gasal', 1, ?)",
+                        [$teacherId, $cid, $sid, now_string()]
+                    );
+                    $newTaId = (int)db()->lastInsertId();
+                    execute_sql("UPDATE lesson_schedules SET assignment_id = ? WHERE teacher_id = ? AND class_id = ? AND subject_id = ?", [$newTaId, $teacherId, $cid, $sid]);
+                }
+            }
+        } catch (Throwable $e) {}
+    }
+
     $sql = "SELECT ta.id, ta.teacher_id, ta.class_id, ta.subject_id, ta.academic_year, ta.semester,
-                   c.name AS class_name, c.grade, s.name AS subject_name, s.code AS subject_code
+                   COALESCE(c.name, 'Kelas') AS class_name, COALESCE(c.grade, 7) AS grade, 
+                   COALESCE(s.name, 'Mata Pelajaran') AS subject_name, COALESCE(s.code, '') AS subject_code
             FROM teaching_assignments ta
-            JOIN classes c ON c.id = ta.class_id
-            JOIN subjects s ON s.id = ta.subject_id
-            WHERE ta.active = 1";
+            LEFT JOIN classes c ON c.id = ta.class_id
+            LEFT JOIN subjects s ON s.id = ta.subject_id
+            WHERE (ta.active = 1 OR ta.active IS NULL)";
     $params = [];
 
     if ($user['role'] !== 'admin' && $teacherId > 0) {
@@ -926,6 +958,26 @@ function mobile_api_handle_teaching_assignments(): void
 
     $sql .= " ORDER BY c.grade, c.name, s.name";
     $assignments = fetch_all($sql, $params);
+
+    // Fallback darurat: Jika masih kosong tapi guru punya jadwal di lesson_schedules, buat list langsung
+    if (empty($assignments) && $teacherId > 0 && table_exists('lesson_schedules')) {
+        $synthesized = fetch_all(
+            "SELECT DISTINCT ls.id, ls.teacher_id, ls.class_id, ls.subject_id,
+                    '2026/2027' AS academic_year, 'Gasal' AS semester,
+                    COALESCE(c.name, 'Kelas') AS class_name, COALESCE(c.grade, 7) AS grade,
+                    COALESCE(s.name, 'Mata Pelajaran') AS subject_name, COALESCE(s.code, '') AS subject_code
+             FROM lesson_schedules ls
+             LEFT JOIN classes c ON c.id = ls.class_id
+             LEFT JOIN subjects s ON s.id = ls.subject_id
+             WHERE ls.teacher_id = ?
+             GROUP BY ls.class_id, ls.subject_id
+             ORDER BY c.grade, c.name, s.name",
+            [$teacherId]
+        );
+        if (!empty($synthesized)) {
+            $assignments = $synthesized;
+        }
+    }
 
     mobile_api_response(true, [
         'assignments' => $assignments,
@@ -943,13 +995,42 @@ function mobile_api_handle_students_for_attendance(): void
     }
 
     $assignment = fetch_one(
-        "SELECT ta.*, c.name AS class_name, c.grade, s.name AS subject_name
+        "SELECT ta.*, COALESCE(c.name, 'Kelas') AS class_name, COALESCE(c.grade, 7) AS grade, COALESCE(s.name, 'Mata Pelajaran') AS subject_name
          FROM teaching_assignments ta
-         JOIN classes c ON c.id = ta.class_id
-         JOIN subjects s ON s.id = ta.subject_id
+         LEFT JOIN classes c ON c.id = ta.class_id
+         LEFT JOIN subjects s ON s.id = ta.subject_id
          WHERE ta.id = ?",
         [$assignmentId]
     );
+
+    if (!$assignment) {
+        $sched = fetch_one(
+            "SELECT ls.id AS schedule_id, ls.teacher_id, ls.class_id, ls.subject_id,
+                    COALESCE(c.name, 'Kelas') AS class_name, COALESCE(c.grade, 7) AS grade, COALESCE(s.name, 'Mata Pelajaran') AS subject_name
+             FROM lesson_schedules ls
+             LEFT JOIN classes c ON c.id = ls.class_id
+             LEFT JOIN subjects s ON s.id = ls.subject_id
+             WHERE ls.id = ? OR ls.assignment_id = ? LIMIT 1",
+            [$assignmentId, $assignmentId]
+        );
+        if ($sched) {
+            $ta = fetch_one("SELECT id FROM teaching_assignments WHERE class_id = ? AND subject_id = ? LIMIT 1", [(int)$sched['class_id'], (int)$sched['subject_id']]);
+            if ($ta) {
+                $assignmentId = (int)$ta['id'];
+            } else {
+                execute_sql("INSERT INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, updated_at) VALUES (?, ?, ?, '2026/2027', 'Gasal', 1, ?)", [(int)$sched['teacher_id'], (int)$sched['class_id'], (int)$sched['subject_id'], now_string()]);
+                $assignmentId = (int)db()->lastInsertId();
+            }
+            $assignment = fetch_one(
+                "SELECT ta.*, COALESCE(c.name, 'Kelas') AS class_name, COALESCE(c.grade, 7) AS grade, COALESCE(s.name, 'Mata Pelajaran') AS subject_name
+                 FROM teaching_assignments ta
+                 LEFT JOIN classes c ON c.id = ta.class_id
+                 LEFT JOIN subjects s ON s.id = ta.subject_id
+                 WHERE ta.id = ?",
+                [$assignmentId]
+            );
+        }
+    }
 
     if (!$assignment) {
         mobile_api_response(false, [], 'Pembelajaran kelas tidak ditemukan.', 404);
@@ -1049,6 +1130,20 @@ function mobile_api_handle_teacher_class_checkin(): void
     }
 
     $assignment = fetch_one("SELECT * FROM teaching_assignments WHERE id = ?", [$assignmentId]);
+    if (!$assignment) {
+        $sched = fetch_one("SELECT * FROM lesson_schedules WHERE id = ? OR assignment_id = ? LIMIT 1", [$assignmentId, $assignmentId]);
+        if ($sched) {
+            $ta = fetch_one("SELECT id, teacher_id, class_id, subject_id FROM teaching_assignments WHERE class_id = ? AND subject_id = ? LIMIT 1", [(int)$sched['class_id'], (int)$sched['subject_id']]);
+            if ($ta) {
+                $assignmentId = (int)$ta['id'];
+                $assignment = $ta;
+            } else {
+                execute_sql("INSERT INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, updated_at) VALUES (?, ?, ?, '2026/2027', 'Gasal', 1, ?)", [(int)$sched['teacher_id'], (int)$sched['class_id'], (int)$sched['subject_id'], now_string()]);
+                $assignmentId = (int)db()->lastInsertId();
+                $assignment = fetch_one("SELECT * FROM teaching_assignments WHERE id = ?", [$assignmentId]);
+            }
+        }
+    }
     if (!$assignment) {
         mobile_api_response(false, [], 'Pembelajaran kelas tidak ditemukan.', 404);
     }
@@ -1279,6 +1374,20 @@ function mobile_api_handle_save_journal(): void
     }
 
     $assignment = fetch_one('SELECT * FROM teaching_assignments WHERE id = ?', [$assignmentId]);
+    if (!$assignment) {
+        $sched = fetch_one("SELECT * FROM lesson_schedules WHERE id = ? OR assignment_id = ? LIMIT 1", [$assignmentId, $assignmentId]);
+        if ($sched) {
+            $ta = fetch_one("SELECT id, teacher_id, class_id, subject_id FROM teaching_assignments WHERE class_id = ? AND subject_id = ? LIMIT 1", [(int)$sched['class_id'], (int)$sched['subject_id']]);
+            if ($ta) {
+                $assignmentId = (int)$ta['id'];
+                $assignment = $ta;
+            } else {
+                execute_sql("INSERT INTO teaching_assignments (teacher_id, class_id, subject_id, academic_year, semester, active, updated_at) VALUES (?, ?, ?, '2026/2027', 'Gasal', 1, ?)", [(int)$sched['teacher_id'], (int)$sched['class_id'], (int)$sched['subject_id'], now_string()]);
+                $assignmentId = (int)db()->lastInsertId();
+                $assignment = fetch_one("SELECT * FROM teaching_assignments WHERE id = ?", [$assignmentId]);
+            }
+        }
+    }
     if (!$assignment) {
         mobile_api_response(false, [], 'Pembelajaran tidak ditemukan.', 404);
     }

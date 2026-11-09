@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/teaching_assignment.dart';
 import '../models/attendance_models.dart';
+import '../models/schedule_item.dart';
 import '../services/api_service.dart';
 
 class TeachingWizardScreen extends StatefulWidget {
@@ -113,7 +114,40 @@ class _TeachingWizardScreenState extends State<TeachingWizardScreen> {
 
     try {
       // 1. Fetch teacher's teaching assignments
-      final assignments = await _api.getTeachingAssignments();
+      var assignments = await _api.getTeachingAssignments();
+
+      // 2. Fallback: jika assignments kosong, sinkronkan dari jadwal KBM guru
+      if (assignments.isEmpty) {
+        final schedRes = await _api.getMySchedule();
+        if (schedRes['success'] == true) {
+          final todayItems = (schedRes['today_schedules'] as List<ScheduleItem>?) ?? [];
+          final allDays = (schedRes['week_schedules'] as List<DaySchedule>?) ?? [];
+          final allItems = <ScheduleItem>[...todayItems];
+          for (final day in allDays) {
+            allItems.addAll(day.items);
+          }
+          final seen = <String>{};
+          for (final item in allItems) {
+            final key = '${item.className}-${item.subjectName}';
+            if (!seen.contains(key) && item.className.isNotEmpty && item.subjectName.isNotEmpty) {
+              seen.add(key);
+              assignments.add(TeachingAssignmentModel(
+                id: item.assignmentId > 0 ? item.assignmentId : item.id,
+                teacherId: 0,
+                classId: 0,
+                subjectId: 0,
+                academicYear: '2026/2027',
+                semester: 'Gasal',
+                className: item.className,
+                grade: 7,
+                subjectName: item.subjectName,
+                subjectCode: '',
+              ));
+            }
+          }
+        }
+      }
+
       _assignments = assignments;
 
       if (_assignments.isNotEmpty) {
