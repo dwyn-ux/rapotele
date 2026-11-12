@@ -1593,10 +1593,12 @@ function mobile_api_handle_save_grades(): void
 function mobile_api_handle_vapid_public_key(): void
 {
     // Endpoint publik (tidak butuh auth) agar SW bisa ambil key sebelum login
-    if (!function_exists('get_app_setting')) {
-        require_once dirname(__DIR__) . '/bootstrap.php';
+    require_once dirname(__DIR__) . '/Services/webpush.php';
+
+    $publicKey = webpush_vapid_public_key();
+    if ($publicKey === '') {
+        mobile_api_response(false, ['vapid_public_key' => ''], 'Kunci VAPID belum siap di server.', 500);
     }
-    $publicKey = (string)get_app_setting('vapid_public_key', '');
     mobile_api_response(true, ['vapid_public_key' => $publicKey], '');
 }
 

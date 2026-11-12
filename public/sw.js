@@ -1,6 +1,6 @@
 // E-Raport KumerBot — Service Worker
 // Versi cache: update string ini setiap deploy besar agar browser refresh cache
-const CACHE_VERSION = 'eraport-v2';
+const CACHE_VERSION = 'eraport-v3';
 const OFFLINE_PAGE  = new URL('offline.html', self.location.href).href;
 
 // Aset yang dicache saat SW di-install
