@@ -78,6 +78,7 @@ function render_header(string $title): void
             'backup-restore' => ['Backup dan Restore', 'backup-restore', 'hard-drive'],
             'telegram' => ['Bot Telegram', 'telegram', 'send'],
             'whatsapp' => ['WhatsApp Report', 'whatsapp', 'message-circle'],
+            'notif-test' => ['Tes Notifikasi', 'notif-test', 'bell'],
         ],
         'Administrasi' => [
             'bulk-delete' => ['Hapus Data Massal', 'bulk-delete', 'trash-2'],
@@ -151,7 +152,7 @@ function render_header(string $title): void
             'tema-kokurikuler', 'kegiatan-kokurikuler', 'kelompok-kokurikuler', 'input-kelulusan',
             'import-nomor-ijazah', 'setting-transkrip', 'setting-skl', 'mapping-mapel-skl',
             'input-nilai-skl', 'backup-restore', 'whatsapp', 'users',
-            'import-bulk', 'bulk-delete', 'violation-rules', 'teacher-attendance', 'assignments',
+            'import-bulk', 'bulk-delete', 'violation-rules', 'teacher-attendance', 'assignments', 'notif-test',
         ] as $adminPage) {
             foreach ($menuGroups as &$groupItems) {
                 unset($groupItems[$adminPage]);
