@@ -13,15 +13,15 @@ function page_notif_test(): void
     render_header('Tes Notifikasi Aplikasi');
 
     $configured = fcm_is_configured();
-    $users = [];
-    if (table_exists('fcm_tokens')) {
-        $users = fetch_all(
-            'SELECT u.*, (SELECT COUNT(*) FROM fcm_tokens ft WHERE ft.user_id = u.id) AS devices
-             FROM users u
-             WHERE u.active = 1
-             ORDER BY devices DESC, u.id ASC'
-        );
-    }
+    $tokensReady = table_exists('fcm_tokens');
+    $users = fetch_all(
+        $tokensReady
+            ? 'SELECT u.*, (SELECT COUNT(*) FROM fcm_tokens ft WHERE ft.user_id = u.id) AS devices
+               FROM users u
+               WHERE u.active = 1
+               ORDER BY devices DESC, u.id ASC'
+            : 'SELECT u.*, 0 AS devices FROM users u WHERE u.active = 1 ORDER BY u.id ASC'
+    );
     ?>
     <section class="panel">
         <?php panel_title('Status FCM'); ?>
@@ -64,7 +64,10 @@ function page_notif_test(): void
                 </tr>
             <?php endforeach; ?>
             <?php if (!$users): ?>
-                <tr><td colspan="6">Belum ada data user, atau tabel fcm_tokens belum dibuat.</td></tr>
+                <tr><td colspan="6">Belum ada user aktif.</td></tr>
+            <?php endif; ?>
+            <?php if (!$tokensReady): ?>
+                <tr><td colspan="6" style="color:#b45309;">Tabel fcm_tokens belum ada di database ini. Jalankan <code>php tools/install.php</code> sekali (atau deploy migrasi terbaru), lalu muat ulang halaman.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>
