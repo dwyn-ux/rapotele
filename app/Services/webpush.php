@@ -424,6 +424,12 @@ function webpush_send_to_user(
         } catch (Throwable) {}
     }
 
+    // Kirim juga ke app mobile (FCM)
+    require_once __DIR__ . '/fcm.php';
+    $fcm = fcm_send_to_user($userId, $title, $body, $url, $type, $tag);
+    $sent   += (int)$fcm['sent'];
+    $failed += (int)$fcm['failed'];
+
     return ['sent' => $sent, 'failed' => $failed, 'skipped' => 0];
 }
 
@@ -470,6 +476,12 @@ function webpush_send_to_all_teachers(
         $result = webpush_send($sub, $title, $body, $url, $type, $tag);
         $result['ok'] ? $sent++ : $failed++;
     }
+
+    // Kirim juga ke app mobile (FCM)
+    require_once __DIR__ . '/fcm.php';
+    $fcm = fcm_send_to_all_teachers($title, $body, $url, $type, $tag);
+    $sent   += (int)$fcm['sent'];
+    $failed += (int)$fcm['failed'];
 
     return ['sent' => $sent, 'failed' => $failed];
 }

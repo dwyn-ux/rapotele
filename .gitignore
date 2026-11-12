@@ -42,3 +42,8 @@ app/storage/uploads/*
 *.apk
 public/downloads/*.apk
 nul
+
+# Firebase / FCM (rahasia, jangan di-commit)
+/storage/fcm-service-account.json
+/storage/*service-account*.json
+/mobile/android/app/google-services.json

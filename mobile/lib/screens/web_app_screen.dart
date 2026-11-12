@@ -4,6 +4,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
+import '../services/fcm_service.dart';
 
 class WebAppScreen extends StatefulWidget {
   const WebAppScreen({super.key});
@@ -55,12 +56,34 @@ class _WebAppScreenState extends State<WebAppScreen> {
           },
           onPageFinished: (String url) async {
             final title = await _controller.getTitle();
+            if (!mounted) return;
             setState(() {
               _isLoading = false;
               if (title != null && title.isNotEmpty) {
                 _currentTitle = title;
               }
             });
+
+            // Ambil api-token dari meta tag halaman web, lalu daftarkan token FCM ke server
+            try {
+              final raw = await _controller.runJavaScriptReturningResult(
+                "(document.querySelector('meta[name=\"api-token\"]')||{}).content||''",
+              );
+              var apiToken = raw.toString();
+              if (apiToken.startsWith('"') && apiToken.endsWith('"') && apiToken.length >= 2) {
+                apiToken = apiToken.substring(1, apiToken.length - 1);
+              }
+              if (apiToken == 'null') apiToken = '';
+              await FcmService().onWebSession(apiToken);
+            } catch (e) {
+              debugPrint('Baca api-token gagal: $e');
+            }
+
+            // Notifikasi FCM yang membuka app saat tertutup
+            final pending = FcmService().takeInitialUrl();
+            if (pending != null && pending.isNotEmpty) {
+              _navigateToPage(pending);
+            }
           },
           onWebResourceError: (WebResourceError error) {
             debugPrint('WebView Error: ${error.errorCode} - ${error.description}');

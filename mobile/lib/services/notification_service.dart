@@ -14,6 +14,10 @@ class NotificationService {
   final Set<String> _notifiedIds = {};
   Timer? _periodicTimer;
 
+  /// Jika true, pengingat harian & jadwal dikirim server lewat FCM,
+  /// jadi timer lokal tidak perlu menampilkannya lagi (hindari notifikasi dobel).
+  bool fcmActive = false;
+
   static const String channelScheduleId = 'erapot_schedule_channel';
   static const String channelDailyId = 'erapot_daily_channel';
 
@@ -22,7 +26,7 @@ class NotificationService {
       StreamController<Map<String, dynamic>>.broadcast();
 
   Future<void> init() async {
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit = AndroidInitializationSettings('@drawable/ic_stat_notification');
     const initSettings = InitializationSettings(android: androidInit);
 
     await _plugin.initialize(
@@ -44,6 +48,24 @@ class NotificationService {
     }
 
     startPeriodicChecker();
+  }
+
+  /// Buat channel Android agar push FCM (saat app tertutup) tampil dengan prioritas tinggi.
+  Future<void> ensureChannels() async {
+    final androidImpl = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (androidImpl == null) return;
+    await androidImpl.createNotificationChannel(const AndroidNotificationChannel(
+      channelScheduleId,
+      'Jadwal & KBM',
+      description: 'Notifikasi jadwal pelajaran, presensi dan jurnal',
+      importance: Importance.max,
+    ));
+    await androidImpl.createNotificationChannel(const AndroidNotificationChannel(
+      channelDailyId,
+      'Pengingat Harian',
+      description: 'Pengingat presensi dan jurnal harian',
+      importance: Importance.max,
+    ));
   }
 
   Future<Map<String, dynamic>?> getInitialNotificationPayload() async {
@@ -107,7 +129,7 @@ class NotificationService {
     final dayOfWeek = now.weekday; // 1 = Monday, 7 = Sunday
 
     // ── 1. Daily Morning Attendance Reminder (Senin - Sabtu, 06:40 - 07:15) ──
-    if (dayOfWeek <= 6 && now.hour == 6 && now.minute >= 40 && now.minute <= 55) {
+    if (!fcmActive && dayOfWeek <= 6 && now.hour == 6 && now.minute >= 40 && now.minute <= 55) {
       final morningKey = 'morning-absensi-$todayStr';
       if (!_notifiedIds.contains(morningKey)) {
         _notifiedIds.add(morningKey);
@@ -123,7 +145,7 @@ class NotificationService {
     }
 
     // ── 2. Daily Afternoon Journal Reminder (Senin - Sabtu, 13:30 - 14:15) ──
-    if (dayOfWeek <= 6 && now.hour == 13 && now.minute >= 30 && now.minute <= 50) {
+    if (!fcmActive && dayOfWeek <= 6 && now.hour == 13 && now.minute >= 30 && now.minute <= 50) {
       final journalKey = 'afternoon-journal-$todayStr';
       if (!_notifiedIds.contains(journalKey)) {
         _notifiedIds.add(journalKey);
@@ -152,6 +174,7 @@ class NotificationService {
         }
 
         final shouldAlert = (item.type == 'schedule' &&
+                !fcmActive &&
                 (item.isStartingSoon || item.isEndingSoon || item.isActive || item.minutesRemaining <= 15)) ||
             (item.type == 'violation') ||
             (item.type == 'attendance');

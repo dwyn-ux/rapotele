@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'services/api_service.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'services/notification_service.dart';
+import 'services/fcm_service.dart';
 import 'screens/web_app_screen.dart';
+
+/// Handler pesan FCM saat app di background/tertutup. Harus top-level.
+/// Pesan dengan blok `notification` otomatis ditampilkan Android di status bar.
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,6 +23,10 @@ void main() async {
   // Initialize persistent API & Notification services
   await ApiService().init();
   await NotificationService().init();
+
+  // Firebase Cloud Messaging (push saat app tertutup)
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  await FcmService().init();
 
   runApp(const ERaporMobileApp());
 }

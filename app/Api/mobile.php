@@ -266,6 +266,14 @@ function mobile_api_dispatch(): void
                 mobile_api_handle_send_push_test();
                 break;
 
+            case 'save_fcm_token':
+                mobile_api_handle_save_fcm_token();
+                break;
+
+            case 'delete_fcm_token':
+                mobile_api_handle_delete_fcm_token();
+                break;
+
             case 'vapid_public_key':
                 mobile_api_handle_vapid_public_key();
                 break;
@@ -1667,6 +1675,60 @@ function mobile_api_handle_delete_push_subscription(): void
         );
         mobile_api_response(true, [], 'Subscription dihapus.');
     }
+}
+
+function mobile_api_handle_save_fcm_token(): void
+{
+    $user = mobile_api_require_auth();
+
+    $token    = trim((string)($_POST['token'] ?? ''));
+    $platform = substr(trim((string)($_POST['platform'] ?? 'android')), 0, 20);
+
+    if ($token === '' || strlen($token) > 255) {
+        mobile_api_response(false, [], 'Token FCM tidak valid.', 422);
+    }
+
+    if (!table_exists('fcm_tokens') && function_exists('run_migrations')) {
+        run_migrations();
+    }
+    if (!table_exists('fcm_tokens')) {
+        mobile_api_response(false, [], 'Tabel fcm_tokens belum ada. Jalankan install.php.', 503);
+    }
+
+    $userId   = (int)$user['id'];
+    $existing = fetch_one('SELECT id, user_id FROM fcm_tokens WHERE token = ?', [$token]);
+
+    if ($existing) {
+        // Token sama bisa berpindah akun (login ganti user di HP yang sama)
+        execute_sql(
+            'UPDATE fcm_tokens SET user_id = ?, platform = ?, last_used_at = ? WHERE id = ?',
+            [$userId, $platform, date('Y-m-d H:i:s'), (int)$existing['id']]
+        );
+        mobile_api_response(true, ['action' => 'updated'], 'Token FCM diperbarui.');
+    }
+
+    execute_sql(
+        'INSERT INTO fcm_tokens (user_id, token, platform, created_at) VALUES (?, ?, ?, ?)',
+        [$userId, $token, $platform, date('Y-m-d H:i:s')]
+    );
+    mobile_api_response(true, ['action' => 'created'], 'Token FCM disimpan.');
+}
+
+function mobile_api_handle_delete_fcm_token(): void
+{
+    $user  = mobile_api_require_auth();
+    $token = trim((string)($_POST['token'] ?? ''));
+
+    if (!table_exists('fcm_tokens')) {
+        mobile_api_response(true, [], 'Tidak ada token.');
+    }
+
+    if ($token === '') {
+        execute_sql('DELETE FROM fcm_tokens WHERE user_id = ?', [(int)$user['id']]);
+    } else {
+        execute_sql('DELETE FROM fcm_tokens WHERE user_id = ? AND token = ?', [(int)$user['id'], $token]);
+    }
+    mobile_api_response(true, [], 'Token FCM dihapus.');
 }
 
 function mobile_api_handle_send_push_test(): void

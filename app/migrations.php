@@ -1030,6 +1030,15 @@ function run_migrations_locked(): void
             last_used_at DATETIME NULL
         )$engine",
 
+        "CREATE TABLE IF NOT EXISTS fcm_tokens (
+            id $pk,
+            user_id INT NOT NULL,
+            token VARCHAR(255) NOT NULL UNIQUE,
+            platform VARCHAR(20) NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_used_at DATETIME NULL
+        )$engine",
+
         "CREATE TABLE IF NOT EXISTS dapodik_sync_logs (
             id $pk,
             mode VARCHAR(40) NOT NULL,
