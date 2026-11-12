@@ -1679,17 +1679,57 @@ function mobile_api_handle_send_push_test(): void
         mobile_api_response(false, [], 'VAPID keys belum di-generate. Buka halaman Pengaturan Push Notifikasi.', 400);
     }
 
+    $type = trim((string)($_POST['type'] ?? $_GET['type'] ?? 'info'));
+    if ($type === 'jadwal') {
+        $teacherId = (int)($user['teacher_id'] ?? 0);
+        $sampleSubj  = 'Matematika';
+        $sampleClass = 'Kelas 7A';
+        $sampleTime  = date('H:i', strtotime('+10 minutes'));
+
+        if ($teacherId > 0 && table_exists('lesson_schedules')) {
+            $sc = fetch_one(
+                'SELECT ls.*, c.name AS class_name, s.name AS subject_name 
+                 FROM lesson_schedules ls 
+                 JOIN classes c ON c.id = ls.class_id 
+                 JOIN subjects s ON s.id = ls.subject_id 
+                 WHERE ls.teacher_id = ? 
+                 ORDER BY ls.day_of_week, ls.start_time 
+                 LIMIT 1',
+                [$teacherId]
+            );
+            if ($sc) {
+                $sampleSubj  = (string)($sc['subject_name'] ?? 'Pelajaran');
+                $sampleClass = 'Kelas ' . ($sc['class_name'] ?? '');
+                $sampleTime  = !empty($sc['start_time']) ? substr((string)$sc['start_time'], 0, 5) : $sampleTime;
+            }
+        }
+
+        $title = '⏰ Pengingat Mengajar (10 Menit Lagi)';
+        $body  = $sampleSubj . ' di ' . $sampleClass . ' mulai pukul ' . $sampleTime . '.';
+        $url   = '/?page=jadwal';
+        $tag   = 'test-jadwal';
+    } else {
+        $title = '🔔 Test Notifikasi';
+        $body  = 'Notifikasi Web Push berhasil! E-Raport siap kirim pengingat absensi dan jurnal ke perangkat Anda.';
+        $url   = '/?page=dashboard';
+        $tag   = 'test';
+        $type  = 'info';
+    }
+
     $result = webpush_send_to_user(
         (int)$user['id'],
-        '🔔 Test Notifikasi',
-        'Notifikasi Web Push berhasil! E-Raport siap kirim pengingat absensi dan jurnal ke perangkat Anda.',
-        '/?page=dashboard',
-        'info',
-        'test'
+        $title,
+        $body,
+        $url,
+        $type,
+        $tag
     );
 
     if ($result['sent'] > 0) {
-        mobile_api_response(true, $result, 'Notifikasi test berhasil dikirim ke ' . $result['sent'] . ' perangkat.');
+        $msg = $type === 'jadwal'
+            ? 'Notifikasi pengingat jadwal berhasil dikirim ke ' . $result['sent'] . ' perangkat.'
+            : 'Notifikasi test berhasil dikirim ke ' . $result['sent'] . ' perangkat.';
+        mobile_api_response(true, $result, $msg);
     } elseif ($result['failed'] > 0) {
         mobile_api_response(false, $result, 'Gagal mengirim notifikasi. Pastikan browser sudah mengizinkan notifikasi.', 500);
     } else {

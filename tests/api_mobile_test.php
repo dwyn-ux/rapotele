@@ -81,5 +81,18 @@ assert(is_array($decoded) && ($decoded['ok'] ?? false) === true, 'VAPID public k
 assert(!empty($decoded['vapid_public_key']), 'VAPID endpoint should return non-empty vapid_public_key');
 echo "✔ VAPID endpoint JSON dispatch passed.\n";
 
+// 8. Test send_push_test handler with type=jadwal
+$_SESSION['user_id'] = 2; // test admin user
+$_POST['type'] = 'jadwal';
+ob_start();
+try {
+    mobile_api_handle_send_push_test();
+} catch (\Throwable $e) {}
+$output = ob_get_clean();
+$decoded = json_decode((string)$output, true);
+assert(is_array($decoded), 'send_push_test should return JSON');
+assert(isset($decoded['ok']), 'send_push_test should have ok field');
+echo "✔ send_push_test with type=jadwal passed.\n";
+
 echo "All Mobile API tests passed successfully!\n";
 

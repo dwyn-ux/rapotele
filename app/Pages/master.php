@@ -1651,6 +1651,10 @@ function page_profile(): void
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                     Kirim Test Notifikasi
                 </button>
+                <button type="button" id="pwa-btn-test-jadwal" class="button" style="display:none">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    ⏰ Test Pengingat Jadwal
+                </button>
                 <button type="button" id="pwa-btn-disable" class="button" style="display:none;color:#ef4444;border-color:#ef4444">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M17 17H3s3-2 3-9a4 4 0 0 1 .88-2.5M9.03 4.5a4 4 0 0 1 7.97 1.5c0 2.5-.89 4.17-1.69 5.22"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                     Nonaktifkan
@@ -1677,11 +1681,12 @@ function page_profile(): void
 
     <script>
     (function() {
-        const badge   = document.getElementById('pwa-push-badge');
-        const btnEn   = document.getElementById('pwa-btn-enable');
-        const btnTest = document.getElementById('pwa-btn-test');
-        const btnDis  = document.getElementById('pwa-btn-disable');
-        const info    = document.getElementById('pwa-push-info');
+        const badge         = document.getElementById('pwa-push-badge');
+        const btnEn         = document.getElementById('pwa-btn-enable');
+        const btnTest       = document.getElementById('pwa-btn-test');
+        const btnTestJadwal = document.getElementById('pwa-btn-test-jadwal');
+        const btnDis        = document.getElementById('pwa-btn-disable');
+        const info          = document.getElementById('pwa-push-info');
 
         function showInfo(msg, isError) {
             info.style.display = 'block';
@@ -1708,9 +1713,10 @@ function page_profile(): void
             if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
                 setBadge('unsupport');
                 showInfo('Browser ini tidak mendukung Web Push. Gunakan Chrome / Edge terbaru.', true);
-                btnEn.style.display   = 'none';
-                btnTest.style.display = 'none';
-                btnDis.style.display  = 'none';
+                btnEn.style.display         = 'none';
+                btnTest.style.display       = 'none';
+                btnTestJadwal.style.display = 'none';
+                btnDis.style.display        = 'none';
                 return;
             }
 
@@ -1718,9 +1724,10 @@ function page_profile(): void
             if (perm === 'denied') {
                 setBadge('denied');
                 showInfo('Izin notifikasi ditolak di browser. Buka pengaturan browser/situs untuk mengizinkan notifikasi.', true);
-                btnEn.style.display   = 'none';
-                btnTest.style.display = 'none';
-                btnDis.style.display  = 'none';
+                btnEn.style.display         = 'none';
+                btnTest.style.display       = 'none';
+                btnTestJadwal.style.display = 'none';
+                btnDis.style.display        = 'none';
                 return;
             }
 
@@ -1730,14 +1737,16 @@ function page_profile(): void
                 const sub = await reg.pushManager.getSubscription();
                 if (perm === 'granted' && sub) {
                     setBadge('active');
-                    btnEn.style.display   = 'none';
-                    btnTest.style.display = 'inline-flex';
-                    btnDis.style.display  = 'inline-flex';
+                    btnEn.style.display         = 'none';
+                    btnTest.style.display       = 'inline-flex';
+                    btnTestJadwal.style.display = 'inline-flex';
+                    btnDis.style.display        = 'inline-flex';
                 } else {
                     setBadge('inactive');
-                    btnEn.style.display   = 'inline-flex';
-                    btnTest.style.display = 'none';
-                    btnDis.style.display  = 'none';
+                    btnEn.style.display         = 'inline-flex';
+                    btnTest.style.display       = 'none';
+                    btnTestJadwal.style.display = 'none';
+                    btnDis.style.display        = 'none';
                 }
             } catch (err) {
                 setBadge('inactive');
@@ -1778,6 +1787,23 @@ function page_profile(): void
             } finally {
                 btnTest.disabled    = false;
                 btnTest.textContent = 'Kirim Test Notifikasi';
+            }
+        });
+
+        btnTestJadwal.addEventListener('click', async () => {
+            btnTestJadwal.disabled    = true;
+            btnTestJadwal.textContent = 'Mengirim...';
+            try {
+                const tokenMeta = document.querySelector('meta[name="api-token"]');
+                const headers   = tokenMeta ? { 'X-Auth-Token': tokenMeta.content } : {};
+                const resp = await fetch('<?= e(app_url('api.php?action=send_push_test&type=jadwal')) ?>', { method: 'POST', headers });
+                const data = await resp.json().catch(() => ({ ok: false, message: 'Respon server tidak valid' }));
+                showInfo(data.ok ? '✅ ' + data.message : '❌ ' + (data.message || 'Gagal mengirim pengingat jadwal.'), !data.ok);
+            } catch (e) {
+                showInfo('❌ Gagal menghubungi server: ' + (e.message || e), true);
+            } finally {
+                btnTestJadwal.disabled    = false;
+                btnTestJadwal.textContent = '⏰ Test Pengingat Jadwal';
             }
         });
 
