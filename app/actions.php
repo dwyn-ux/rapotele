@@ -86,4 +86,5 @@ return [
     'import_siswa_dapodik_validate' => 'action_import_siswa_dapodik_validate',
     'import_siswa_dapodik_confirm' => 'action_import_siswa_dapodik_confirm',
     'bulk_delete' => 'action_bulk_delete',
+    'send_test_notification' => 'action_send_test_notification',
 ];

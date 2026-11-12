@@ -93,6 +93,7 @@ return [
         'student-documents' => 'page_student_documents',
         'student-document-download' => 'page_student_document_download',
         'telegram' => 'page_telegram',
+        'notif-test' => 'page_notif_test',
         'export-csv' => 'page_export_csv',
         'bulk-delete' => 'page_bulk_delete',
     ],

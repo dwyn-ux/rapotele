@@ -392,6 +392,26 @@ function schedule_log_reminder(array $row, string $date, string $startTime, int 
     );
 }
 
+/**
+ * Kirim notifikasi ke aplikasi mobile (FCM) untuk semua akun aktif milik satu guru.
+ * Mengembalikan true jika minimal satu perangkat berhasil dikirimi.
+ */
+function schedule_push_to_teacher(int $teacherId, string $title, string $body, string $url = '/', string $type = 'jadwal', string $tag = ''): bool
+{
+    require_once __DIR__ . '/fcm.php';
+    if (!function_exists('fcm_is_configured') || !fcm_is_configured()) {
+        return false;
+    }
+
+    $sent = 0;
+    foreach (fetch_all('SELECT id FROM users WHERE teacher_id = ? AND active = 1', [$teacherId]) as $user) {
+        $result = fcm_send_to_user((int)$user['id'], $title, $body, $url, $type, $tag);
+        $sent += (int)($result['sent'] ?? 0);
+    }
+
+    return $sent > 0;
+}
+
 function schedule_send_due_reminders(?DateTimeImmutable $now = null, ?int $minutesBefore = null): array
 {
     schedule_require_reminder_logs();
@@ -431,37 +451,18 @@ function schedule_send_due_reminders(?DateTimeImmutable $now = null, ?int $minut
         }
 
         $remainingMinutes = (int)ceil($diffSeconds / 60);
-        $message = schedule_reminder_message($row, max(0, $remainingMinutes));
-        $sentAny = false;
-
-        // 1. Kirim via Telegram jika terhubung
-        if ($hasToken && trim((string)($row['teacher_chat_id'] ?? '')) !== '') {
-            try {
-                telegram_send_message((string)$row['teacher_chat_id'], $message);
-                $sentAny = true;
-            } catch (Throwable $e) {
-                log_exception($e);
-            }
-        }
-
-        // 2. Kirim via Web Push ke HP / Browser Guru (PWA status bar)
-        require_once dirname(__DIR__) . '/Services/webpush.php';
-        if (function_exists('webpush_send_to_teacher')) {
-            $pushTitle = '⏰ Pengingat Mengajar (' . max(1, $remainingMinutes) . ' Menit Lagi)';
-            $pushBody  = ($row['subject_name'] ?? 'Mata Pelajaran') . ' di kelas ' . ($row['class_name'] ?? '') . ' mulai pukul ' . substr($startTime, 0, 5) . '.';
-            $pushRes   = webpush_send_to_teacher((int)$row['teacher_id'], $pushTitle, $pushBody, '/?page=jadwal', 'jadwal', 'jadwal-' . $row['id']);
-            if (!empty($pushRes['sent'])) {
-                $sentAny = true;
-            }
-        }
+        // Hanya notifikasi aplikasi mobile (FCM)
+        $pushTitle = '⏰ Pengingat Mengajar (' . max(1, $remainingMinutes) . ' Menit Lagi)';
+        $pushBody  = ($row['subject_name'] ?? 'Mata Pelajaran') . ' di kelas ' . ($row['class_name'] ?? '') . ' mulai pukul ' . $startTime . '.';
+        $message   = $pushTitle . ' - ' . $pushBody;
+        $sentAny   = schedule_push_to_teacher((int)$row['teacher_id'], $pushTitle, $pushBody, '/?page=jadwal', 'jadwal', 'jadwal-' . $row['id']);
 
         if ($sentAny) {
             schedule_log_reminder($row, $date, $startTime, $minutesBefore, $message);
             $result['sent']++;
         } else {
-            if (!$hasToken && trim((string)($row['teacher_chat_id'] ?? '')) === '') {
-                $result['skipped_no_chat']++;
-            }
+            // Belum ada perangkat terdaftar atau FCM belum siap; akan dicoba lagi di menit berikutnya
+            $result['skipped_no_chat']++;
         }
     }
 
@@ -554,28 +555,13 @@ function schedule_send_morning_reminders(?DateTimeImmutable $now = null): array
         $lines[] = 'Selamat bekerja! Semoga lancar 🙏';
 
         $message = implode("\n", $lines);
-        $sentAny = false;
 
-        if ($hasToken && trim((string)($teacher['chat_id'] ?? '')) !== '') {
-            try {
-                telegram_send_message((string)$teacher['chat_id'], $message);
-                $sentAny = true;
-            } catch (Throwable $e) {
-                log_exception($e);
-            }
-        }
-
-        require_once dirname(__DIR__) . '/Services/webpush.php';
-        if (function_exists('webpush_send_to_teacher')) {
-            $pushTitle = '☀️ Jadwal Mengajar Hari Ini (' . count($schedules) . ' Kelas)';
-            $firstSubj = $schedules[0]['subject_name'] ?? 'Pelajaran';
-            $firstTime = substr((string)($schedules[0]['start_time'] ?? ''), 0, 5);
-            $pushBody  = 'Hari ini Anda mengajar ' . count($schedules) . ' kelas, dimulai ' . $firstSubj . ($firstTime ? ' pukul ' . $firstTime : '') . '.';
-            $pushRes   = webpush_send_to_teacher((int)$teacher['id'], $pushTitle, $pushBody, '/?page=jadwal', 'jadwal', 'morning-' . $date);
-            if (!empty($pushRes['sent'])) {
-                $sentAny = true;
-            }
-        }
+        // Hanya notifikasi aplikasi mobile (FCM)
+        $pushTitle = '☀️ Jadwal Mengajar Hari Ini (' . count($schedules) . ' Kelas)';
+        $firstSubj = $schedules[0]['subject_name'] ?? 'Pelajaran';
+        $firstTime = substr((string)($schedules[0]['start_time'] ?? ''), 0, 5);
+        $pushBody  = 'Hari ini Anda mengajar ' . count($schedules) . ' kelas, dimulai ' . $firstSubj . ($firstTime ? ' pukul ' . $firstTime : '') . '.';
+        $sentAny   = schedule_push_to_teacher((int)$teacher['id'], $pushTitle, $pushBody, '/?page=jadwal', 'jadwal', 'morning-' . $date);
 
         if ($sentAny) {
             schedule_log_daily_summary((int)$teacher['id'], 'morning', $date, $message);
@@ -645,28 +631,13 @@ function schedule_send_afternoon_reminders(?DateTimeImmutable $now = null): arra
         $lines[] = 'Semangat mengajar! 💪';
 
         $message = implode("\n", $lines);
-        $sentAny = false;
 
-        if ($hasToken && trim((string)($teacher['chat_id'] ?? '')) !== '') {
-            try {
-                telegram_send_message((string)$teacher['chat_id'], $message);
-                $sentAny = true;
-            } catch (Throwable $e) {
-                log_exception($e);
-            }
-        }
-
-        require_once dirname(__DIR__) . '/Services/webpush.php';
-        if (function_exists('webpush_send_to_teacher')) {
-            $pushTitle = '📋 Jadwal Mengajar Besok (' . count($schedules) . ' Kelas)';
-            $firstSubj = $schedules[0]['subject_name'] ?? 'Pelajaran';
-            $firstTime = substr((string)($schedules[0]['start_time'] ?? ''), 0, 5);
-            $pushBody  = 'Besok Anda mengajar ' . count($schedules) . ' kelas, dimulai ' . $firstSubj . ($firstTime ? ' pukul ' . $firstTime : '') . '.';
-            $pushRes   = webpush_send_to_teacher((int)$teacher['id'], $pushTitle, $pushBody, '/?page=jadwal', 'jadwal', 'afternoon-' . $date);
-            if (!empty($pushRes['sent'])) {
-                $sentAny = true;
-            }
-        }
+        // Hanya notifikasi aplikasi mobile (FCM)
+        $pushTitle = '📋 Jadwal Mengajar Besok (' . count($schedules) . ' Kelas)';
+        $firstSubj = $schedules[0]['subject_name'] ?? 'Pelajaran';
+        $firstTime = substr((string)($schedules[0]['start_time'] ?? ''), 0, 5);
+        $pushBody  = 'Besok Anda mengajar ' . count($schedules) . ' kelas, dimulai ' . $firstSubj . ($firstTime ? ' pukul ' . $firstTime : '') . '.';
+        $sentAny   = schedule_push_to_teacher((int)$teacher['id'], $pushTitle, $pushBody, '/?page=jadwal', 'jadwal', 'afternoon-' . $date);
 
         if ($sentAny) {
             schedule_log_daily_summary((int)$teacher['id'], 'afternoon', $date, $message);

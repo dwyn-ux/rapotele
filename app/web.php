@@ -35,3 +35,4 @@ require_once $base . '/Pages/export.php';
 require_once $base . '/Pages/import_bulk.php';
 require_once $base . '/Pages/admin.php';
 require_once $base . '/Pages/violations.php';
+require_once $base . '/Pages/notif_test.php';
