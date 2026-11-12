@@ -205,6 +205,11 @@ function render_header(string $title): void
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="default">
         <meta name="apple-mobile-web-app-title" content="<?= e(config('app_name')) ?>">
+        <?php if ($currUser = current_user()):
+            require_once dirname(__DIR__) . '/Api/mobile.php';
+        ?>
+            <meta name="api-token" content="<?= e(mobile_api_generate_token((int)$currUser['id'])) ?>">
+        <?php endif; ?>
         <title><?= e($title) ?> — <?= e(config('app_name')) ?></title>
         <link rel="manifest" href="<?= e(app_url('manifest.php')) ?>">
         <link rel="icon" type="image/png" sizes="192x192" href="<?= e(app_url('icon-192.png')) ?>">
@@ -389,8 +394,8 @@ function render_footer(): void
         'use strict';
         if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
 
-        const VAPID_KEY_URL  = '/api?action=vapid_public_key';
-        const SUB_SAVE_URL   = '/api?action=save_push_subscription';
+        const VAPID_KEY_URL  = '<?= e(app_url('api?action=vapid_public_key')) ?>';
+        const SUB_SAVE_URL   = '<?= e(app_url('api?action=save_push_subscription')) ?>';
         const TOKEN_KEY      = 'eraport_push_subscribed';
 
         function urlBase64ToUint8Array(base64String) {
@@ -400,46 +405,57 @@ function render_footer(): void
             return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
         }
 
+        async function doSubscribe() {
+            const reg = await navigator.serviceWorker.ready;
+
+            // Ambil VAPID public key dari server
+            const keyResp = await fetch(VAPID_KEY_URL);
+            if (!keyResp.ok) {
+                return { ok: false, message: 'Gagal mengambil kunci VAPID dari server.' };
+            }
+            const keyData = await keyResp.json().catch(() => ({}));
+            const vapidKey = keyData.vapid_public_key;
+            if (!vapidKey) {
+                return { ok: false, message: 'Kunci VAPID belum siap di server.' };
+            }
+
+            // Cek apakah sudah punya subscription atau buat baru
+            let sub = await reg.pushManager.getSubscription();
+            if (!sub) {
+                sub = await reg.pushManager.subscribe({
+                    userVisibleOnly:      true,
+                    applicationServerKey: urlBase64ToUint8Array(vapidKey),
+                });
+            }
+
+            // Kirim ke server
+            const subJson = sub.toJSON();
+            const body    = new FormData();
+            body.append('endpoint', subJson.endpoint);
+            body.append('p256dh',   subJson.keys.p256dh);
+            body.append('auth',     subJson.keys.auth);
+
+            // Ambil auth token dari meta (diinject oleh PHP)
+            const tokenMeta = document.querySelector('meta[name="api-token"]');
+            const headers   = tokenMeta ? { 'X-Auth-Token': tokenMeta.content } : {};
+            const saveResp = await fetch(SUB_SAVE_URL, { method: 'POST', headers, body });
+            const saveData = await saveResp.json().catch(() => ({}));
+
+            if (!saveResp.ok || saveData.ok === false) {
+                return { ok: false, message: saveData.message || 'Gagal menyimpan subscription ke server.' };
+            }
+
+            localStorage.setItem(TOKEN_KEY, '1');
+            sessionStorage.setItem(TOKEN_KEY, '1');
+            return { ok: true, message: 'Notifikasi berhasil diaktifkan!' };
+        }
+
         async function trySubscribe() {
-            // Sudah pernah subscribe di sesi ini — skip
-            if (sessionStorage.getItem(TOKEN_KEY)) return;
-
-            const perm = Notification.permission;
-            if (perm === 'denied') return;
-
+            if (Notification.permission !== 'granted') return;
             try {
-                const reg = await navigator.serviceWorker.ready;
-
-                // Ambil VAPID public key dari server
-                const keyResp = await fetch(VAPID_KEY_URL);
-                const keyData = await keyResp.json();
-                const vapidKey = keyData.vapid_public_key;
-                if (!vapidKey) return; // VAPID belum di-generate admin
-
-                // Cek apakah sudah punya subscription
-                let sub = await reg.pushManager.getSubscription();
-                if (!sub) {
-                    if (perm !== 'granted') return; // Jangan auto-prompt, biar user pilih
-                    sub = await reg.pushManager.subscribe({
-                        userVisibleOnly:      true,
-                        applicationServerKey: urlBase64ToUint8Array(vapidKey),
-                    });
-                }
-
-                // Kirim ke server
-                const subJson = sub.toJSON();
-                const body    = new FormData();
-                body.append('endpoint', subJson.endpoint);
-                body.append('p256dh',   subJson.keys.p256dh);
-                body.append('auth',     subJson.keys.auth);
-
-                // Ambil auth token dari meta (diinject oleh PHP)
-                const tokenMeta = document.querySelector('meta[name="api-token"]');
-                const headers   = tokenMeta ? { 'X-Auth-Token': tokenMeta.content } : {};
-                await fetch(SUB_SAVE_URL, { method: 'POST', headers, body });
-                sessionStorage.setItem(TOKEN_KEY, '1');
+                await doSubscribe();
             } catch (e) {
-                // Gagal subscribe — silent, tidak ganggu UI
+                console.warn('Auto-subscribe push notice:', e);
             }
         }
 
@@ -452,15 +468,25 @@ function render_footer(): void
 
         // Expose fungsi global untuk tombol "Aktifkan Notifikasi" di halaman Profil
         window.eraportRequestPush = async function() {
+            if (!('Notification' in window) || !('PushManager' in window)) {
+                return { ok: false, message: 'Browser tidak mendukung Web Push.' };
+            }
+            if (Notification.permission === 'denied') {
+                return { ok: false, message: 'Izin notifikasi ditolak di browser. Buka pengaturan browser untuk mengizinkan.' };
+            }
             const perm = await Notification.requestPermission();
             if (perm !== 'granted') {
-                return { ok: false, message: 'Izin notifikasi ditolak.' };
+                return { ok: false, message: 'Izin notifikasi tidak diberikan.' };
             }
-            await trySubscribe();
-            return { ok: true, message: 'Notifikasi diaktifkan!' };
+            try {
+                return await doSubscribe();
+            } catch (err) {
+                return { ok: false, message: err.message || 'Terjadi kesalahan saat mendaftar push notification.' };
+            }
         };
+
         window.eraportPushEnabled = function() {
-            return Notification.permission === 'granted' && sessionStorage.getItem(TOKEN_KEY) === '1';
+            return Notification.permission === 'granted' && (localStorage.getItem(TOKEN_KEY) === '1' || sessionStorage.getItem(TOKEN_KEY) === '1');
         };
     })();
     </script>
@@ -570,6 +596,11 @@ function render_public_header(string $title): void
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="default">
         <meta name="apple-mobile-web-app-title" content="<?= e(config('app_name')) ?>">
+        <?php if ($currUser = current_user()):
+            require_once dirname(__DIR__) . '/Api/mobile.php';
+        ?>
+            <meta name="api-token" content="<?= e(mobile_api_generate_token((int)$currUser['id'])) ?>">
+        <?php endif; ?>
         <title><?= e($title) ?> — <?= e(config('app_name')) ?></title>
         <link rel="manifest" href="<?= e(app_url('manifest.php')) ?>">
         <link rel="icon" type="image/png" sizes="192x192" href="<?= e(app_url('icon-192.png')) ?>">

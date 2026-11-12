@@ -13,14 +13,52 @@ declare(strict_types=1);
 
 // ─── VAPID Key Management ──────────────────────────────────────────────────────
 
+function webpush_openssl_config_path(): ?string
+{
+    $env = getenv('OPENSSL_CONF');
+    if ($env && file_exists($env)) {
+        return $env;
+    }
+    static $cached = null;
+    if ($cached !== null && file_exists($cached)) {
+        return $cached;
+    }
+    $temp = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'openssl_webpush.cnf';
+    if (!file_exists($temp)) {
+        @file_put_contents($temp, "default_bits = 2048\n[req]\ndistinguished_name = req_dn\n[req_dn]\n");
+    }
+    $cached = $temp;
+    return $cached;
+}
+
 function webpush_vapid_public_key(): string
 {
-    return (string)get_app_setting('vapid_public_key', '');
+    $key = (string)get_app_setting('vapid_public_key', '');
+    if ($key === '') {
+        try {
+            $generated = webpush_generate_vapid_keys();
+            return (string)($generated['public'] ?? '');
+        } catch (Throwable $e) {
+            log_exception($e);
+            return '';
+        }
+    }
+    return $key;
 }
 
 function webpush_vapid_private_key(): string
 {
-    return (string)get_app_setting('vapid_private_key', '');
+    $key = (string)get_app_setting('vapid_private_key', '');
+    if ($key === '') {
+        try {
+            $generated = webpush_generate_vapid_keys();
+            return (string)($generated['private'] ?? '');
+        } catch (Throwable $e) {
+            log_exception($e);
+            return '';
+        }
+    }
+    return $key;
 }
 
 /**
@@ -33,10 +71,16 @@ function webpush_generate_vapid_keys(): array
         throw new RuntimeException('Extension openssl diperlukan untuk VAPID.');
     }
 
-    $key = openssl_pkey_new([
+    $cnf = webpush_openssl_config_path();
+    $configArgs = [
         'curve_name'       => 'prime256v1',
         'private_key_type' => OPENSSL_KEYTYPE_EC,
-    ]);
+    ];
+    if ($cnf) {
+        $configArgs['config'] = $cnf;
+    }
+
+    $key = openssl_pkey_new($configArgs);
 
     if ($key === false) {
         throw new RuntimeException('Gagal generate EC key: ' . openssl_error_string());
@@ -52,7 +96,14 @@ function webpush_generate_vapid_keys(): array
     $y   = str_pad((string)$details['ec']['y'], 32, "\x00", STR_PAD_LEFT);
     $pub = "\x04" . $x . $y;
 
-    openssl_pkey_export($key, $privPem);
+    $exportArgs = [];
+    if ($cnf) {
+        $exportArgs['config'] = $cnf;
+    }
+    openssl_pkey_export($key, $privPem, null, $exportArgs);
+    if (empty($privPem)) {
+        throw new RuntimeException('Gagal export private key: ' . openssl_error_string());
+    }
 
     $publicKey  = webpush_base64url_encode($pub);
     $privateKey = webpush_base64url_encode($privPem);  // simpan PEM agar mudah dipakai
@@ -137,8 +188,19 @@ function webpush_der_to_raw_signature(string $der): string
 function webpush_encrypt_payload(string $payload, string $p256dh, string $auth): array
 {
     $salt       = random_bytes(16);
-    $serverKey  = openssl_pkey_new(['curve_name' => 'prime256v1', 'private_key_type' => OPENSSL_KEYTYPE_EC]);
+    $cnf        = webpush_openssl_config_path();
+    $keyArgs    = ['curve_name' => 'prime256v1', 'private_key_type' => OPENSSL_KEYTYPE_EC];
+    if ($cnf) {
+        $keyArgs['config'] = $cnf;
+    }
+    $serverKey  = openssl_pkey_new($keyArgs);
+    if ($serverKey === false) {
+        throw new RuntimeException('Gagal generate server EC key: ' . openssl_error_string());
+    }
     $serverDetails = openssl_pkey_get_details($serverKey);
+    if ($serverDetails === false || !isset($serverDetails['ec'])) {
+        throw new RuntimeException('Gagal mengambil detail server EC key.');
+    }
 
     $serverX   = str_pad((string)$serverDetails['ec']['x'], 32, "\x00", STR_PAD_LEFT);
     $serverY   = str_pad((string)$serverDetails['ec']['y'], 32, "\x00", STR_PAD_LEFT);
@@ -147,18 +209,24 @@ function webpush_encrypt_payload(string $payload, string $p256dh, string $auth):
     // Decode client public key (browser p256dh)
     $clientPubRaw = webpush_base64url_decode($p256dh);
     $clientKey    = openssl_pkey_get_public(webpush_raw_ec_to_pem($clientPubRaw));
+    if ($clientKey === false) {
+        throw new RuntimeException('Public key subscriber tidak valid.');
+    }
 
     // ECDH shared secret
-    openssl_pkey_export($serverKey, $serverPrivPem);
+    $exportArgs = [];
+    if ($cnf) {
+        $exportArgs['config'] = $cnf;
+    }
+    openssl_pkey_export($serverKey, $serverPrivPem, null, $exportArgs);
     $serverPriv = openssl_pkey_get_private($serverPrivPem);
-    openssl_dh_compute_key($sharedSecret, $clientKey, $serverPriv); // tidak ada di PHP standar
 
-    // Fallback: gunakan ext-openssl ECDH
-    // PHP 7.3+ punya openssl_pkey_derive (tapi tidak semua hosting support)
+    // ext-openssl ECDH
     if (function_exists('openssl_pkey_derive')) {
         $sharedSecret = openssl_pkey_derive($clientKey, $serverKey, 32);
+    } elseif ($serverPriv && function_exists('openssl_dh_compute_key')) {
+        openssl_dh_compute_key($sharedSecret, $clientKey, $serverPriv);
     } else {
-        // Minimal viable: shared secret dari hash kombinasi
         $sharedSecret = hash('sha256', $clientPubRaw . $serverPub . $salt, true);
     }
 
@@ -172,6 +240,9 @@ function webpush_encrypt_payload(string $payload, string $p256dh, string $auth):
 
     $tag       = '';
     $encrypted = openssl_encrypt($padded, 'aes-128-gcm', $cek, OPENSSL_RAW_DATA, $nonce, $tag);
+    if ($encrypted === false) {
+        throw new RuntimeException('Enkripsi AES-128-GCM payload push gagal.');
+    }
 
     return [
         'body'       => $encrypted . $tag,
@@ -336,6 +407,24 @@ function webpush_send_to_user(
     }
 
     return ['sent' => $sent, 'failed' => $failed, 'skipped' => 0];
+}
+
+/**
+ * Kirim push ke satu guru berdasarkan teacher_id.
+ */
+function webpush_send_to_teacher(
+    int    $teacherId,
+    string $title,
+    string $body,
+    string $url  = '/',
+    string $type = 'info',
+    string $tag  = ''
+): array {
+    $user = fetch_one('SELECT id FROM users WHERE teacher_id = ? AND active = 1 ORDER BY id ASC LIMIT 1', [$teacherId]);
+    if (!$user) {
+        return ['sent' => 0, 'failed' => 0, 'skipped' => 1];
+    }
+    return webpush_send_to_user((int)$user['id'], $title, $body, $url, $type, $tag);
 }
 
 /**

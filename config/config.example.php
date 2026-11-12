@@ -63,6 +63,7 @@ return [
 
     'security' => [
         'session_name' => 'ERAPORTSESSID',
+        'session_lifetime' => config_env_int('SESSION_LIFETIME', 30 * 86400),
         'max_upload_bytes' => 10 * 1024 * 1024,
         'max_backup_upload_bytes' => 128 * 1024 * 1024,
         'max_image_upload_bytes' => 2 * 1024 * 1024,

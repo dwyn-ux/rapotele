@@ -1708,31 +1708,38 @@ function page_profile(): void
             if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
                 setBadge('unsupport');
                 showInfo('Browser ini tidak mendukung Web Push. Gunakan Chrome / Edge terbaru.', true);
+                btnEn.style.display   = 'none';
+                btnTest.style.display = 'none';
+                btnDis.style.display  = 'none';
                 return;
             }
 
             const perm = Notification.permission;
             if (perm === 'denied') {
                 setBadge('denied');
-                showInfo('Izin notifikasi ditolak di pengaturan browser. Reset izin notifikasi untuk domain ini di pengaturan browser Anda.', true);
-                btnDis.style.display = 'inline-flex';
+                showInfo('Izin notifikasi ditolak di browser. Buka pengaturan browser/situs untuk mengizinkan notifikasi.', true);
+                btnEn.style.display   = 'none';
+                btnTest.style.display = 'none';
+                btnDis.style.display  = 'none';
                 return;
             }
 
-            if (perm !== 'granted') {
-                setBadge('inactive');
-                btnEn.style.display = 'inline-flex';
-                return;
-            }
-
-            // Cek apakah sudah ada subscription aktif
-            const reg = await navigator.serviceWorker.ready;
-            const sub = await reg.pushManager.getSubscription();
-            if (sub) {
-                setBadge('active');
-                btnTest.style.display   = 'inline-flex';
-                btnDis.style.display    = 'inline-flex';
-            } else {
+            // Cek apakah sudah ada subscription aktif di Service Worker
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                const sub = await reg.pushManager.getSubscription();
+                if (perm === 'granted' && sub) {
+                    setBadge('active');
+                    btnEn.style.display   = 'none';
+                    btnTest.style.display = 'inline-flex';
+                    btnDis.style.display  = 'inline-flex';
+                } else {
+                    setBadge('inactive');
+                    btnEn.style.display   = 'inline-flex';
+                    btnTest.style.display = 'none';
+                    btnDis.style.display  = 'none';
+                }
+            } catch (err) {
                 setBadge('inactive');
                 btnEn.style.display = 'inline-flex';
             }
@@ -1741,24 +1748,33 @@ function page_profile(): void
         btnEn.addEventListener('click', async () => {
             btnEn.disabled = true;
             btnEn.textContent = 'Meminta izin...';
-            const result = await (window.eraportRequestPush ? window.eraportRequestPush() : Promise.resolve({ ok: false, message: 'Belum siap' }));
-            if (result.ok) {
-                showInfo('✅ Notifikasi berhasil diaktifkan!', false);
-            } else {
-                showInfo('❌ ' + result.message, true);
+            try {
+                const result = await (window.eraportRequestPush ? window.eraportRequestPush() : Promise.resolve({ ok: false, message: 'Fungsi notifikasi belum siap.' }));
+                if (result.ok) {
+                    showInfo('✅ ' + (result.message || 'Notifikasi berhasil diaktifkan!'), false);
+                } else {
+                    showInfo('❌ ' + result.message, true);
+                }
+            } catch (err) {
+                showInfo('❌ ' + (err.message || err), true);
+            } finally {
+                btnEn.disabled = false;
+                btnEn.textContent = 'Aktifkan Notifikasi';
+                await checkStatus();
             }
-            await checkStatus();
         });
 
         btnTest.addEventListener('click', async () => {
             btnTest.disabled    = true;
             btnTest.textContent = 'Mengirim...';
             try {
-                const resp = await fetch('/api?action=send_push_test', { method: 'POST' });
-                const data = await resp.json();
-                showInfo(data.ok ? '✅ ' + data.message : '❌ ' + data.message, !data.ok);
+                const tokenMeta = document.querySelector('meta[name="api-token"]');
+                const headers   = tokenMeta ? { 'X-Auth-Token': tokenMeta.content } : {};
+                const resp = await fetch('<?= e(app_url('api?action=send_push_test')) ?>', { method: 'POST', headers });
+                const data = await resp.json().catch(() => ({ ok: false, message: 'Respon server tidak valid' }));
+                showInfo(data.ok ? '✅ ' + data.message : '❌ ' + (data.message || 'Gagal mengirim notifikasi test.'), !data.ok);
             } catch (e) {
-                showInfo('❌ Gagal menghubungi server.', true);
+                showInfo('❌ Gagal menghubungi server: ' + (e.message || e), true);
             } finally {
                 btnTest.disabled    = false;
                 btnTest.textContent = 'Kirim Test Notifikasi';
@@ -1766,18 +1782,28 @@ function page_profile(): void
         });
 
         btnDis.addEventListener('click', async () => {
-            const reg = await navigator.serviceWorker.ready;
-            const sub = await reg.pushManager.getSubscription();
-            if (sub) {
-                const ep = sub.endpoint;
-                await sub.unsubscribe();
-                // Beritahu server
-                const body = new FormData();
-                body.append('endpoint', ep);
-                await fetch('/api?action=delete_push_subscription', { method: 'POST', body });
+            btnDis.disabled = true;
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                const sub = await reg.pushManager.getSubscription();
+                if (sub) {
+                    const ep = sub.endpoint;
+                    await sub.unsubscribe();
+                    const body = new FormData();
+                    body.append('endpoint', ep);
+                    const tokenMeta = document.querySelector('meta[name="api-token"]');
+                    const headers   = tokenMeta ? { 'X-Auth-Token': tokenMeta.content } : {};
+                    await fetch('<?= e(app_url('api?action=delete_push_subscription')) ?>', { method: 'POST', headers, body });
+                }
+                localStorage.removeItem('eraport_push_subscribed');
+                sessionStorage.removeItem('eraport_push_subscribed');
+                showInfo('🔕 Notifikasi dinonaktifkan.', false);
+            } catch (err) {
+                showInfo('❌ Gagal menonaktifkan notifikasi: ' + (err.message || err), true);
+            } finally {
+                btnDis.disabled = false;
+                await checkStatus();
             }
-            showInfo('🔕 Notifikasi dinonaktifkan.', false);
-            checkStatus();
         });
 
         checkStatus();

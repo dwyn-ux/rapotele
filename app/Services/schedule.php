@@ -430,21 +430,39 @@ function schedule_send_due_reminders(?DateTimeImmutable $now = null, ?int $minut
             continue;
         }
 
-        if (trim((string)($row['teacher_chat_id'] ?? '')) === '') {
-            $result['skipped_no_chat']++;
-            continue;
-        }
-
-        if (!$hasToken) {
-            $result['skipped_no_token']++;
-            continue;
-        }
-
         $remainingMinutes = (int)ceil($diffSeconds / 60);
         $message = schedule_reminder_message($row, max(0, $remainingMinutes));
-        telegram_send_message((string)$row['teacher_chat_id'], $message);
-        schedule_log_reminder($row, $date, $startTime, $minutesBefore, $message);
-        $result['sent']++;
+        $sentAny = false;
+
+        // 1. Kirim via Telegram jika terhubung
+        if ($hasToken && trim((string)($row['teacher_chat_id'] ?? '')) !== '') {
+            try {
+                telegram_send_message((string)$row['teacher_chat_id'], $message);
+                $sentAny = true;
+            } catch (Throwable $e) {
+                log_exception($e);
+            }
+        }
+
+        // 2. Kirim via Web Push ke HP / Browser Guru (PWA status bar)
+        require_once dirname(__DIR__) . '/Services/webpush.php';
+        if (function_exists('webpush_send_to_teacher')) {
+            $pushTitle = '⏰ Pengingat Mengajar (' . max(1, $remainingMinutes) . ' Menit Lagi)';
+            $pushBody  = ($row['subject_name'] ?? 'Mata Pelajaran') . ' di kelas ' . ($row['class_name'] ?? '') . ' mulai pukul ' . substr($startTime, 0, 5) . '.';
+            $pushRes   = webpush_send_to_teacher((int)$row['teacher_id'], $pushTitle, $pushBody, '/?page=jadwal', 'jadwal', 'jadwal-' . $row['id']);
+            if (!empty($pushRes['sent'])) {
+                $sentAny = true;
+            }
+        }
+
+        if ($sentAny) {
+            schedule_log_reminder($row, $date, $startTime, $minutesBefore, $message);
+            $result['sent']++;
+        } else {
+            if (!$hasToken && trim((string)($row['teacher_chat_id'] ?? '')) === '') {
+                $result['skipped_no_chat']++;
+            }
+        }
     }
 
     return $result;
@@ -507,10 +525,6 @@ function schedule_send_morning_reminders(?DateTimeImmutable $now = null): array
 
     foreach ($teachers as $teacher) {
         $result['checked']++;
-        if (trim((string)($teacher['chat_id'] ?? '')) === '') {
-            $result['skipped_no_chat']++;
-            continue;
-        }
         if (schedule_daily_summary_already_sent((int)$teacher['id'], 'morning', $date)) {
             $result['skipped_duplicate']++;
             continue;
@@ -540,9 +554,35 @@ function schedule_send_morning_reminders(?DateTimeImmutable $now = null): array
         $lines[] = 'Selamat bekerja! Semoga lancar 🙏';
 
         $message = implode("\n", $lines);
-        telegram_send_message((string)$teacher['chat_id'], $message);
-        schedule_log_daily_summary((int)$teacher['id'], 'morning', $date, $message);
-        $result['sent']++;
+        $sentAny = false;
+
+        if ($hasToken && trim((string)($teacher['chat_id'] ?? '')) !== '') {
+            try {
+                telegram_send_message((string)$teacher['chat_id'], $message);
+                $sentAny = true;
+            } catch (Throwable $e) {
+                log_exception($e);
+            }
+        }
+
+        require_once dirname(__DIR__) . '/Services/webpush.php';
+        if (function_exists('webpush_send_to_teacher')) {
+            $pushTitle = '☀️ Jadwal Mengajar Hari Ini (' . count($schedules) . ' Kelas)';
+            $firstSubj = $schedules[0]['subject_name'] ?? 'Pelajaran';
+            $firstTime = substr((string)($schedules[0]['start_time'] ?? ''), 0, 5);
+            $pushBody  = 'Hari ini Anda mengajar ' . count($schedules) . ' kelas, dimulai ' . $firstSubj . ($firstTime ? ' pukul ' . $firstTime : '') . '.';
+            $pushRes   = webpush_send_to_teacher((int)$teacher['id'], $pushTitle, $pushBody, '/?page=jadwal', 'jadwal', 'morning-' . $date);
+            if (!empty($pushRes['sent'])) {
+                $sentAny = true;
+            }
+        }
+
+        if ($sentAny) {
+            schedule_log_daily_summary((int)$teacher['id'], 'morning', $date, $message);
+            $result['sent']++;
+        } else {
+            $result['skipped_no_chat']++;
+        }
     }
 
     return $result;
@@ -576,10 +616,6 @@ function schedule_send_afternoon_reminders(?DateTimeImmutable $now = null): arra
 
     foreach ($teachers as $teacher) {
         $result['checked']++;
-        if (trim((string)($teacher['chat_id'] ?? '')) === '') {
-            $result['skipped_no_chat']++;
-            continue;
-        }
         if (schedule_daily_summary_already_sent((int)$teacher['id'], 'afternoon', $date)) {
             $result['skipped_duplicate']++;
             continue;
@@ -609,9 +645,35 @@ function schedule_send_afternoon_reminders(?DateTimeImmutable $now = null): arra
         $lines[] = 'Semangat mengajar! 💪';
 
         $message = implode("\n", $lines);
-        telegram_send_message((string)$teacher['chat_id'], $message);
-        schedule_log_daily_summary((int)$teacher['id'], 'afternoon', $date, $message);
-        $result['sent']++;
+        $sentAny = false;
+
+        if ($hasToken && trim((string)($teacher['chat_id'] ?? '')) !== '') {
+            try {
+                telegram_send_message((string)$teacher['chat_id'], $message);
+                $sentAny = true;
+            } catch (Throwable $e) {
+                log_exception($e);
+            }
+        }
+
+        require_once dirname(__DIR__) . '/Services/webpush.php';
+        if (function_exists('webpush_send_to_teacher')) {
+            $pushTitle = '📋 Jadwal Mengajar Besok (' . count($schedules) . ' Kelas)';
+            $firstSubj = $schedules[0]['subject_name'] ?? 'Pelajaran';
+            $firstTime = substr((string)($schedules[0]['start_time'] ?? ''), 0, 5);
+            $pushBody  = 'Besok Anda mengajar ' . count($schedules) . ' kelas, dimulai ' . $firstSubj . ($firstTime ? ' pukul ' . $firstTime : '') . '.';
+            $pushRes   = webpush_send_to_teacher((int)$teacher['id'], $pushTitle, $pushBody, '/?page=jadwal', 'jadwal', 'afternoon-' . $date);
+            if (!empty($pushRes['sent'])) {
+                $sentAny = true;
+            }
+        }
+
+        if ($sentAny) {
+            schedule_log_daily_summary((int)$teacher['id'], 'afternoon', $date, $message);
+            $result['sent']++;
+        } else {
+            $result['skipped_no_chat']++;
+        }
     }
 
     return $result;

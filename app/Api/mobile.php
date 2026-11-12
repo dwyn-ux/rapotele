@@ -102,10 +102,21 @@ function mobile_api_get_request_token(): string
 function mobile_api_authenticated_user(): ?array
 {
     $token = mobile_api_get_request_token();
-    if ($token === '') {
-        return null;
+    if ($token !== '') {
+        $user = mobile_api_verify_token($token);
+        if ($user) {
+            return $user;
+        }
     }
-    return mobile_api_verify_token($token);
+
+    if (function_exists('current_user')) {
+        $sessionUser = current_user();
+        if ($sessionUser) {
+            return $sessionUser;
+        }
+    }
+
+    return null;
 }
 
 function mobile_api_require_auth(): array

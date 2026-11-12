@@ -39,5 +39,34 @@ $authTestUser = mobile_api_authenticated_user();
 assert($authTestUser !== null, 'Authenticated user via Bearer header failed');
 echo "✔ Bearer token extraction passed.\n";
 
+// 5. Test Session fallback in mobile_api_authenticated_user
+unset($_SERVER['HTTP_AUTHORIZATION']);
+$_SESSION['user_id'] = (int)$user['id'];
+$sessionAuthUser = mobile_api_authenticated_user();
+assert($sessionAuthUser !== null && (int)$sessionAuthUser['id'] === (int)$user['id'], 'Session fallback authentication failed');
+echo "✔ Session fallback auth passed.\n";
+
+// 6. Test Web Push VAPID keys and encryption
+require_once dirname(__DIR__) . '/app/Services/webpush.php';
+$vapidPublic = webpush_vapid_public_key();
+assert(!empty($vapidPublic), 'VAPID public key should be auto-generated and non-empty');
+assert(webpush_is_configured() === true, 'Webpush should be configured');
+
+// Test payload encryption with a valid client EC key
+$cnf = webpush_openssl_config_path();
+$clientKeyArgs = ['curve_name' => 'prime256v1', 'private_key_type' => OPENSSL_KEYTYPE_EC];
+if ($cnf) $clientKeyArgs['config'] = $cnf;
+$clientKey = openssl_pkey_new($clientKeyArgs);
+$clientDetails = openssl_pkey_get_details($clientKey);
+$cx = str_pad((string)$clientDetails['ec']['x'], 32, "\x00", STR_PAD_LEFT);
+$cy = str_pad((string)$clientDetails['ec']['y'], 32, "\x00", STR_PAD_LEFT);
+$validP256dh = webpush_base64url_encode("\x04" . $cx . $cy);
+$validAuth   = webpush_base64url_encode(random_bytes(16));
+
+$encrypted   = webpush_encrypt_payload('{"title":"Test"}', $validP256dh, $validAuth);
+assert(!empty($encrypted['body']), 'Encrypted body must not be empty');
+assert(!empty($encrypted['salt']) && strlen($encrypted['salt']) === 16, 'Salt must be 16 bytes');
+echo "✔ VAPID key auto-generation and payload encryption passed.\n";
+
 echo "All Mobile API tests passed successfully!\n";
 
