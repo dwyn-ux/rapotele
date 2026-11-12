@@ -181,7 +181,17 @@ function app_handle_post_request(): void
 
 function app_dispatch_request(): void
 {
-    $page = (string)($_GET['page'] ?? 'dashboard');
+    $page = (string)($_GET['page'] ?? '');
+
+    // Fallback jika webserver (Nginx/rewrite) meneruskan request /api ke index.php
+    $uriPath = parse_url((string)($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?? '';
+    if ($page === 'api' || str_ends_with($uriPath, '/api')) {
+        require_once dirname(__DIR__) . '/Api/mobile.php';
+        mobile_api_dispatch();
+        return;
+    }
+
+    $page = $page !== '' ? $page : 'dashboard';
 
     try {
         if ($page === 'install') {

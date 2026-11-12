@@ -1770,7 +1770,7 @@ function page_profile(): void
             try {
                 const tokenMeta = document.querySelector('meta[name="api-token"]');
                 const headers   = tokenMeta ? { 'X-Auth-Token': tokenMeta.content } : {};
-                const resp = await fetch('<?= e(app_url('api?action=send_push_test')) ?>', { method: 'POST', headers });
+                const resp = await fetch('<?= e(app_url('api.php?action=send_push_test')) ?>', { method: 'POST', headers });
                 const data = await resp.json().catch(() => ({ ok: false, message: 'Respon server tidak valid' }));
                 showInfo(data.ok ? '✅ ' + data.message : '❌ ' + (data.message || 'Gagal mengirim notifikasi test.'), !data.ok);
             } catch (e) {
@@ -1793,7 +1793,7 @@ function page_profile(): void
                     body.append('endpoint', ep);
                     const tokenMeta = document.querySelector('meta[name="api-token"]');
                     const headers   = tokenMeta ? { 'X-Auth-Token': tokenMeta.content } : {};
-                    await fetch('<?= e(app_url('api?action=delete_push_subscription')) ?>', { method: 'POST', headers, body });
+                    await fetch('<?= e(app_url('api.php?action=delete_push_subscription')) ?>', { method: 'POST', headers, body });
                 }
                 localStorage.removeItem('eraport_push_subscribed');
                 sessionStorage.removeItem('eraport_push_subscribed');

@@ -131,11 +131,13 @@ function mobile_api_require_auth(): array
 
 function mobile_api_response(bool $ok, array $data = [], string $message = '', int $statusCode = 200): void
 {
-    http_response_code($statusCode);
-    header('Content-Type: application/json; charset=utf-8');
-    header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Auth-Token, X-Requested-With');
+    if (!headers_sent()) {
+        http_response_code($statusCode);
+        header('Content-Type: application/json; charset=utf-8');
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Auth-Token, X-Requested-With');
+    }
 
     $payload = array_merge([
         'ok' => $ok,
@@ -143,7 +145,9 @@ function mobile_api_response(bool $ok, array $data = [], string $message = '', i
     ], $data);
 
     echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    exit;
+    if (!defined('TEST_SUITE_RUNNING')) {
+        exit;
+    }
 }
 
 function mobile_api_school_profile(): array
@@ -1595,9 +1599,11 @@ function mobile_api_handle_vapid_public_key(): void
     // Endpoint publik (tidak butuh auth) agar SW bisa ambil key sebelum login
     require_once dirname(__DIR__) . '/Services/webpush.php';
 
-    $publicKey = webpush_vapid_public_key();
+    $error = null;
+    $publicKey = webpush_vapid_public_key($error);
     if ($publicKey === '') {
-        mobile_api_response(false, ['vapid_public_key' => ''], 'Kunci VAPID belum siap di server.', 500);
+        $msg = 'Kunci VAPID belum siap di server' . ($error ? ': ' . $error : '.');
+        mobile_api_response(false, ['vapid_public_key' => ''], $msg, 500);
     }
     mobile_api_response(true, ['vapid_public_key' => $publicKey], '');
 }
@@ -1614,6 +1620,9 @@ function mobile_api_handle_save_push_subscription(): void
         mobile_api_response(false, [], 'endpoint, p256dh, dan auth wajib diisi.', 422);
     }
 
+    if (!table_exists('push_subscriptions') && function_exists('run_migrations')) {
+        run_migrations();
+    }
     if (!table_exists('push_subscriptions')) {
         mobile_api_response(false, [], 'Tabel push_subscriptions belum ada. Jalankan install.php.', 503);
     }

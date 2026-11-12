@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+define('TEST_SUITE_RUNNING', true);
+
 require_once dirname(__DIR__) . '/app/bootstrap.php';
 require_once dirname(__DIR__) . '/app/Api/mobile.php';
 
@@ -67,6 +69,17 @@ $encrypted   = webpush_encrypt_payload('{"title":"Test"}', $validP256dh, $validA
 assert(!empty($encrypted['body']), 'Encrypted body must not be empty');
 assert(!empty($encrypted['salt']) && strlen($encrypted['salt']) === 16, 'Salt must be 16 bytes');
 echo "✔ VAPID key auto-generation and payload encryption passed.\n";
+
+// 7. Test VAPID public key API dispatch
+$_GET['action'] = 'vapid_public_key';
+$_SERVER['REQUEST_METHOD'] = 'GET';
+ob_start();
+mobile_api_handle_vapid_public_key();
+$output = ob_get_clean();
+$decoded = json_decode((string)$output, true);
+assert(is_array($decoded) && ($decoded['ok'] ?? false) === true, 'VAPID public key API endpoint should return ok: true');
+assert(!empty($decoded['vapid_public_key']), 'VAPID endpoint should return non-empty vapid_public_key');
+echo "✔ VAPID endpoint JSON dispatch passed.\n";
 
 echo "All Mobile API tests passed successfully!\n";
 

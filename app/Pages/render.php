@@ -394,8 +394,8 @@ function render_footer(): void
         'use strict';
         if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
 
-        const VAPID_KEY_URL  = '<?= e(app_url('api?action=vapid_public_key')) ?>';
-        const SUB_SAVE_URL   = '<?= e(app_url('api?action=save_push_subscription')) ?>';
+        const VAPID_KEY_URL  = '<?= e(app_url('api.php?action=vapid_public_key')) ?>';
+        const SUB_SAVE_URL   = '<?= e(app_url('api.php?action=save_push_subscription')) ?>';
         const TOKEN_KEY      = 'eraport_push_subscribed';
 
         function urlBase64ToUint8Array(base64String) {
@@ -410,13 +410,13 @@ function render_footer(): void
 
             // Ambil VAPID public key dari server
             const keyResp = await fetch(VAPID_KEY_URL);
-            if (!keyResp.ok) {
-                return { ok: false, message: 'Gagal mengambil kunci VAPID dari server.' };
-            }
             const keyData = await keyResp.json().catch(() => ({}));
+            if (!keyResp.ok || keyData.ok === false) {
+                return { ok: false, message: keyData.message || ('Gagal mengambil kunci VAPID dari server (HTTP ' + keyResp.status + ').') };
+            }
             const vapidKey = keyData.vapid_public_key;
             if (!vapidKey) {
-                return { ok: false, message: 'Kunci VAPID belum siap di server.' };
+                return { ok: false, message: keyData.message || 'Kunci VAPID belum siap di server.' };
             }
 
             // Cek apakah sudah punya subscription atau buat baru

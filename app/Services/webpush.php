@@ -31,7 +31,7 @@ function webpush_openssl_config_path(): ?string
     return $cached;
 }
 
-function webpush_vapid_public_key(): string
+function webpush_vapid_public_key(?string &$error = null): string
 {
     $key = (string)get_app_setting('vapid_public_key', '');
     if ($key === '') {
@@ -39,6 +39,7 @@ function webpush_vapid_public_key(): string
             $generated = webpush_generate_vapid_keys();
             return (string)($generated['public'] ?? '');
         } catch (Throwable $e) {
+            $error = $e->getMessage();
             log_exception($e);
             return '';
         }
@@ -46,7 +47,7 @@ function webpush_vapid_public_key(): string
     return $key;
 }
 
-function webpush_vapid_private_key(): string
+function webpush_vapid_private_key(?string &$error = null): string
 {
     $key = (string)get_app_setting('vapid_private_key', '');
     if ($key === '') {
@@ -54,6 +55,7 @@ function webpush_vapid_private_key(): string
             $generated = webpush_generate_vapid_keys();
             return (string)($generated['private'] ?? '');
         } catch (Throwable $e) {
+            $error = $e->getMessage();
             log_exception($e);
             return '';
         }
@@ -71,19 +73,29 @@ function webpush_generate_vapid_keys(): array
         throw new RuntimeException('Extension openssl diperlukan untuk VAPID.');
     }
 
-    $cnf = webpush_openssl_config_path();
+    if (!table_exists('app_settings') && function_exists('run_migrations')) {
+        run_migrations();
+    }
+
     $configArgs = [
         'curve_name'       => 'prime256v1',
         'private_key_type' => OPENSSL_KEYTYPE_EC,
     ];
-    if ($cnf) {
-        $configArgs['config'] = $cnf;
+
+    // Coba tanpa config khusus terlebih dahulu (default di Linux/macOS)
+    $key = @openssl_pkey_new($configArgs);
+
+    // Fallback jika gagal (misalnya di Windows tanpa openssl.cnf bawaan)
+    if ($key === false) {
+        $cnf = webpush_openssl_config_path();
+        if ($cnf) {
+            $configArgs['config'] = $cnf;
+            $key = @openssl_pkey_new($configArgs);
+        }
     }
 
-    $key = openssl_pkey_new($configArgs);
-
     if ($key === false) {
-        throw new RuntimeException('Gagal generate EC key: ' . openssl_error_string());
+        throw new RuntimeException('Gagal generate EC key: ' . (openssl_error_string() ?: 'openssl_pkey_new returned false'));
     }
 
     $details = openssl_pkey_get_details($key);
@@ -96,17 +108,20 @@ function webpush_generate_vapid_keys(): array
     $y   = str_pad((string)$details['ec']['y'], 32, "\x00", STR_PAD_LEFT);
     $pub = "\x04" . $x . $y;
 
-    $exportArgs = [];
-    if ($cnf) {
-        $exportArgs['config'] = $cnf;
+    $privPem = '';
+    $exported = @openssl_pkey_export($key, $privPem);
+    if (!$exported || empty($privPem)) {
+        $cnf = webpush_openssl_config_path();
+        $exportArgs = $cnf ? ['config' => $cnf] : [];
+        @openssl_pkey_export($key, $privPem, null, $exportArgs);
     }
-    openssl_pkey_export($key, $privPem, null, $exportArgs);
+
     if (empty($privPem)) {
-        throw new RuntimeException('Gagal export private key: ' . openssl_error_string());
+        throw new RuntimeException('Gagal export private key: ' . (openssl_error_string() ?: 'openssl_pkey_export returned empty'));
     }
 
     $publicKey  = webpush_base64url_encode($pub);
-    $privateKey = webpush_base64url_encode($privPem);  // simpan PEM agar mudah dipakai
+    $privateKey = webpush_base64url_encode($privPem);
 
     set_app_setting('vapid_public_key', $publicKey);
     set_app_setting('vapid_private_key', $privateKey);
@@ -187,15 +202,18 @@ function webpush_der_to_raw_signature(string $der): string
  */
 function webpush_encrypt_payload(string $payload, string $p256dh, string $auth): array
 {
-    $salt       = random_bytes(16);
-    $cnf        = webpush_openssl_config_path();
-    $keyArgs    = ['curve_name' => 'prime256v1', 'private_key_type' => OPENSSL_KEYTYPE_EC];
-    if ($cnf) {
-        $keyArgs['config'] = $cnf;
-    }
-    $serverKey  = openssl_pkey_new($keyArgs);
+    $salt    = random_bytes(16);
+    $keyArgs = ['curve_name' => 'prime256v1', 'private_key_type' => OPENSSL_KEYTYPE_EC];
+    $serverKey = @openssl_pkey_new($keyArgs);
     if ($serverKey === false) {
-        throw new RuntimeException('Gagal generate server EC key: ' . openssl_error_string());
+        $cnf = webpush_openssl_config_path();
+        if ($cnf) {
+            $keyArgs['config'] = $cnf;
+            $serverKey = @openssl_pkey_new($keyArgs);
+        }
+    }
+    if ($serverKey === false) {
+        throw new RuntimeException('Gagal generate server EC key: ' . (openssl_error_string() ?: 'openssl_pkey_new returned false'));
     }
     $serverDetails = openssl_pkey_get_details($serverKey);
     if ($serverDetails === false || !isset($serverDetails['ec'])) {

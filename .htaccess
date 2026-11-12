@@ -13,6 +13,8 @@ DirectoryIndex public/index.php index.php
     RewriteRule ^(index|install|media|telegram_webhook|schedule_reminders|whatsapp_weekly|api|pwa-icon|manifest)\.php$ public/$1.php [L]
     RewriteRule ^(sw\.js|manifest\.json|offline\.html|icon-.*\.png|apple-touch-icon.*\.png|favicon\.ico)$ public/$1 [L]
 
+    RewriteRule ^api/?$ public/api.php [QSA,L]
+
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^ public/index.php [L]
